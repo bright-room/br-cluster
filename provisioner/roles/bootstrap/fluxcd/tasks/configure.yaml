@@ -1,0 +1,4 @@
+---
+- name: Apply cluster-settings ConfigMap
+  command: >
+    kubectl apply -k {{ fluxcd_cluster_config }}

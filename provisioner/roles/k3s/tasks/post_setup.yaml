@@ -1,0 +1,23 @@
+---
+- name: Label k3s worker nodes
+  command:
+    cmd: "kubectl label nodes {{ item }} kubernetes.io/role=worker"
+  environment:
+    KUBECONFIG: "{{ k3s.config_dir }}/k3s.yaml"
+  with_items: "{{ groups['worker'] }}"
+  run_once: true
+  ignore_errors: true
+
+- name: Get k3s config file
+  run_once: true
+  slurp:
+    src: "{{ k3s.config_dir }}/k3s.yaml"
+  register: kube_config_base64
+
+- name: Write Kubernetes config file with the correct cluster address
+  copy:
+    content: "{{ kube_config_base64.content | b64decode | replace('127.0.0.1', k3s_api_vip_domain) }}"
+    dest: "/.secret/config"
+    mode: "0644"
+  delegate_to: localhost
+  run_once: true

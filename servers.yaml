@@ -1,0 +1,21 @@
+environments:
+  - dev
+  - prod
+
+servers:
+  - name: br-gateway1
+    type: gateway
+  - name: br-external1
+    type: external
+  - name: br-node1
+    type: node
+  - name: br-node2
+    type: node
+  - name: br-node3
+    type: node
+  - name: br-node4
+    type: node
+  - name: br-node5
+    type: node
+  - name: br-node6
+    type: node

@@ -1,0 +1,30 @@
+---
+- name: Start k3s cluster - Masters
+  hosts: master
+  gather_facts: false
+  become: true
+  serial: 1
+  tasks:
+    - name: Start k3s server
+      systemd:
+        name: k3s
+        state: started
+      tags: [k3s]
+
+    - name: Wait for k3s API server to be available
+      wait_for:
+        port: 6443
+        host: "127.0.0.1"
+        timeout: 120
+      tags: [k3s]
+
+- name: Start k3s cluster - Workers
+  hosts: worker
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Start k3s agent
+      systemd:
+        name: k3s-agent
+        state: started
+      tags: [k3s]

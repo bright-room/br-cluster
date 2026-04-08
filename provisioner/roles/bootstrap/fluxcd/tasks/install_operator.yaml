@@ -1,0 +1,27 @@
+---
+- name: Check if Flux Operator Helm release exists
+  command: helm status flux-operator -n {{ fluxcd_namespace }}
+  register: flux_operator_status
+  failed_when: false
+  changed_when: false
+
+- name: Install Flux Operator via Helm (bootstrap only)
+  command: >
+    helm install flux-operator
+    oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator
+    --version {{ fluxcd_operator_version }}
+    --namespace {{ fluxcd_namespace }}
+    --create-namespace
+    --values {{ fluxcd_operator_values_base }}
+    --values {{ fluxcd_operator_values_overlay }}
+  register: flux_operator_apply
+  when: flux_operator_status.rc != 0
+  changed_when: "'STATUS: deployed' in flux_operator_apply.stdout"
+
+- name: Wait for Flux Operator to be ready
+  command: >
+    kubectl rollout status deployment/flux-operator -n {{ fluxcd_namespace }} --timeout=600s
+  retries: 10
+  delay: 15
+  register: flux_operator_rollout
+  until: flux_operator_rollout.rc == 0

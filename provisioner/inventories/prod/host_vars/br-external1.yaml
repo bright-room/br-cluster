@@ -1,0 +1,55 @@
+---
+##################################
+# Ansible configuration
+##################################
+hostname: "br-external1"
+
+##################################
+# External disk configuration
+# Garage (オブジェクトストレージ) / Restic (バックアップ) が使用する
+##################################
+volume_group: "vg_external"
+logical_volume: "lv_external"
+
+
+##################################
+# Let's Encrypt configuration
+##################################
+lets_encrypt:
+  virtual_environment: /lets_encrypt
+  certificate_dir: /etc/letsencrypt/live
+  deploy_hook_dir: /etc/letsencrypt/renewal-hooks/deploy
+
+##################################
+# Garage S3 configuration
+##################################
+garage:
+  data_dir: /storage/garage/data
+  meta_dir: /storage/garage/meta
+  config_dir: /etc/garage
+  ssl_dir: /etc/garage/ssl
+  capacity: 1T
+  server:
+    s3_port: 3900
+    rpc_port: 3901
+    web_port: 3902
+    admin_port: 3903
+  operator:
+    user: garage
+    group: garage
+  provisioning:
+    region: ap-northeast-1
+    buckets:
+      - name: restic
+      - name: k3s-longhorn
+      - name: k3s-barman
+    users:
+      - name: restic
+        bucket_acl:
+          bucket_name: restic
+      - name: longhorn
+        bucket_acl:
+          bucket_name: k3s-longhorn
+      - name: barman
+        bucket_acl:
+          bucket_name: k3s-barman

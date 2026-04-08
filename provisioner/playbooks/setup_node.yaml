@@ -1,0 +1,147 @@
+---
+# Play 1: Install k3s on master nodes
+- name: Configure master nodes
+  hosts: master
+  tags: [master]
+  gather_facts: true
+  become: true
+
+  collections:
+    - onepassword.connect
+
+  environment:
+    OP_CONNECT_TOKEN: "{{ lookup('env', 'OP_CONNECT_TOKEN') }}"
+    OP_CONNECT_HOST: "{{ lookup('env', 'OP_CONNECT_HOST') }}"
+
+  pre_tasks:
+    - name: Package update
+      include_tasks: ../tasks/update.yaml
+      tags: [always]
+
+  roles:
+    - name: Fetch required secrets
+      role: secrets
+      vars:
+        required_secrets:
+          - k3s_token
+      tags: [always]
+
+    - name: Common system configuration
+      role: common
+      tags: [system]
+
+    - name: k3s cluster setup
+      role: k3s
+      tags: [k3s]
+
+# Play 2: Bootstrap CNI, CoreDNS, and kube-vip on primary master
+- name: Bootstrap cluster networking
+  hosts: primary
+  gather_facts: true
+  become: true
+  tags: [bootstrap]
+
+  environment:
+    KUBECONFIG: "{{ k3s.config_dir }}/k3s.yaml"
+
+  pre_tasks:
+    - name: Wait for Kubernetes API
+      wait_for:
+        port: 6443
+        host: localhost
+        delay: 5
+        timeout: 120
+
+    - name: Install helm binary
+      include_tasks: ../roles/k3s/tasks/install_helm.yaml
+
+    - name: Copy bootstrap manifests to primary master
+      copy:
+        src: "/manifests/platform/{{ item }}/"
+        dest: "/tmp/bootstrap-manifests/platform/{{ item }}/"
+      loop:
+        - cilium
+        - coredns
+        - kube-vip
+
+  roles:
+    - role: bootstrap/cilium
+      tags: [cilium]
+      vars:
+        cilium_values_base: /tmp/bootstrap-manifests/platform/cilium/app/base/values.yaml
+        cilium_values_overlay: /tmp/bootstrap-manifests/platform/cilium/app/overlays/prod/values.yaml
+        cilium_config_overlay: /tmp/bootstrap-manifests/platform/cilium/config/overlays/prod
+
+    - role: bootstrap/coredns
+      tags: [coredns]
+      vars:
+        coredns_values_base: /tmp/bootstrap-manifests/platform/coredns/app/base/values.yaml
+        coredns_values_overlay: /tmp/bootstrap-manifests/platform/coredns/app/overlays/prod/values.yaml
+
+    - role: bootstrap/kube_vip
+      tags: [kube-vip]
+      vars:
+        kube_vip_values_base: /tmp/bootstrap-manifests/platform/kube-vip/app/base/values.yaml
+        kube_vip_values_overlay: /tmp/bootstrap-manifests/platform/kube-vip/app/overlays/prod/values.yaml
+
+# Play 3: Install k3s on worker nodes
+- name: Configure worker nodes
+  hosts: worker
+  tags: [worker]
+  gather_facts: true
+  become: true
+
+  collections:
+    - onepassword.connect
+
+  environment:
+    OP_CONNECT_TOKEN: "{{ lookup('env', 'OP_CONNECT_TOKEN') }}"
+    OP_CONNECT_HOST: "{{ lookup('env', 'OP_CONNECT_HOST') }}"
+
+  pre_tasks:
+    - name: Package update
+      include_tasks: ../tasks/update.yaml
+      tags: [always]
+
+    - name: Setup initialize disk
+      include_tasks: ../tasks/init_disk.yaml
+      tags: [system]
+
+  roles:
+    - name: Fetch required secrets
+      role: secrets
+      vars:
+        required_secrets:
+          - k3s_token
+      tags: [always]
+
+    - name: Common system configuration
+      role: common
+      tags: [system]
+
+    - name: k3s cluster setup
+      role: k3s
+      tags: [k3s]
+
+# Play 4: Post setup (labels and kubeconfig with VIP domain)
+- name: Post setup
+  hosts: master
+  gather_facts: false
+  become: true
+  tags: [post_setup]
+  tasks:
+    - name: Wait for worker nodes to join the cluster
+      command:
+        cmd: "kubectl get node {{ item }}"
+      environment:
+        KUBECONFIG: "{{ k3s.config_dir }}/k3s.yaml"
+      with_items: "{{ groups['worker'] }}"
+      run_once: true
+      register: node_check
+      until: node_check.rc == 0
+      retries: 30
+      delay: 5
+      changed_when: false
+
+    - name: Run post setup tasks
+      include_tasks: ../roles/k3s/tasks/post_setup.yaml

@@ -1,0 +1,27 @@
+---
+- name: Check if CoreDNS Helm release exists
+  command: helm status coredns -n {{ coredns_namespace }}
+  register: coredns_status
+  failed_when: false
+  changed_when: false
+
+- name: Install CoreDNS via Helm (bootstrap only)
+  command: >
+    helm install coredns coredns
+    --repo https://coredns.github.io/helm
+    --version {{ coredns_version }}
+    --namespace {{ coredns_namespace }}
+    --set service.clusterIP={{ coredns_cluster_ip }}
+    --values {{ coredns_values_base }}
+    --values {{ coredns_values_overlay }}
+  register: coredns_apply
+  when: coredns_status.rc != 0
+  changed_when: "'STATUS: deployed' in coredns_apply.stdout"
+
+- name: Wait for CoreDNS to be ready
+  command: >
+    kubectl rollout status deployment/coredns -n {{ coredns_namespace }} --timeout=600s
+  retries: 10
+  delay: 15
+  register: coredns_rollout
+  until: coredns_rollout.rc == 0

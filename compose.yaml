@@ -1,0 +1,35 @@
+services:
+  op-connect-api:
+    image: 1password/connect-api:latest
+    hostname: ${ENV}-op-connect-api
+    environment:
+      OP_SESSION: ${OP_SESSION}
+    volumes:
+      - op-data:/home/opuser/.op/data
+
+  op-connect-sync:
+    image: 1password/connect-sync:latest
+    hostname: ${ENV}-op-connect-sync
+    environment:
+      OP_SESSION: ${OP_SESSION}
+    volumes:
+      - op-data:/home/opuser/.op/data
+
+  ansible-runner:
+    build:
+      context: ./docker
+    hostname: ${ENV}-ansible-runner
+    environment:
+      SSH_AUTH_SOCK: /ssh-agent.sock
+      OP_CONNECT_TOKEN: ${OP_CONNECT_TOKEN}
+      OP_CONNECT_HOST: http://${ENV}-op-connect-api:8080
+    volumes:
+      - ${SSH_AUTH_SOCK}:/ssh-agent.sock
+      - ./provisioner:/ansible
+      - ./manifests:/manifests:ro
+      - ./.secret/${ENV}:/.secret
+      - ./.kube/${ENV}:/root/.kube
+    tty: true
+
+volumes:
+  op-data:

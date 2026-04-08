@@ -1,0 +1,43 @@
+---
+- name: Check if Flux Instance Helm release exists
+  command: helm status flux-instance -n {{ fluxcd_namespace }}
+  register: flux_instance_status
+  failed_when: false
+  changed_when: false
+
+- name: Install Flux Instance via Helm (bootstrap only)
+  command: >
+    helm install flux-instance
+    oci://ghcr.io/controlplaneio-fluxcd/charts/flux-instance
+    --version {{ fluxcd_instance_version }}
+    --namespace {{ fluxcd_namespace }}
+    --values {{ fluxcd_instance_values_base }}
+    --values {{ fluxcd_instance_values_overlay }}
+  register: flux_instance_apply
+  when: flux_instance_status.rc != 0
+  changed_when: "'STATUS: deployed' in flux_instance_apply.stdout"
+
+- name: Wait for Flux source-controller to be ready
+  command: >
+    kubectl rollout status deployment/source-controller -n {{ fluxcd_namespace }} --timeout=600s
+  retries: 10
+  delay: 15
+  register: source_controller_rollout
+  until: source_controller_rollout.rc == 0
+
+- name: Wait for Flux kustomize-controller to be ready
+  command: >
+    kubectl rollout status deployment/kustomize-controller -n {{ fluxcd_namespace }} --timeout=600s
+  retries: 10
+  delay: 15
+  register: kustomize_controller_rollout
+  until: kustomize_controller_rollout.rc == 0
+
+- name: Display Flux status
+  command: kubectl get pods -n {{ fluxcd_namespace }}
+  register: flux_status
+  changed_when: false
+
+- name: Show Flux pods
+  debug:
+    msg: "{{ flux_status.stdout_lines }}"

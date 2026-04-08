@@ -1,0 +1,3 @@
+---
+- name: Install kube-vip
+  include_tasks: install.yaml

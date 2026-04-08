@@ -1,0 +1,6 @@
+---
+coredns_version: "1.36.1"
+coredns_namespace: kube-system
+coredns_cluster_ip: "10.43.0.10"
+coredns_values_base: /manifests/platform/coredns/app/base/values.yaml
+coredns_values_overlay: /manifests/platform/coredns/app/overlays/prod/values.yaml

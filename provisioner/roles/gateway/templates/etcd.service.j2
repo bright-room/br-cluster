@@ -1,0 +1,25 @@
+[Unit]
+Description=etcd key-value store
+Documentation=https://github.com/etcd-io/etcd
+After=network.target
+
+[Service]
+Type=notify
+ExecStart={{ install_dir }}/etcd \
+    --data-dir=/var/lib/etcd \
+    --listen-client-urls=http://127.0.0.1:2379 \
+    --advertise-client-urls=http://127.0.0.1:2379 \
+    --listen-peer-urls=http://127.0.0.1:2380 \
+    --initial-advertise-peer-urls=http://127.0.0.1:2380 \
+    --initial-cluster=default=http://127.0.0.1:2380 \
+    --initial-cluster-token=tkn \
+    --initial-cluster-state=new \
+    --log-level=info \
+    --logger=zap \
+    --log-outputs=stderr
+Restart=always
+RestartSec=10s
+LimitNOFILE=40000
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,32 @@
+---
+- name: Set platform and architecture facts
+  set_fact:
+    helm_platform: "{{ ansible_facts['system'] | lower }}"
+    helm_arch: >-
+      {{
+        'amd64' if ansible_facts['architecture'] in ['x86_64', 'amd64'] else
+        'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64'] else
+        ansible_facts['architecture']
+      }}
+
+- name: Check if helm binary exists
+  stat:
+    path: /usr/local/bin/helm
+  register: helm_check
+
+- name: Install helm
+  block:
+    - name: Download and extract helm binary
+      unarchive:
+        src: "https://get.helm.sh/helm-{{ versions.helm }}-{{ helm_platform }}-{{ helm_arch }}.tar.gz"
+        dest: /tmp
+        remote_src: true
+        mode: "0755"
+
+    - name: Copy helm binary
+      copy:
+        src: "/tmp/{{ helm_platform }}-{{ helm_arch }}/helm"
+        dest: /usr/local/bin/helm
+        mode: "0755"
+        remote_src: true
+  when: not helm_check.stat.exists

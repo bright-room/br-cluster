@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - cert-manager-app.yaml
+  - cilium-app.yaml
+  - coredns-app.yaml
+  - csi-external-snapshotter-app.yaml
+  - external-secrets-app.yaml
+  - flux-app.yaml
+  - kube-vip-app.yaml
+  - longhorn-app.yaml
+  - onepassword-connect-app.yaml

@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+source {{ restic.config_dir }}/restic_common.sh
+
+echo "$(timestamp): restic-backup started" | tee -a ${LOG_FILE}
+echo "-------------------------------------------------------------------------------" | tee -a ${LOG_FILE}
+
+{% for backup_dir in restic_config.environment.backup_dirs %}
+
+echo "$(timestamp):  Directory {{ backup_dir.path }} backup started" | tee -a ${LOG_FILE}
+
+${RESTIC} backup {{ backup_dir.path }} \
+{% if backup_dir.exclude is defined %}
+{% for exclude in backup_dir.exclude %}
+    --exclude {{ exclude.pattern }} \
+{% endfor %}
+{% endif %}
+    2>&1 | tee -a ${LOG_FILE}
+
+printf "\n" | tee -a ${LOG_FILE}
+{% endfor %}
+
+echo "-------------------------------------------------------------------------------" | tee -a ${LOG_FILE}
+echo "$(timestamp): restic-backup finished" | tee -a ${LOG_FILE}
+printf "\n" | tee -a ${LOG_FILE}
+
+exit 0

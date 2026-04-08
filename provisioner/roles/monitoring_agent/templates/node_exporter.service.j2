@@ -1,0 +1,15 @@
+[Unit]
+Description=Prometheus Node Exporter
+Documentation=https://prometheus.io/docs/guides/node-exporter/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart={{ install_dir }}/node_exporter \
+  --web.listen-address=:{{ node_exporter.port }}
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

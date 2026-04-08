@@ -1,0 +1,6 @@
+---
+node_exporter:
+  port: 9100
+
+fluent_bit:
+  port: 2020

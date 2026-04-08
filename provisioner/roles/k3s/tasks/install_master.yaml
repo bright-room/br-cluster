@@ -1,0 +1,78 @@
+---
+- name: Install primary master
+  block:
+    - name: Download k3s installation script
+      get_url:
+        url: https://get.k3s.io
+        dest: "{{ tmp_dir }}/k3s_install.sh"
+        mode: "0755"
+
+    - name: Install k3s server
+      command:
+        cmd: "{{ tmp_dir }}/k3s_install.sh server"
+      environment:
+        INSTALL_K3S_VERSION: "{{ versions.k3s }}"
+      register: k3s_install
+      changed_when: k3s_install.rc == 0
+
+    - name: Create .kube directory
+      file:
+        path: "/home/{{ ansible_user }}/.kube"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0750"
+        state: directory
+
+    - name: Copy k3s kubeconfig
+      copy:
+        src: "{{ k3s.config_dir }}/k3s.yaml"
+        dest: "/home/{{ ansible_user }}/.kube/config"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0600"
+        remote_src: true
+
+  when: is_primary_control_node | bool
+
+- name: Install secondary masters
+  block:
+    - name: Wait for primary master
+      wait_for:
+        host: "{{ primary_control_node_ip }}"
+        port: "{{ k3s.cluster.port }}"
+        delay: 5
+        sleep: 5
+        timeout: 300
+
+    - name: Download k3s installation script
+      get_url:
+        url: https://get.k3s.io
+        dest: "{{ tmp_dir }}/k3s_install.sh"
+        mode: "0755"
+
+    - name: Install k3s server (secondary)
+      command:
+        cmd: "{{ tmp_dir }}/k3s_install.sh server"
+      environment:
+        INSTALL_K3S_VERSION: "{{ versions.k3s }}"
+      register: k3s_install
+      changed_when: k3s_install.rc == 0
+
+    - name: Create .kube directory
+      file:
+        path: "/home/{{ ansible_user }}/.kube"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0750"
+        state: directory
+
+    - name: Copy k3s kubeconfig
+      copy:
+        src: "{{ k3s.config_dir }}/k3s.yaml"
+        dest: "/home/{{ ansible_user }}/.kube/config"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0600"
+        remote_src: true
+  throttle: 1
+  when: not (is_primary_control_node | bool)

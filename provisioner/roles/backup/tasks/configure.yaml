@@ -1,0 +1,28 @@
+---
+- name: Create restic directories
+  file:
+    path: "{{ restic.config_dir }}"
+    state: directory
+    owner: "{{ restic.operator.user }}"
+    group: "{{ restic.operator.group }}"
+    mode: "0750"
+
+- name: Copy scripts
+  template:
+    src: "{{ item.script }}.j2"
+    dest: "{{ restic.config_dir }}/{{ item.script }}"
+    owner: "{{ restic.operator.user }}"
+    group: "{{ restic.operator.group }}"
+    mode: "0755"
+  with_items:
+    - script: "restic_common.sh"
+    - script: "restic_init.sh"
+    - script: "restic_backup.sh"
+    - script: "restic_clean.sh"
+
+- name: Initialize restic repository
+  command:
+    cmd: "bash {{ restic.config_dir }}/restic_init.sh"
+  run_once: true
+  register: restic_init
+  changed_when: '"Initializing it...." in restic_init.stdout'

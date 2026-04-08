@@ -1,0 +1,12 @@
+---
+- name: Create buckets
+  command: >
+    garage -c {{ garage.config_dir }}/garage.toml bucket create {{ item.name }}
+  with_items: "{{ garage.provisioning.buckets }}"
+  register: bucket_create
+  changed_when: '"has been created" in bucket_create.stdout'
+  failed_when:
+    - bucket_create.rc != 0
+    - '"already exists" not in bucket_create.stderr'
+  environment:
+    GARAGE_CONFIG_FILE: "{{ garage.config_dir }}/garage.toml"

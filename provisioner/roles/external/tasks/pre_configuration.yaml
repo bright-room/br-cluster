@@ -1,0 +1,5 @@
+---
+- name: Install external prerequisite packages
+  apt:
+    name: "{{ external_packages }}"
+    state: present

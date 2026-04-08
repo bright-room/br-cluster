@@ -1,0 +1,14 @@
+---
+roles:
+  - name: ipr-cnrs.nftables
+    version: v2.2.6
+
+collections:
+  - name: community.general
+    version: 12.5.0
+  - name: ansible.posix
+    version: 2.1.0
+  - name: onepassword.connect
+    version: 2.3.0
+  - name: kubernetes.core
+    version: 6.3.0

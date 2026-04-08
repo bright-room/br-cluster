@@ -1,0 +1,12 @@
+# kube-vip helm values (prod overlay)
+env:
+  vip_interface: "eth0"
+  enable_node_labeling: "true"
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 500Mi
+  requests:
+    cpu: 100m
+    memory: 100Mi

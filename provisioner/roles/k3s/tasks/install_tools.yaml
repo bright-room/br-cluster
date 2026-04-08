@@ -1,0 +1,30 @@
+---
+- name: Get system architecture
+  command: dpkg --print-architecture
+  register: system_arch
+  changed_when: false
+
+# --- kubectl ---
+- name: Check if kubectl binary exists
+  stat:
+    path: "{{ install_dir }}/kubectl"
+  register: kubectl_check
+
+- name: Install kubectl
+  block:
+    - name: Download kubectl binary
+      get_url:
+        url: "https://dl.k8s.io/release/{{ versions.kubectl }}/bin/linux/{{ system_arch.stdout }}/kubectl"
+        dest: "{{ install_dir }}/kubectl"
+        mode: "0755"
+
+    - name: Download kubectl checksum
+      get_url:
+        url: "https://dl.k8s.io/release/{{ versions.kubectl }}/bin/linux/{{ system_arch.stdout }}/kubectl.sha256"
+        dest: "{{ tmp_dir }}/kubectl.sha256"
+        mode: "0644"
+
+    - name: Verify kubectl checksum
+      shell: "echo \"$(cat {{ tmp_dir }}/kubectl.sha256)  {{ install_dir }}/kubectl\" | sha256sum --check"
+      changed_when: false
+  when: not kubectl_check.stat.exists

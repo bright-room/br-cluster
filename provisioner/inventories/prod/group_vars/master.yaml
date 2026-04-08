@@ -1,0 +1,3 @@
+---
+# Master node specific defaults
+# Primary control node is determined by inventory group 'primary'

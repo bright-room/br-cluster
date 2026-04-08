@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+source {{ restic.config_dir }}/restic_common.sh
+
+echo "$(timestamp): Repository initialize started" | tee -a ${LOG_FILE}
+echo "-------------------------------------------------------------------------------" | tee -a ${LOG_FILE}
+
+if ${RESTIC} cat config >/dev/null 2>&1; then
+  echo "Repo ${RESTIC_REPOSITORY} already initialized"  | tee -a ${LOG_FILE}
+  exit 0
+fi
+
+echo "Repo ${RESTIC_REPOSITORY} is not initilized. Initializing it...." | tee -a ${LOG_FILE}
+${RESTIC} init 2>&1 | tee -a ${LOG_FILE}
+
+echo "-------------------------------------------------------------------------------" | tee -a ${LOG_FILE}
+echo "$(timestamp): Repository initialize finished" | tee -a ${LOG_FILE}
+printf "\n" | tee -a ${LOG_FILE}
+
+exit 0

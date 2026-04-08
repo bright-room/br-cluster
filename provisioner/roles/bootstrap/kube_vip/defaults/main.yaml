@@ -1,0 +1,6 @@
+---
+kube_vip_version: "0.9.8"
+kube_vip_namespace: kube-system
+kube_vip_address: "{{ (cluster_vips | selectattr('name', 'equalto', 'k8s-api') | first).ip }}"
+kube_vip_values_base: /manifests/platform/kube-vip/app/base/values.yaml
+kube_vip_values_overlay: /manifests/platform/kube-vip/app/overlays/prod/values.yaml

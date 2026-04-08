@@ -1,0 +1,4 @@
+---
+gateway_packages:
+  - netfilter-persistent
+  - iptables-persistent

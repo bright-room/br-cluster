@@ -1,0 +1,9 @@
+---
+hostname: "br-node4"
+
+##################################
+# External disk configuration
+# Longhorn (k3s) が Pod のストレージとして使用する
+##################################
+volume_group: "vg_node"
+logical_volume: "lv_node"

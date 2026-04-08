@@ -1,0 +1,69 @@
+CanonicalizeHostname yes
+Include ~/.ssh/1Password/config
+
+Host *
+  StrictHostKeyChecking accept-new
+  UserKnownHostsFile /root/.ssh/known_hosts
+
+Host br-gateway1
+  HostName 192.168.2.50
+  Port 22
+  User bradmin
+  IdentitiesOnly yes
+  IdentityFile /root/.ssh/keys/br-gateway1.pub
+
+Host br-node1
+  HostName 172.22.10.10
+  Port 22
+  User bradmin
+  ProxyJump br-gateway1
+  IdentitiesOnly yes
+  IdentityFile /root/.ssh/keys/br-node1.pub
+
+Host br-node2
+  HostName 172.22.10.11
+  Port 22
+  User bradmin
+  ProxyJump br-gateway1
+  IdentitiesOnly yes
+  IdentityFile /root/.ssh/keys/br-node2.pub
+
+Host br-node3
+  HostName 172.22.10.12
+  Port 22
+  User bradmin
+  ProxyJump br-gateway1
+  IdentitiesOnly yes
+  IdentityFile /root/.ssh/keys/br-node3.pub
+
+Host br-node4
+  HostName 172.22.10.13
+  Port 22
+  User bradmin
+  ProxyJump br-gateway1
+  IdentitiesOnly yes
+  IdentityFile /root/.ssh/keys/br-node4.pub
+
+Host br-node5
+  HostName 172.22.10.14
+  Port 22
+  User bradmin
+  ProxyJump br-gateway1
+  IdentitiesOnly yes
+  IdentityFile /root/.ssh/keys/br-node5.pub
+
+Host br-node6
+  HostName 172.22.10.15
+  Port 22
+  User bradmin
+  ProxyJump br-gateway1
+  IdentitiesOnly yes
+  IdentityFile /root/.ssh/keys/br-node6.pub
+
+Host br-external1
+  HostName 172.22.10.50
+  Port 22
+  User bradmin
+  ProxyJump br-gateway1
+  IdentitiesOnly yes
+  IdentityFile /root/.ssh/keys/br-external1.pub

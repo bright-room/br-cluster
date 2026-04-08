@@ -1,0 +1,6 @@
+---
+cilium_version: "1.19.2"
+cilium_namespace: kube-system
+cilium_values_base: /manifests/platform/cilium/app/base/values.yaml
+cilium_values_overlay: /manifests/platform/cilium/app/overlays/prod/values.yaml
+cilium_config_overlay: /manifests/platform/cilium/config/overlays/prod

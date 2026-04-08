@@ -1,0 +1,6 @@
+---
+- name: Install Cilium
+  include_tasks: install.yaml
+
+- name: Configure Cilium
+  include_tasks: configure.yaml

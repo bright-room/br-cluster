@@ -1,1 +1,31 @@
+### system ###
+.DS_Store
+
+### idea ###
 .idea/
+*.iml
+
+### python ###
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+### secrets ###
+.secret/
+!.secret/dev/.gitkeep
+!.secret/prod/.gitkeep
+.env
+.env.*
+.kube/
+
+### generated ###
+.generated/
+
+### ansible ###
+provisioner/roles/ipr-cnrs.nftables/
+provisioner/collections/ansible_collections/
+
+### misc ###
+.tmp/
