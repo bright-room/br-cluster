@@ -1,0 +1,27 @@
+---
+- name: Stop k3s cluster - Workers
+  hosts: worker
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Stop k3s agent
+      systemd:
+        name: k3s-agent
+        state: stopped
+      tags: [k3s]
+
+- name: Stop k3s cluster - Masters
+  hosts: master
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Stop k3s server
+      systemd:
+        name: k3s
+        state: stopped
+      tags: [k3s]
+
+    - name: Run k3s-killall
+      command: /usr/local/bin/k3s-killall.sh
+      ignore_errors: true
+      tags: [k3s]

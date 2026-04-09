@@ -1,0 +1,6 @@
+---
+k3s_packages:
+  - open-iscsi
+  - nfs-common
+  - cryptsetup
+  - dmsetup

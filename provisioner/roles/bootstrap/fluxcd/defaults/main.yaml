@@ -1,0 +1,9 @@
+---
+fluxcd_operator_version: "0.45.1"
+fluxcd_instance_version: "0.45.1"
+fluxcd_namespace: flux-system
+fluxcd_operator_values_base: /manifests/platform/flux-operator/operator/base/values.yaml
+fluxcd_operator_values_overlay: /manifests/platform/flux-operator/operator/overlays/prod/values.yaml
+fluxcd_instance_values_base: /manifests/platform/flux-operator/instance/base/values.yaml
+fluxcd_instance_values_overlay: /manifests/platform/flux-operator/instance/overlays/prod/values.yaml
+fluxcd_cluster_config: /manifests/clusters/prod/config

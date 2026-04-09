@@ -1,0 +1,8 @@
+# coredns helm values (prod overlay)
+service:
+  clusterIP: 10.43.0.10
+
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule

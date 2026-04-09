@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-settings
+  namespace: flux-system
+data:
+  CLUSTER_DOMAIN: "b8m.app"
+  CLUSTER_INTERNAL_DOMAIN: "cluster-internal.bright-room.net"
+  KUBE_VIP_ADDRESS: "172.22.10.60"
+  TRUSTED_INTERNAL_POD_CIDR: "10.42.0.0/16"

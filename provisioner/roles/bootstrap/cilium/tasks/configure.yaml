@@ -1,0 +1,15 @@
+---
+- name: Wait for Cilium CRDs to be established
+  command: >
+    kubectl wait --for=condition=Established
+    crd/ciliuml2announcementpolicies.cilium.io
+    crd/ciliumloadbalancerippools.cilium.io
+    --timeout=300s
+  retries: 5
+  delay: 15
+  register: cilium_crds
+  until: cilium_crds.rc == 0
+
+- name: Apply Cilium L2 policy and IP pool
+  command: >
+    kubectl apply -k {{ cilium_config_overlay }}

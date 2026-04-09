@@ -1,0 +1,9 @@
+---
+k3s:
+  config_dir: "/etc/rancher/k3s"
+  cluster:
+    port: "6443"
+
+# Kube-VIP floating IP for K8s API (replaces HAProxy)
+k3s_api_vip_address: "{{ (cluster_vips | selectattr('name', 'equalto', 'k8s-api') | first).ip }}"
+k3s_api_vip_domain: "{{ (cluster_vips | selectattr('name', 'equalto', 'k8s-api') | first).domain }}"

@@ -1,0 +1,130 @@
+---
+##################################
+# ipr-cnrs/nftables configuration
+##################################
+nft_old_pkg_list: []
+
+nft_global_default_rules: {}
+nft_global_rules:
+  005 state management:
+    - ct state established,related accept
+    - ct state invalid drop
+
+nft_input_default_rules: {}
+nft_input_rules:
+  000 policy:
+    - type filter hook input priority 0; policy drop;
+  001 global:
+    - jump global
+  002 localhost:
+    - iif lo accept
+  014 icmp:
+    - meta l4proto { icmp ,icmpv6 } accept
+  210 input tcp accepted:
+    - iifname $lan_interface tcp dport @in_tcp_accept ct state new accept
+  211 input udp accepted:
+    - iifname $lan_interface udp dport @in_udp_accept ct state new accept
+  220 input tcp from wan:
+    - iifname $wan_interface tcp dport @in_wan_tcp_accept ct state new accept
+
+nft_output_default_rules: {}
+nft_output_rules:
+  000 policy:
+    - type filter hook output priority 0;
+
+nft__forward_table_manage: true
+nft_forward_default_rules: {}
+nft_forward_rules:
+  000 policy:
+    - type filter hook forward priority 0; policy drop;
+  001 global:
+    - jump global
+  200 lan to wan tcp:
+    - iifname $lan_interface ip saddr $lan_network oifname $wan_interface tcp dport @forward_tcp_accept ct state new accept
+  210 lan to wan udp:
+    - iifname $lan_interface ip saddr $lan_network oifname $wan_interface udp dport @forward_udp_accept ct state new accept
+  220 ssh from wan:
+    - iifname $wan_interface oifname $lan_interface ip daddr $lan_network tcp dport ssh ct state new accept
+  230 http from wan:
+    - iifname $wan_interface oifname $lan_interface ip daddr $lan_network tcp dport { http, https } ct state new accept
+  250 k8s api from wan:
+    - iifname $wan_interface oifname $lan_interface ip daddr {{ (cluster_vips | selectattr('name', 'equalto', 'k8s-api') | first).ip }} tcp dport 6443 ct state new accept
+
+nft__nat_table_manage: true
+nft__nat_default_prerouting_rules: {}
+nft__nat_prerouting_rules:
+  000 policy:
+    - type nat hook prerouting priority -100;
+  010 dnat garage web:
+    - iifname $wan_interface tcp dport 443 dnat ip to 172.22.10.50:443
+  020 dnat k8s api:
+    - iifname $wan_interface tcp dport 6443 dnat ip to {{ (cluster_vips | selectattr('name', 'equalto', 'k8s-api') | first).ip }}:6443
+
+nft__nat_default_postrouting_rules: {}
+nft__nat_postrouting_rules:
+  000 policy:
+    - type nat hook postrouting priority 100;
+  005 masquerade lan to wan:
+    - ip saddr $lan_network oifname $wan_interface masquerade
+  010 masquerade wan to lan (hairpin for dnat):
+    - ip saddr $wan_network ip daddr $lan_network oifname $lan_interface masquerade
+
+nft_define_default: {}
+nft_define:
+  broadcast and multicast:
+    name: badcast_addr
+    value: "{ 255.255.255.255, 224.0.0.1, 224.0.0.251 }"
+  ip6 broadcast and multicast:
+    name: ip6_badcast_addr
+    value: "{ ff02::16 }"
+  input tcp accepted from lan:
+    name: in_tcp_accept
+    value: "{ ssh, domain, 2379, 9100 }"
+  input udp accepted from lan:
+    name: in_udp_accept
+    value: "{ domain, ntp, bootps }"
+  input tcp accepted from wan:
+    name: in_wan_tcp_accept
+    value: "{ ssh }"
+  lan interface:
+    name: lan_interface
+    value: "eth0"
+  wan interface:
+    name: wan_interface
+    value: "wlan0"
+  lan network:
+    name: lan_network
+    value: "{{ cluster_network.subnet }}/{{ cluster_network.prefix_length }}"
+  wan network:
+    name: wan_network
+    value: "0.0.0.0/0"
+  forward tcp accept:
+    name: forward_tcp_accept
+    value: "{ http, https, domain }"
+  forward udp accept:
+    name: forward_udp_accept
+    value: "{ domain, ntp }"
+
+nft_set_default: {}
+nft_set:
+  blackhole:
+    - type ipv4_addr;
+    - elements = $badcast_addr
+  ip6blackhole:
+    - type ipv6_addr;
+    - elements = $ip6_badcast_addr
+  in_tcp_accept:
+    - type inet_service; flags interval;
+    - elements = $in_tcp_accept
+  in_udp_accept:
+    - type inet_service; flags interval;
+    - elements = $in_udp_accept
+  in_wan_tcp_accept:
+    - type inet_service; flags interval;
+    - elements = $in_wan_tcp_accept
+  forward_tcp_accept:
+    - type inet_service; flags interval;
+    - elements = $forward_tcp_accept
+  forward_udp_accept:
+    - type inet_service; flags interval;
+    - elements = $forward_udp_accept

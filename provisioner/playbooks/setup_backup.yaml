@@ -1,0 +1,24 @@
+---
+- name: Configure backup
+  hosts: all
+  gather_facts: true
+  become: true
+
+  collections:
+    - onepassword.connect
+
+  environment:
+    OP_CONNECT_TOKEN: "{{ lookup('env', 'OP_CONNECT_TOKEN') }}"
+    OP_CONNECT_HOST: "{{ lookup('env', 'OP_CONNECT_HOST') }}"
+
+  roles:
+    - name: Fetch required secrets
+      role: secrets
+      vars:
+        required_secrets:
+          - restic
+      tags: [always]
+
+    - name: Backup configuration
+      role: backup
+      tags: [backup]

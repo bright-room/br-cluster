@@ -12,5 +12,16 @@
   "major": {
     "minimumReleaseAge": "7 days",
     "automerge": false
-  }
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/imager/variables\\.pkr\\.hcl$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?) versioning=(?<versioning>.*?)\\n.*?default\\s*=\\s*\"(?<currentValue>.*?)\""
+      ]
+    }
+  ]
 }

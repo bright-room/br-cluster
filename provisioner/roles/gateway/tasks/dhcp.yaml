@@ -1,0 +1,38 @@
+---
+- name: Install kea-dhcp4-server package
+  apt:
+    name: kea-dhcp4-server
+    state: present
+
+- name: Set gateway host info
+  set_fact:
+    gateway_host: "{{ cluster_hosts | selectattr('name', 'equalto', 'br-gateway1') | first }}"
+
+- name: Render Kea DHCP4 config (staging)
+  template:
+    src: "kea-dhcp4.conf.j2"
+    dest: "/etc/kea/kea-dhcp4.conf.new"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+
+- name: Validate Kea DHCP4 config
+  command: kea-dhcp4 -t /etc/kea/kea-dhcp4.conf.new
+  changed_when: false
+
+- name: Activate Kea DHCP4 config
+  copy:
+    src: "/etc/kea/kea-dhcp4.conf.new"
+    dest: "/etc/kea/kea-dhcp4.conf"
+    remote_src: true
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  notify: restart kea-dhcp4
+
+- name: Ensure kea-dhcp4-server is running and enabled
+  systemd:
+    name: kea-dhcp4-server
+    state: started
+    enabled: true
+  when: not ansible_check_mode

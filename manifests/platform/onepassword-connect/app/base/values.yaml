@@ -1,0 +1,8 @@
+# onepassword-connect helm values (base)
+connect:
+  credentialsName: op-credentials
+  credentialsKey: 1password-credentials.json
+operator:
+  token:
+    name: onepassword-connect-token
+    key: token

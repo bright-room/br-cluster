@@ -1,0 +1,17 @@
+---
+- name: Check node readiness
+  command: >
+    kubectl wait --for=condition=Ready nodes --all --timeout=300s
+  retries: 5
+  delay: 15
+  register: nodes_ready
+  until: nodes_ready.rc == 0
+
+- name: Display node status
+  command: kubectl get nodes -o wide
+  register: node_status
+  changed_when: false
+
+- name: Show nodes
+  debug:
+    msg: "{{ node_status.stdout_lines }}"

@@ -1,0 +1,23 @@
+---
+- name: Configure gateway server
+  hosts: gateway
+  gather_facts: true
+  become: true
+
+  pre_tasks:
+    - name: Package update
+      include_tasks: ../tasks/update.yaml
+      tags: [always]
+
+  roles:
+    - name: Common system configuration
+      role: common
+      tags: [system]
+
+    - name: Gateway services configuration
+      role: gateway
+      tags: [gateway]
+
+    - name: Firewall configuration
+      role: ipr-cnrs.nftables
+      tags: [firewall]

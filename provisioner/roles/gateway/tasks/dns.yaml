@@ -1,0 +1,150 @@
+---
+- name: Get system architecture
+  command: dpkg --print-architecture
+  register: system_arch
+  changed_when: false
+  check_mode: false
+
+# --- etcd ---
+- name: Create etcd data directory
+  file:
+    path: "/var/lib/etcd"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+    state: directory
+
+- name: Download etcd archive
+  get_url:
+    url: "https://github.com/etcd-io/etcd/releases/download/{{ versions.etcd }}/etcd-{{ versions.etcd }}-linux-{{ system_arch.stdout }}.tar.gz"
+    dest: "{{ tmp_dir }}/etcd-{{ versions.etcd }}-linux-{{ system_arch.stdout }}.tar.gz"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+
+- name: Extract etcd
+  unarchive:
+    src: "{{ tmp_dir }}/etcd-{{ versions.etcd }}-linux-{{ system_arch.stdout }}.tar.gz"
+    dest: "{{ tmp_dir }}"
+    owner: "root"
+    group: "root"
+    remote_src: true
+
+- name: Copy etcd binaries
+  copy:
+    src: "{{ item.source }}"
+    dest: "{{ item.target }}"
+    owner: "root"
+    group: "root"
+    mode: "0755"
+    remote_src: true
+  with_items:
+    - source: "{{ tmp_dir }}/etcd-{{ versions.etcd }}-linux-{{ system_arch.stdout }}/etcd"
+      target: "{{ install_dir }}/etcd"
+    - source: "{{ tmp_dir }}/etcd-{{ versions.etcd }}-linux-{{ system_arch.stdout }}/etcdctl"
+      target: "{{ install_dir }}/etcdctl"
+    - source: "{{ tmp_dir }}/etcd-{{ versions.etcd }}-linux-{{ system_arch.stdout }}/etcdutl"
+      target: "{{ install_dir }}/etcdutl"
+
+- name: Create etcd systemd service file
+  template:
+    src: "etcd.service.j2"
+    dest: "/etc/systemd/system/etcd.service"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: true
+
+- name: Enable and start etcd
+  systemd:
+    name: etcd
+    state: started
+    enabled: true
+  when: not ansible_check_mode
+
+# --- CoreDNS ---
+- name: Create CoreDNS config directory
+  file:
+    path: "/etc/coredns"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+    state: directory
+
+- name: Download CoreDNS archive
+  get_url:
+    url: "https://github.com/coredns/coredns/releases/download/v{{ versions.coredns }}/coredns_{{ versions.coredns }}_linux_{{ system_arch.stdout }}.tgz"
+    dest: "{{ tmp_dir }}/coredns_{{ versions.coredns }}_linux_{{ system_arch.stdout }}.tgz"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+
+- name: Extract CoreDNS
+  unarchive:
+    src: "{{ tmp_dir }}/coredns_{{ versions.coredns }}_linux_{{ system_arch.stdout }}.tgz"
+    dest: "{{ tmp_dir }}"
+    owner: "root"
+    group: "root"
+    remote_src: true
+
+- name: Copy CoreDNS binary
+  copy:
+    src: "{{ tmp_dir }}/coredns"
+    dest: "{{ install_dir }}/coredns"
+    owner: "root"
+    group: "root"
+    mode: "0755"
+    remote_src: true
+
+- name: Create CoreDNS systemd service file
+  template:
+    src: "coredns.service.j2"
+    dest: "/etc/systemd/system/coredns.service"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+
+- name: Create CoreDNS configuration
+  template:
+    src: "Corefile.j2"
+    dest: "/etc/coredns/Corefile"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  notify: restart coredns
+
+- name: Disable and stop systemd-resolved
+  systemd:
+    name: systemd-resolved
+    state: stopped
+    enabled: false
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: true
+
+- name: Enable and start CoreDNS
+  systemd:
+    name: coredns
+    state: started
+    enabled: true
+  when: not ansible_check_mode
+
+- name: Remove systemd-resolved managed resolv.conf symlink
+  file:
+    path: /etc/resolv.conf
+    state: absent
+
+- name: Write static resolv.conf pointing to local CoreDNS
+  copy:
+    dest: /etc/resolv.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by br-cluster-provisioner (gateway role)
+      nameserver {{ (cluster_hosts | selectattr('name', 'equalto', 'br-gateway1') | first).ip }}
+      search {{ cluster_domain }}

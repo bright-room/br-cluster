@@ -1,0 +1,37 @@
+[SERVICE]
+    Flush        5
+    Daemon       Off
+    Log_Level    info
+    Parsers_File parsers.conf
+    HTTP_Server  On
+    HTTP_Listen  0.0.0.0
+    HTTP_Port    {{ fluent_bit.port }}
+
+[INPUT]
+    Name         systemd
+    Tag          host.*
+    Read_From_Tail On
+
+[INPUT]
+    Name         tail
+    Tag          syslog
+    Path         /var/log/syslog
+    Parser       syslog-rfc3164
+
+[INPUT]
+    Name         tail
+    Tag          auth
+    Path         /var/log/auth.log
+    Parser       syslog-rfc3164
+
+[FILTER]
+    Name         record_modifier
+    Match        *
+    Record       hostname {{ '{{' }} ansible_hostname {{ '}}' }}
+
+[OUTPUT]
+    Name         forward
+    Match        *
+    Host         {{ fluentd_host }}
+    Port         {{ fluentd_port }}
+    tls          off

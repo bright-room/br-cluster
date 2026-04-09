@@ -1,0 +1,101 @@
+---
+##################################
+# Cluster configuration
+##################################
+cluster_domain: cluster-internal.bright-room.net
+
+##################################
+# Network configuration
+##################################
+cluster_network:
+  cidr: "172.22.10.0/24"
+  subnet: "172.22.10.0"
+  netmask: "255.255.255.0"
+  prefix_length: 24
+
+##################################
+# DHCP configuration
+##################################
+dhcp:
+  range_begin: "172.22.10.100"
+  range_end: "172.22.10.200"
+  default_lease_time: 86400
+  max_lease_time: 604800
+
+##################################
+# DNS configuration
+##################################
+dns:
+  forwarders:
+    - "8.8.8.8"
+    - "8.8.4.4"
+  fallback_servers:
+    - "8.8.8.8"
+    - "8.8.4.4"
+
+# Domains exposed to WAN clients via split-horizon DNS.
+# From WAN, these resolve to gateway1's wan_ip and are DNAT-forwarded
+# to the actual LAN target by gateway1's nftables rules.
+wan_exposed_domains:
+  - "backup-storage.{{ cluster_domain }}"
+  - "k8s-api.{{ cluster_domain }}"
+
+##################################
+# NTP configuration
+##################################
+ntp:
+  upstream_pool: "ntp.nict.jp"
+  fallback_servers:
+    - "ntp1.jst.mfeed.ad.jp"
+    - "ntp2.jst.mfeed.ad.jp"
+    - "ntp3.jst.mfeed.ad.jp"
+
+##################################
+# Monitoring configuration
+##################################
+fluentd_load_balancer_ip: "172.22.10.65"
+
+##################################
+# Restic backup configuration
+##################################
+restic:
+  binary_path: "{{ install_dir }}/restic"
+  force_install: false
+  config_dir: "/etc/restic"
+  operator:
+    user: "root"
+    group: "root"
+
+restic_config:
+  file_path: "{{ restic.config_dir }}/restic.conf"
+  environment:
+    repository: "s3:https://backup-storage.{{ cluster_domain }}:3900/restic"
+    log_dir_path: "/var/log"
+    log_file_prefix: "restic"
+    backup_dirs:
+      - path: "/etc"
+      - path: "/var/log"
+      - path: "/root"
+        exclude:
+          - pattern: ".cache"
+          - pattern: ".ignore"
+      - path: "/home/bradmin"
+        exclude:
+          - pattern: ".cache"
+          - pattern: ".ignore"
+    backup:
+      scheduling: "*-*-* 03:00:00"
+      randomized_delay_sec: 0
+    clean:
+      scheduling: "*-*-* 06:00:00"
+      randomized_delay_sec: 0
+      forget_keep_within: "7d"
+
+##################################
+# Cluster VIPs (floating IPs exposed via DNS)
+# k8s-api: kube-vip DaemonSet on control-plane nodes (ARP L2 failover)
+##################################
+cluster_vips:
+  - name: k8s-api
+    ip: "172.22.10.60"
+    domain: "k8s-api.{{ cluster_domain }}"

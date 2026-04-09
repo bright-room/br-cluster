@@ -1,0 +1,5 @@
+# coredns helm values (base)
+replicaCount: 2
+rollingUpdate:
+  maxUnavailable: 0
+  maxSurge: 1

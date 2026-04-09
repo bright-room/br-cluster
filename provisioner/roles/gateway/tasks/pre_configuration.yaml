@@ -1,0 +1,25 @@
+---
+- name: Enable IPv4 forward
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: 1
+    sysctl_set: true
+    state: present
+    reload: true
+
+- name: Configure iptables-persistent debconf settings
+  debconf:
+    name: iptables-persistent
+    question: "{{ item.question }}"
+    value: "{{ item.value }}"
+    vtype: boolean
+  with_items:
+    - question: "iptables-persistent/autosave_v4"
+      value: "true"
+    - question: "iptables-persistent/autosave_v6"
+      value: "true"
+
+- name: Install gateway prerequisite packages
+  apt:
+    name: "{{ gateway_packages }}"
+    state: present

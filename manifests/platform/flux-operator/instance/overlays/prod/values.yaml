@@ -1,0 +1,9 @@
+# flux-instance helm values (prod overlay)
+instance:
+  sync:
+    kind: GitRepository
+    url: https://github.com/bright-room/br-cluster
+    ref: refs/heads/main
+    path: manifests/clusters/prod
+    provider: github
+    pullSecret: flux-system

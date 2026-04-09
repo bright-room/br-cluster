@@ -1,0 +1,34 @@
+---
+- name: Check if Cilium Helm release exists
+  command: helm status cilium -n {{ cilium_namespace }}
+  register: cilium_status
+  failed_when: false
+  changed_when: false
+
+- name: Install Cilium via Helm (bootstrap only)
+  command: >
+    helm install cilium
+    oci://quay.io/cilium/charts/cilium
+    --version {{ cilium_version }}
+    --namespace {{ cilium_namespace }}
+    --values {{ cilium_values_base }}
+    --values {{ cilium_values_overlay }}
+  register: cilium_apply
+  when: cilium_status.rc != 0
+  changed_when: "'STATUS: deployed' in cilium_apply.stdout"
+
+- name: Wait for Cilium DaemonSet to be ready
+  command: >
+    kubectl rollout status daemonset/cilium -n {{ cilium_namespace }} --timeout=600s
+  retries: 10
+  delay: 15
+  register: cilium_rollout
+  until: cilium_rollout.rc == 0
+
+- name: Wait for Cilium Operator to be ready
+  command: >
+    kubectl rollout status deployment/cilium-operator -n {{ cilium_namespace }} --timeout=600s
+  retries: 10
+  delay: 15
+  register: cilium_operator_rollout
+  until: cilium_operator_rollout.rc == 0

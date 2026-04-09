@@ -1,0 +1,42 @@
+---
+- name: Install k3s prerequisite packages
+  apt:
+    name: "{{ k3s_packages }}"
+    state: present
+
+- name: Enable and start iscsid
+  systemd:
+    name: iscsid
+    state: started
+    enabled: true
+
+# --- Network configuration ---
+- name: Load br_netfilter kernel module
+  modprobe:
+    name: br_netfilter
+    state: present
+    persistent: present
+
+- name: Set bridge-nf-call-iptables
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    sysctl_set: true
+    state: present
+    reload: true
+  with_items:
+    - name: net.bridge.bridge-nf-call-iptables
+      value: 1
+    - name: net.bridge.bridge-nf-call-ip6tables
+      value: 1
+
+# --- Disable swap ---
+- name: Disable swap
+  command: swapoff -a
+  changed_when: false
+
+- name: Disable swap in fstab
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+    replace: '# \1'

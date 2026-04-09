@@ -1,0 +1,13 @@
+[Unit]
+Description=CoreDNS DNS server
+Documentation=https://coredns.io
+After=network.target etcd.service
+
+[Service]
+ExecStart={{ install_dir }}/coredns -conf /etc/coredns/Corefile
+Restart=always
+RestartSec=10s
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target

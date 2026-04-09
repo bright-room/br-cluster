@@ -1,0 +1,52 @@
+---
+- name: Determine primary control node
+  set_fact:
+    is_primary_control_node: "{{ 'primary' in group_names }}"
+
+- name: Set primary control node IP
+  set_fact:
+    primary_control_node_ip: "{{ (cluster_hosts | selectattr('name', 'equalto', 'br-node1') | first).ip }}"
+  when: "'master' in group_names"
+
+- name: Create k3s config directory
+  file:
+    path: "{{ k3s.config_dir }}"
+    state: directory
+    owner: "root"
+    group: "root"
+    mode: "0755"
+
+- name: Create cluster token file
+  copy:
+    content: "{{ secret_k3s_token }}"
+    dest: "{{ k3s.config_dir }}/cluster-token"
+    owner: "root"
+    group: "root"
+    mode: "0600"
+  no_log: true
+
+- name: Copy kubelet configuration
+  template:
+    src: "kubelet.config.j2"
+    dest: "{{ k3s.config_dir }}/kubelet.config"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+
+- name: Copy k3s master configuration
+  template:
+    src: "config.yaml.master.j2"
+    dest: "{{ k3s.config_dir }}/config.yaml"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  when: "'master' in group_names"
+
+- name: Copy k3s worker configuration
+  template:
+    src: "config.yaml.worker.j2"
+    dest: "{{ k3s.config_dir }}/config.yaml"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  when: "'worker' in group_names"

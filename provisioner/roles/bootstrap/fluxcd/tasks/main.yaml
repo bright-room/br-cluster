@@ -1,0 +1,9 @@
+---
+- name: Install Flux Operator
+  include_tasks: install_operator.yaml
+
+- name: Configure FluxCD
+  include_tasks: configure.yaml
+
+- name: Install Flux Instance
+  include_tasks: install_instance.yaml

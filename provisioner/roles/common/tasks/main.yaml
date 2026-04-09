@@ -1,0 +1,16 @@
+---
+- name: Remove snap packages
+  include_tasks: packages.yaml
+  tags: [system]
+
+- name: RaspberryPi system configuration
+  include_tasks: system.yaml
+  tags: [system]
+
+- name: Blacklist storage devices in multipath configuration
+  include_tasks: multipath.yaml
+  tags: [system]
+
+- name: SSH configuration
+  include_tasks: ssh.yaml
+  tags: [system]

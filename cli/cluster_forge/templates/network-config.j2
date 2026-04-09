@@ -1,0 +1,17 @@
+version: 2
+ethernets:
+  eth0:
+    dhcp4: false
+    addresses: [ {{ internal_ip }}/24 ]
+wifis:
+  renderer: networkd
+  wlan0:
+    dhcp4: false
+    optional: true
+    access-points:
+      "{{ ssid }}":
+        password: "{{ passphrase }}"
+    addresses: [ {{ external_ip }}/24 ]
+    gateway4: {{ gateway_ip }}
+    nameservers:
+      addresses: [ 8.8.8.8, 8.8.4.4 ]

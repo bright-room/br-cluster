@@ -1,0 +1,10 @@
+[Unit]
+Description=Restic check and purge
+
+[Service]
+Type=oneshot
+User={{ restic.operator.user }}
+Group={{ restic.operator.group }}
+WorkingDirectory=/usr/local/
+CPUQuota={{ 25 * ansible_processor_vcpus }}%
+ExecStart={{ restic.config_dir }}/restic_clean.sh

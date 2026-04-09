@@ -1,0 +1,16 @@
+---
+- name: Pre-configuration
+  include_tasks: pre_configuration.yaml
+  tags: [system]
+
+- name: DHCP configuration
+  include_tasks: dhcp.yaml
+  tags: [dhcp]
+
+- name: DNS configuration
+  include_tasks: dns.yaml
+  tags: [dns]
+
+- name: NTP configuration
+  include_tasks: ntp.yaml
+  tags: [ntp]

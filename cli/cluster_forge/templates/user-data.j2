@@ -1,0 +1,40 @@
+#cloud-config
+hostname: {{ hostname }}
+manage_etc_hosts: false
+
+timezone: JST
+locale: ja_JP.UTF-8
+
+ssh_pwauth: false
+
+packages:
+  - avahi-daemon
+
+apt:
+  conf: |
+    Acquire {
+      Check-Date 'false';
+    };
+
+users:
+  - name: root
+    lock_passwd: false
+    hashed_passwd: {{ root_password }}
+  - name: {{ operator_username }}
+    groups: users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: false
+    passwd: {{ operator_password }}
+    ssh_authorized_keys:
+      - {{ operator_pubkey }}
+{%- if server_type == 'gateway' %}
+
+runcmd:
+  - sed -i 's/^s*REGDOMAIN=S*/REGDOMAIN=JP/' /etc/default/crda || true
+  - localectl set-x11-keymap "us" pc105
+  - setupcon -k --force || true
+
+power_state:
+  mode: reboot
+{%- endif %}

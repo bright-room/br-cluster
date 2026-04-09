@@ -1,0 +1,15 @@
+---
+- name: restart kea-dhcp4
+  systemd:
+    name: kea-dhcp4-server
+    state: restarted
+
+- name: restart coredns
+  systemd:
+    name: coredns
+    state: restarted
+
+- name: restart ntp
+  service:
+    name: chrony
+    state: restarted

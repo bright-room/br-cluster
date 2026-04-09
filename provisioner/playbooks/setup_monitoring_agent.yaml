@@ -1,0 +1,14 @@
+---
+- name: Deploy monitoring agents to non-k3s nodes
+  hosts: gateway:external
+  gather_facts: true
+  become: true
+
+  vars:
+    fluentd_host: "{{ fluentd_load_balancer_ip }}"
+    fluentd_port: 24224
+
+  roles:
+    - name: Monitoring agent (node_exporter + Fluent Bit)
+      role: monitoring_agent
+      tags: [monitoring]

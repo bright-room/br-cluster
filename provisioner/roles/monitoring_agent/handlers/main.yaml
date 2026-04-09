@@ -1,0 +1,11 @@
+---
+- name: restart node_exporter
+  systemd:
+    name: node_exporter
+    state: restarted
+    daemon_reload: true
+
+- name: restart fluent-bit
+  systemd:
+    name: fluent-bit
+    state: restarted

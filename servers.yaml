@@ -1,0 +1,27 @@
+environments:
+  - dev
+  - prod
+
+servers:
+  - name: br-gateway1
+    type: gateway
+  - name: br-external1
+    type: external
+  - name: br-node1
+    type: node
+    k8s_role: primary
+  - name: br-node2
+    type: node
+    k8s_role: secondary
+  - name: br-node3
+    type: node
+    k8s_role: secondary
+  - name: br-node4
+    type: node
+    k8s_role: worker
+  - name: br-node5
+    type: node
+    k8s_role: worker
+  - name: br-node6
+    type: node
+    k8s_role: worker

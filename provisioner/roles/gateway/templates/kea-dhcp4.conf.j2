@@ -1,0 +1,62 @@
+{
+{% set gw = cluster_hosts | selectattr('name', 'equalto', 'br-gateway1') | first %}
+    "Dhcp4": {
+        "interfaces-config": {
+            "interfaces": ["{{ gw.interfaces.cluster }}"]
+        },
+        "lease-database": {
+            "type": "memfile",
+            "persist": true,
+            "name": "/var/lib/kea/kea-leases4.csv",
+            "lfc-interval": 3600
+        },
+        "valid-lifetime": {{ dhcp.default_lease_time }},
+        "max-valid-lifetime": {{ dhcp.max_lease_time }},
+        "option-data": [
+            {
+                "name": "domain-name",
+                "data": "{{ cluster_domain }}"
+            },
+            {
+                "name": "domain-name-servers",
+                "data": "{{ gw.ip }}"
+            },
+            {
+                "name": "routers",
+                "data": "{{ gw.ip }}"
+            }
+        ],
+        "subnet4": [
+            {
+                "id": 1,
+                "subnet": "{{ cluster_network.subnet }}/{{ cluster_network.prefix_length }}",
+                "pools": [
+                    {
+                        "pool": "{{ dhcp.range_begin }} - {{ dhcp.range_end }}"
+                    }
+                ],
+                "reservations": [
+{% for host in cluster_hosts %}
+                    {
+                        "hw-address": "{{ host.mac }}",
+                        "ip-address": "{{ host.ip }}",
+                        "hostname": "{{ host.name | replace('br-', '') }}"
+                    }{% if not loop.last %},{% endif %}
+
+{% endfor %}
+                ]
+            }
+        ],
+        "loggers": [
+            {
+                "name": "kea-dhcp4",
+                "output_options": [
+                    {
+                        "output": "syslog"
+                    }
+                ],
+                "severity": "INFO"
+            }
+        ]
+    }
+}

@@ -1,0 +1,33 @@
+# cilium helm values (base)
+
+k8sClientRateLimit:
+  qps: 50
+  burst: 200
+
+operator:
+  replicas: 1
+  rollOutPods: true
+  nodeSelector:
+    node-role.kubernetes.io/control-plane: "true"
+
+rollOutCiliumPods: true
+
+# K8s API service (k3s default)
+k8sServiceHost: 127.0.0.1
+k8sServicePort: 6444
+
+# Replace kube-proxy
+kubeProxyReplacement: true
+kubeProxyReplacementHealthzBindAddr: 0.0.0.0:10256
+
+# IPAM configuration
+ipam:
+  operator:
+    clusterPoolIPv4PodCIDRList: "10.42.0.0/16"
+
+# L2 announcements for LoadBalancer services
+l2announcements:
+  enabled: true
+
+externalIPs:
+  enabled: true

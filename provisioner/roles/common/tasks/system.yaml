@@ -1,0 +1,73 @@
+---
+- name: Append hosts
+  blockinfile:
+    path: "/etc/hosts"
+    marker: "# {mark} Append by ansible"
+    block: "127.0.1.1 {{ inventory_hostname }}"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+    state: present
+
+- name: Set gateway host info
+  set_fact:
+    gateway_host: "{{ cluster_hosts | selectattr('name', 'equalto', 'br-gateway1') | first }}"
+
+- name: Update DNS server
+  lineinfile:
+    dest: "/etc/systemd/resolved.conf"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    mode: "0644"
+    backup: true
+    state: present
+  with_items:
+    - regexp: "^#?DNS="
+      line: "DNS={{ gateway_host.ip }}"
+    - regexp: "^#?Domains="
+      line: "Domains={{ gateway_host.domains.dns }}"
+    - regexp: "^#?FallbackDNS="
+      line: "FallbackDNS={{ dns.fallback_servers | join(' ') }}"
+  notify: restart systemd-resolved
+
+- name: Change default GPU Memory Split
+  blockinfile:
+    path: /boot/firmware/config.txt
+    marker: "# {mark} Append by ansible"
+    block: "gpu_mem={{ gpu_memory_mb }}"
+    owner: "root"
+    group: "root"
+    mode: "0755"
+    state: present
+
+- name: Read current cmdline.txt content
+  command:
+    cmd: "cat /boot/firmware/cmdline.txt"
+  register: cmdline_content
+  changed_when: false
+
+- name: Add cgroup parameters if not present
+  lineinfile:
+    path: "/boot/firmware/cmdline.txt"
+    regexp: '^((?!.*\bcgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory\b).*)$'
+    line: '\1 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory'
+    backrefs: true
+
+- name: Update NTP server
+  lineinfile:
+    dest: /etc/systemd/timesyncd.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    mode: "0644"
+    backup: true
+    state: present
+  with_items:
+    - regexp: "^#?NTP="
+      line: "NTP={{ gateway_host.domains.ntp }}"
+    - regexp: "^#?FallbackNTP="
+      line: "FallbackNTP={{ ntp.fallback_servers | join(' ') }}"
+
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ timezone }}"
+  notify: reboot

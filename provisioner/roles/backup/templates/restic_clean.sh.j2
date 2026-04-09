@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+log_delete() {
+  find "{{ restic_config.environment.log_dir_path }}" -type f -name "{{ restic_config.environment.log_file_prefix }}_*.log" -mtime +7 -print | while read -r file; do
+    if rm -f "$file"; then
+      echo "Deleted: $file" | tee -a ${LOG_FILE}
+    fi
+  done
+}
+
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+source {{ restic.config_dir }}/restic_common.sh
+
+echo "$(timestamp): restic-repo-clean started" | tee -a ${LOG_FILE}
+echo "-------------------------------------------------------------------------------" | tee -a ${LOG_FILE}
+
+${RESTIC} forget --keep-within {{ restic_config.environment.clean.forget_keep_within }} 2>&1 | tee -a ${LOG_FILE}
+${RESTIC} prune 2>&1 | tee -a ${LOG_FILE}
+
+echo "-------------------------------------------------------------------------------" | tee -a ${LOG_FILE}
+echo "$(timestamp): restic-repo-clean finished" | tee -a ${LOG_FILE}
+printf "\n" | tee -a ${LOG_FILE}
+
+log_delete
+exit 0

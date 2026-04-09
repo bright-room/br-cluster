@@ -1,0 +1,14 @@
+---
+- name: Download k3s installation script
+  get_url:
+    url: https://get.k3s.io
+    dest: "{{ tmp_dir }}/k3s_install.sh"
+    mode: "0755"
+
+- name: Install k3s agent
+  command:
+    cmd: "{{ tmp_dir }}/k3s_install.sh agent"
+  environment:
+    INSTALL_K3S_VERSION: "{{ versions.k3s }}"
+  register: k3s_install
+  changed_when: k3s_install.rc == 0

@@ -1,0 +1,13 @@
+---
+##################################
+# Ansible configuration
+##################################
+ansible_user: bradmin
+
+##################################
+# System configuration
+##################################
+timezone: "Asia/Tokyo"
+tmp_dir: "/tmp"
+install_dir: "/usr/local/bin"
+gpu_memory_mb: 16

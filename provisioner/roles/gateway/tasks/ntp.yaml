@@ -1,0 +1,22 @@
+---
+- name: Install chrony package
+  apt:
+    name: chrony
+    state: present
+
+- name: Ensure chrony is running and enabled
+  systemd:
+    name: chrony
+    state: started
+    enabled: true
+  when: not ansible_check_mode
+
+- name: Create NTP configuration file
+  template:
+    src: "chrony.conf.j2"
+    dest: "/etc/chrony/chrony.conf"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+    backup: true
+  notify: restart ntp

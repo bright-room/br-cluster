@@ -1,0 +1,16 @@
+# flux-instance helm values (base)
+instance:
+  distribution:
+    version: 2.x
+    registry: ghcr.io/fluxcd
+  components:
+    - source-controller
+    - kustomize-controller
+    - helm-controller
+    - notification-controller
+  cluster:
+    networkPolicy: false
+    domain: cluster.local
+  commonMetadata:
+    labels:
+      app.kubernetes.io/managed-by: flux

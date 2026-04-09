@@ -1,0 +1,73 @@
+---
+- name: Reset k3s cluster
+  hosts: all
+  gather_facts: false
+  become: true
+
+  vars_prompt:
+    - name: confirm_reset
+      prompt: "This will DESTROY the entire k3s cluster. Type 'yes' to confirm"
+      private: false
+
+  pre_tasks:
+    - name: Abort if not confirmed
+      fail:
+        msg: "Reset aborted by user"
+      when: confirm_reset != 'yes'
+
+  tasks:
+    - name: Uninstall k3s worker
+      command: /usr/local/bin/k3s-agent-uninstall.sh
+      ignore_errors: true
+      when: "'worker' in group_names"
+      tags: [k3s]
+
+    - name: Uninstall k3s server
+      command: /usr/local/bin/k3s-uninstall.sh
+      ignore_errors: true
+      when: "'master' in group_names"
+      tags: [k3s]
+
+    - name: Remove Cilium network interfaces
+      command: "ip link delete {{ item }}"
+      loop:
+        - cilium_host
+        - cilium_net
+        - cilium_vxlan
+      ignore_errors: true
+      tags: [cleanup]
+
+    - name: Flush iptables
+      command: "{{ item }}"
+      loop:
+        - iptables -F
+        - iptables -X
+        - iptables -t nat -F
+        - iptables -t nat -X
+        - iptables -t mangle -F
+        - iptables -t mangle -X
+      ignore_errors: true
+      tags: [cleanup]
+
+    - name: Remove k3s directories
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/rancher
+        - /var/lib/rancher
+        - /etc/cni/net.d
+      tags: [cleanup]
+
+    - name: Remove kubeconfig
+      file:
+        path: "/.secret/config"
+        state: absent
+      delegate_to: localhost
+      run_once: true
+      tags: [cleanup]
+
+    - name: Reboot nodes
+      reboot:
+        reboot_timeout: 300
+      tags: [reboot]

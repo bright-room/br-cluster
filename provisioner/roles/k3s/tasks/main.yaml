@@ -1,0 +1,22 @@
+---
+- name: Prerequisites
+  include_tasks: prerequisites.yaml
+  tags: [system]
+
+- name: Install CLI tools
+  include_tasks: install_tools.yaml
+  tags: [system]
+
+- name: Configure k3s
+  include_tasks: configure.yaml
+  tags: [k3s]
+
+- name: Install k3s master
+  include_tasks: install_master.yaml
+  when: "'master' in group_names"
+  tags: [k3s]
+
+- name: Install k3s worker
+  include_tasks: install_worker.yaml
+  when: "'worker' in group_names"
+  tags: [k3s]

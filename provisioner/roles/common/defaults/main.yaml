@@ -1,0 +1,17 @@
+---
+uninstall_packages:
+  - needrestart
+  - snapd
+
+install_packages:
+  - libraspberrypi-bin
+  - fake-hwclock
+  - bridge-utils
+  - dnsutils
+  - lsof
+  - net-tools
+  - jq
+  - wget
+  - tar
+  - bzip2
+  - unzip

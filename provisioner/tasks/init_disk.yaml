@@ -1,0 +1,78 @@
+---
+- name: Check if logical volume exists
+  command:
+    cmd: "lvs /dev/{{ volume_group }}/{{ logical_volume }}"
+  register: lv_check
+  ignore_errors: true
+  changed_when: false
+
+- name: Initialize disk
+  block:
+    - name: Filter disk devices
+      shell: "lsblk -d -n -o NAME,SIZE,TYPE | grep disk | cut -d ' ' -f 1"
+      register: physical_disks
+      changed_when: false
+
+    - name: Get OS disk
+      shell: "df / | tail -1 | cut -d ' ' -f 1 | sed -E 's/[0-9]+$//' | cut -d '/' -f 3"
+      register: os_disk
+      changed_when: false
+
+    - name: Identify external disks
+      set_fact:
+        external_disks: "{{ physical_disks.stdout_lines | select('regex', '^(?!.*' ~ os_disk.stdout | regex_escape ~ ').*$') | list }}"
+
+    - name: Wipe filesystem using module
+      command:
+        cmd: "wipefs -af /dev/{{ item }}"
+      with_items: "{{ external_disks }}"
+
+    - name: Create Volume Group
+      lvg:
+        vg: "{{ volume_group }}"
+        pvs: "/dev/{{ item }}"
+        state: present
+      with_items: "{{ external_disks }}"
+
+    - name: Create Logical Volume
+      lvol:
+        vg: "{{ volume_group }}"
+        lv: "{{ logical_volume }}"
+        size: "100%VG"
+        state: present
+        force: no
+
+    - name: Create ext4 filesystem
+      filesystem:
+        fstype: "ext4"
+        dev: "/dev/{{ volume_group }}/{{ logical_volume }}"
+        force: no
+
+    - name: Get UUID of the device
+      command:
+        cmd: "blkid -s UUID -o value /dev/{{ volume_group }}/{{ logical_volume }}"
+      register: device_uuid
+      changed_when: false
+
+    - name: Create mount point directory
+      file:
+        path: "/storage"
+        mode: "0755"
+        state: directory
+
+    - name: Add mount entry to /etc/fstab
+      mount:
+        path: "/storage"
+        src: "UUID={{ device_uuid.stdout }}"
+        fstype: "ext4"
+        opts: "_netdev"
+        backup: true
+        state: present
+
+    - name: Mount filesystem
+      mount:
+        path: "/storage"
+        src: "UUID={{ device_uuid.stdout }}"
+        fstype: "ext4"
+        state: mounted
+  when: lv_check.rc != 0
