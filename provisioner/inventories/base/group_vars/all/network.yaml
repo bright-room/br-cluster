@@ -98,9 +98,6 @@ cluster_vips:
   - name: k8s-api
     ip: "172.22.10.60"
     domain: "k8s-api.{{ cluster_domain }}"
-  - name: public-gateway
-    ip: "172.22.10.64"
-    domain: "gateway.{{ cluster_external_domain }}"
   - name: internal-gateway
     ip: "172.22.10.68"
     domain: "gateway.{{ cluster_domain }}"
