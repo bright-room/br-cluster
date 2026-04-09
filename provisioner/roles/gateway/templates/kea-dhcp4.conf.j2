@@ -40,7 +40,7 @@
                     {
                         "hw-address": "{{ host.mac }}",
                         "ip-address": "{{ host.ip }}",
-                        "hostname": "{{ host.hostname | replace('br-', '') }}"
+                        "hostname": "{{ host.name | replace('br-', '') }}"
                     }{% if not loop.last %},{% endif %}
 
 {% endfor %}

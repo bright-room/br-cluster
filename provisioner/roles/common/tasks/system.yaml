@@ -3,7 +3,7 @@
   blockinfile:
     path: "/etc/hosts"
     marker: "# {mark} Append by ansible"
-    block: "127.0.1.1 {{ hostname }}"
+    block: "127.0.1.1 {{ inventory_hostname }}"
     owner: "root"
     group: "root"
     mode: "0644"

@@ -15,6 +15,11 @@ PLAYBOOK_COMMANDS = {
 }
 
 
+def _inventory_args(env: str) -> list[str]:
+    """Return -i flags for both base (static) and env (generated) inventories."""
+    return ["-i", "inventories/base", "-i", f"inventories/{env}"]
+
+
 def _exec_in_runner(
     compose_cmd: list[str],
     compose_env: dict[str, str],
@@ -47,20 +52,18 @@ def run_playbook(
         available = ", ".join(sorted(PLAYBOOK_COMMANDS))
         raise ValueError(f"Unknown playbook: {playbook_key}. Available: {available}")
 
-    inventory = f"inventories/{env}/hosts.yaml"
     playbook = PLAYBOOK_COMMANDS[playbook_key]
-    args = ["ansible-playbook", "-i", inventory, playbook]
+    args = ["ansible-playbook", *_inventory_args(env), playbook]
     if check_mode:
         args.extend(["--check", "--diff"])
     _exec_in_runner(compose_cmd, compose_env, args)
 
 
 def ping(compose_cmd: list[str], compose_env: dict[str, str], env: str) -> None:
-    inventory = f"inventories/{env}/hosts.yaml"
     _exec_in_runner(
         compose_cmd,
         compose_env,
-        ["ansible", "-i", inventory, "all", "-m", "ping"],
+        ["ansible", *_inventory_args(env), "all", "-m", "ping"],
     )
 
 

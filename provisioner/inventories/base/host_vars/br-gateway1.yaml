@@ -1,15 +1,5 @@
 ---
 ##################################
-# Ansible configuration
-##################################
-hostname: "br-gateway1"
-
-##################################
-# WAN (upstream) network configuration
-##################################
-wan_ip: "192.168.2.50"
-
-##################################
 # ipr-cnrs/nftables configuration
 ##################################
 nft_old_pkg_list: []

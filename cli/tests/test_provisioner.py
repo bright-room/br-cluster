@@ -50,8 +50,16 @@ class TestRunPlaybook:
         run_playbook(FAKE_CMD, FAKE_ENV, "dev", "setup-node")
         args = mock_run.call_args[0][0]
         assert "ansible-playbook" in args
-        assert "inventories/dev/hosts.yaml" in args
+        assert "inventories/base" in args
+        assert "inventories/dev" in args
         assert "playbooks/setup_node.yaml" in args
+
+    @patch("cluster_forge.provisioner.subprocess.run")
+    def test_uses_two_inventory_sources(self, mock_run) -> None:
+        run_playbook(FAKE_CMD, FAKE_ENV, "dev", "setup-node")
+        args = mock_run.call_args[0][0]
+        i_flags = [i for i, a in enumerate(args) if a == "-i"]
+        assert len(i_flags) == 2
 
     @patch("cluster_forge.provisioner.subprocess.run")
     def test_check_mode_adds_flags(self, mock_run) -> None:
@@ -77,7 +85,8 @@ class TestPing:
         ping(FAKE_CMD, FAKE_ENV, "prod")
         args = mock_run.call_args[0][0]
         assert "ansible" in args
-        assert "inventories/prod/hosts.yaml" in args
+        assert "inventories/base" in args
+        assert "inventories/prod" in args
         assert "all" in args
         assert "-m" in args
         assert "ping" in args

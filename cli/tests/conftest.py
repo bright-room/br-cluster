@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from cluster_forge.models import Inventory, ServerDefinition, ServerType
+from cluster_forge.models import Inventory, K8sRole, ServerDefinition, ServerType
 from cluster_forge.secrets import MockSecretProvider
 
 
@@ -18,7 +18,9 @@ def gateway_server() -> ServerDefinition:
 
 @pytest.fixture
 def node_server() -> ServerDefinition:
-    return ServerDefinition(name="br-node1", type=ServerType.NODE)
+    return ServerDefinition(
+        name="br-node1", type=ServerType.NODE, k8s_role=K8sRole.PRIMARY
+    )
 
 
 @pytest.fixture
@@ -32,8 +34,39 @@ def sample_inventory() -> Inventory:
         environments=["dev", "prod"],
         servers=[
             ServerDefinition(name="br-gateway1", type=ServerType.GATEWAY),
-            ServerDefinition(name="br-node1", type=ServerType.NODE),
+            ServerDefinition(
+                name="br-node1", type=ServerType.NODE, k8s_role=K8sRole.PRIMARY
+            ),
             ServerDefinition(name="br-external1", type=ServerType.EXTERNAL),
+        ],
+    )
+
+
+@pytest.fixture
+def full_inventory() -> Inventory:
+    return Inventory(
+        environments=["dev", "prod"],
+        servers=[
+            ServerDefinition(name="br-gateway1", type=ServerType.GATEWAY),
+            ServerDefinition(name="br-external1", type=ServerType.EXTERNAL),
+            ServerDefinition(
+                name="br-node1", type=ServerType.NODE, k8s_role=K8sRole.PRIMARY
+            ),
+            ServerDefinition(
+                name="br-node2", type=ServerType.NODE, k8s_role=K8sRole.SECONDARY
+            ),
+            ServerDefinition(
+                name="br-node3", type=ServerType.NODE, k8s_role=K8sRole.SECONDARY
+            ),
+            ServerDefinition(
+                name="br-node4", type=ServerType.NODE, k8s_role=K8sRole.WORKER
+            ),
+            ServerDefinition(
+                name="br-node5", type=ServerType.NODE, k8s_role=K8sRole.WORKER
+            ),
+            ServerDefinition(
+                name="br-node6", type=ServerType.NODE, k8s_role=K8sRole.WORKER
+            ),
         ],
     )
 

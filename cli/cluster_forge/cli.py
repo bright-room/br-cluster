@@ -9,6 +9,7 @@ from pathlib import Path
 import click
 
 from cluster_forge import config_generator as config_gen
+from cluster_forge import inventory_generator as inv_gen
 from cluster_forge import packer as packer_mod
 from cluster_forge import provisioner as provisioner_mod
 from cluster_forge.bootstrap import (
@@ -25,6 +26,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 CLOUD_INIT_DIR = REPO_ROOT / ".generated" / "cloud-init"
 GENERATED_DIR = REPO_ROOT / ".generated"
 IMAGER_DIR = REPO_ROOT / "imager"
+PROVISIONER_DIR = REPO_ROOT / "provisioner"
 SSH_DIR = REPO_ROOT / "docker" / "ssh"
 
 ENV_OPTION = click.option(
@@ -157,6 +159,19 @@ def generate_config_cmd(env: str, server: str | None) -> None:
         for f in files:
             click.echo(f"  -> {f.relative_to(REPO_ROOT)}")
 
+    click.echo("Done.")
+
+
+@main.command("generate-inventory")
+@ENV_OPTION
+def generate_inventory_cmd(env: str) -> None:
+    """Generate Ansible inventory from servers.yaml + 1Password."""
+    inventory = load_inventory()
+    provider = OnePasswordCliProvider(env)
+    click.echo(f"Generating inventory for {env}...")
+    files = inv_gen.write_inventory(inventory, env, provider, PROVISIONER_DIR)
+    for f in files:
+        click.echo(f"  -> {f.relative_to(REPO_ROOT)}")
     click.echo("Done.")
 
 

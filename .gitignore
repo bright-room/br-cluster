@@ -28,6 +28,11 @@ docker/ssh
 ### ansible ###
 provisioner/roles/ipr-cnrs.nftables/
 provisioner/collections/ansible_collections/
+# Generated inventory files (by cluster-forge generate-inventory)
+provisioner/inventories/*/hosts.yaml
+!provisioner/inventories/base/hosts.yaml
+provisioner/inventories/*/group_vars/all/cluster_hosts.yaml
+provisioner/inventories/*/host_vars/br-gateway1.yaml
 
 ### misc ###
 .tmp/

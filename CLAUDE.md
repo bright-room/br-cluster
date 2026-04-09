@@ -13,6 +13,9 @@ cli/
   tests/                 # pytest テスト
 imager/                  # Packer HCL (OS イメージ定義)
 provisioner/             # Ansible (ノードプロビジョニング)
+  inventories/
+    base/                # 静的設定 (group_vars, host_vars)
+    {env}/               # 動的生成 (hosts.yaml, cluster_hosts.yaml) ※ gitignored
 manifests/               # Kubernetes マニフェスト (Flux GitOps)
 servers.yaml             # サーバー定義の唯一の情報源
 compose.yaml             # Docker Compose (1Password Connect + ansible-runner)
@@ -39,6 +42,9 @@ uv run cluster-forge bootstrap --env dev
 # OS イメージビルド
 uv run cluster-forge generate-config --env dev [--server br-node1]
 uv run cluster-forge build-image --env dev [--server br-node1] [--skip-generate]
+
+# Ansible インベントリ生成 (servers.yaml + 1Password → inventories/{env}/)
+uv run cluster-forge generate-inventory --env dev
 
 # プロビジョニング
 uv run cluster-forge provision run --env dev setup-node

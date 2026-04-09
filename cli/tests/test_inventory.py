@@ -17,6 +17,7 @@ def test_load_inventory_from_project_root() -> None:
 
     node = next(s for s in inventory.servers if s.name == "br-node1")
     assert node.type == ServerType.NODE
+    assert node.k8s_role is not None
 
 
 def test_load_inventory_from_custom_path(tmp_path: Path) -> None:
@@ -28,6 +29,7 @@ servers:
     type: gateway
   - name: test-node
     type: node
+    k8s_role: primary
 """
     path = tmp_path / "servers.yaml"
     path.write_text(yaml_content)

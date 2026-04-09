@@ -4,7 +4,7 @@ cluster-init: true
 server: https://{{ primary_control_node_ip }}:{{ k3s.cluster.port }}
 {% endif %}
 token-file: {{ k3s.config_dir }}/cluster-token
-node-name: {{ hostname }}
+node-name: {{ inventory_hostname }}
 
 flannel-backend: none
 disable-network-policy: true

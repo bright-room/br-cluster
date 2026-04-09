@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from enum import StrEnum
 
 from pydantic import BaseModel
@@ -9,9 +11,16 @@ class ServerType(StrEnum):
     EXTERNAL = "external"
 
 
+class K8sRole(StrEnum):
+    PRIMARY = "primary"
+    SECONDARY = "secondary"
+    WORKER = "worker"
+
+
 class ServerDefinition(BaseModel):
     name: str
     type: ServerType
+    k8s_role: K8sRole | None = None
 
     @property
     def needs_network_config(self) -> bool:

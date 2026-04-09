@@ -1,6 +1,4 @@
 ---
-hostname: "br-node5"
-
 ##################################
 # External disk configuration
 # Longhorn (k3s) が Pod のストレージとして使用する

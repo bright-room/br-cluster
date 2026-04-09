@@ -1,0 +1,5 @@
+---
+# Empty inventory source.
+# Hosts are defined in the generated inventories/{env}/hosts.yaml.
+# This file exists so that Ansible recognises this directory
+# and loads its group_vars/ and host_vars/.

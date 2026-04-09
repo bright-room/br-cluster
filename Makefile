@@ -55,6 +55,14 @@ dev/image-build/%:
 prod/image-build/%:
 	uv run cluster-forge build-image --env prod --server $*
 
+# === Inventory Generation ===
+
+dev/generate-inventory:
+	uv run cluster-forge generate-inventory --env dev
+
+prod/generate-inventory:
+	uv run cluster-forge generate-inventory --env prod
+
 # === Provisioning ===
 # Usage: make dev/provision/setup-node, make prod/provision/k3s-start, etc.
 
