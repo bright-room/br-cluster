@@ -24,6 +24,8 @@ nft_input_rules:
     - iifname $lan_interface tcp dport @in_tcp_accept ct state new accept
   211 input udp accepted:
     - iifname $lan_interface udp dport @in_udp_accept ct state new accept
+  215 input tcp from k8s pods:
+    - ip saddr $pod_cidr tcp dport @in_pod_tcp_accept ct state new accept
   220 input tcp from wan:
     - iifname $wan_interface tcp dport @in_wan_tcp_accept ct state new accept
   221 input udp from wan:
@@ -105,6 +107,12 @@ nft_define:
   wan network:
     name: wan_network
     value: "0.0.0.0/0"
+  pod cidr:
+    name: pod_cidr
+    value: "10.42.0.0/16"
+  input tcp accepted from k8s pods:
+    name: in_pod_tcp_accept
+    value: "{ domain, 2379 }"
   forward tcp accept:
     name: forward_tcp_accept
     value: "{ http, https, domain }"
@@ -132,6 +140,9 @@ nft_set:
   in_wan_udp_accept:
     - type inet_service; flags interval;
     - elements = $in_wan_udp_accept
+  in_pod_tcp_accept:
+    - type inet_service; flags interval;
+    - elements = $in_pod_tcp_accept
   forward_tcp_accept:
     - type inet_service; flags interval;
     - elements = $forward_tcp_accept
