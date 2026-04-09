@@ -57,8 +57,10 @@ nft__nat_default_prerouting_rules: {}
 nft__nat_prerouting_rules:
   000 policy:
     - type nat hook prerouting priority -100;
-  010 dnat garage web:
-    - iifname $wan_interface tcp dport 443 dnat ip to 172.22.10.50:443
+  010 dnat http to internal gateway:
+    - iifname $wan_interface tcp dport 80 dnat ip to {{ (cluster_vips | selectattr('name', 'equalto', 'internal-gateway') | first).ip }}:80
+  011 dnat https to internal gateway:
+    - iifname $wan_interface tcp dport 443 dnat ip to {{ (cluster_vips | selectattr('name', 'equalto', 'internal-gateway') | first).ip }}:443
   020 dnat k8s api:
     - iifname $wan_interface tcp dport 6443 dnat ip to {{ (cluster_vips | selectattr('name', 'equalto', 'k8s-api') | first).ip }}:6443
 

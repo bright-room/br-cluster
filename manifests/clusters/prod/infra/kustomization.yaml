@@ -5,6 +5,8 @@ resources:
   - cilium-app.yaml
   - coredns-app.yaml
   - csi-external-snapshotter-app.yaml
+  - envoy-gateway-app.yaml
+  - external-dns-app.yaml
   - external-secrets-app.yaml
   - flux-app.yaml
   - kube-vip-app.yaml

@@ -1,0 +1,16 @@
+# external-dns helm values (base)
+provider:
+  name: coredns
+
+extraArgs:
+  - --source=service
+  - --source=gateway-httproute
+
+env:
+  - name: ETCD_URLS
+    value: http://172.22.10.1:2379
+
+domainFilters:
+  - bright-room.net
+
+policy: upsert-only

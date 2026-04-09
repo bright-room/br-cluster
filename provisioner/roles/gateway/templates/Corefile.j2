@@ -31,6 +31,12 @@
 {% for domain in wan_exposed_domains %}
         {{ wan_ip }}     {{ domain }}
 {% endfor %}
+        fallthrough
+    }
+    template IN A {
+        match ".*\.{{ cluster_domain }}\.$"
+        answer "{{ "{{" }} .Name {{ "}}" }} 60 IN A {{ wan_ip }}"
+        fallthrough
     }
     import common
 }
