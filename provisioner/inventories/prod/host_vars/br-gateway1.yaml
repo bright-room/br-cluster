@@ -36,8 +36,6 @@ nft_input_rules:
     - iifname $lan_interface udp dport @in_udp_accept ct state new accept
   220 input tcp from wan:
     - iifname $wan_interface tcp dport @in_wan_tcp_accept ct state new accept
-  221 input udp from wan:
-    - iifname $wan_interface udp dport @in_wan_udp_accept ct state new accept
 
 nft_output_default_rules: {}
 nft_output_rules:
@@ -59,21 +57,16 @@ nft_forward_rules:
     - iifname $wan_interface oifname $lan_interface ip daddr $lan_network tcp dport ssh ct state new accept
   230 http from wan:
     - iifname $wan_interface oifname $lan_interface ip daddr $lan_network tcp dport { http, https } ct state new accept
-  240 backup from wan:
-    - iifname $wan_interface oifname $lan_interface ip daddr 172.22.10.50 tcp dport { 3900, 3902 } ct state new accept
   250 k8s api from wan:
     - iifname $wan_interface oifname $lan_interface ip daddr {{ (cluster_vips | selectattr('name', 'equalto', 'k8s-api') | first).ip }} tcp dport 6443 ct state new accept
-  260 docker:
-    - iifname $docker_interface accept
 
 nft__nat_table_manage: true
 nft__nat_default_prerouting_rules: {}
 nft__nat_prerouting_rules:
   000 policy:
     - type nat hook prerouting priority -100;
-  010 dnat garage s3:
-    - iifname $wan_interface tcp dport 3900 dnat ip to 172.22.10.50:3900
-    - iifname $wan_interface tcp dport 3902 dnat ip to 172.22.10.50:3902
+  010 dnat garage web:
+    - iifname $wan_interface tcp dport 443 dnat ip to 172.22.10.50:443
   020 dnat k8s api:
     - iifname $wan_interface tcp dport 6443 dnat ip to {{ (cluster_vips | selectattr('name', 'equalto', 'k8s-api') | first).ip }}:6443
 
@@ -99,22 +92,16 @@ nft_define:
     value: "{ ssh, domain, 2379, 9100 }"
   input udp accepted from lan:
     name: in_udp_accept
-    value: "{ snmp, domain, ntp, bootps }"
+    value: "{ domain, ntp, bootps }"
   input tcp accepted from wan:
     name: in_wan_tcp_accept
-    value: "{ ssh, domain }"
-  input udp accepted from wan:
-    name: in_wan_udp_accept
-    value: "{ domain }"
+    value: "{ ssh }"
   lan interface:
     name: lan_interface
     value: "eth0"
   wan interface:
     name: wan_interface
     value: "wlan0"
-  docker interface:
-    name: docker_interface
-    value: "docker0"
   lan network:
     name: lan_network
     value: "{{ cluster_network.subnet }}/{{ cluster_network.prefix_length }}"
@@ -123,7 +110,7 @@ nft_define:
     value: "0.0.0.0/0"
   forward tcp accept:
     name: forward_tcp_accept
-    value: "{ http, https, ssh, domain, whois }"
+    value: "{ http, https, domain }"
   forward udp accept:
     name: forward_udp_accept
     value: "{ domain, ntp }"
@@ -145,9 +132,6 @@ nft_set:
   in_wan_tcp_accept:
     - type inet_service; flags interval;
     - elements = $in_wan_tcp_accept
-  in_wan_udp_accept:
-    - type inet_service; flags interval;
-    - elements = $in_wan_udp_accept
   forward_tcp_accept:
     - type inet_service; flags interval;
     - elements = $forward_tcp_accept
