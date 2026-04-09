@@ -15,7 +15,9 @@
 {% endfor %}
 {% endfor %}
 {% for vip in cluster_vips %}
+{% if vip.domain is defined %}
         {{ vip.ip }}     {{ vip.domain }}
+{% endif %}
 {% endfor %}
     }
     etcd {
