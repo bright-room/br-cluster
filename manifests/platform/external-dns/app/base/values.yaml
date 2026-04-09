@@ -2,9 +2,9 @@
 provider:
   name: coredns
 
-extraArgs:
-  - --source=service
-  - --source=gateway-httproute
+sources:
+  - service
+  - gateway-httproute
 
 env:
   - name: ETCD_URLS
