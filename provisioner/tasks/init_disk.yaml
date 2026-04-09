@@ -1,12 +1,15 @@
 ---
+# LV の存在チェック: 未作成時は rc!=0 になるが、後続ブロックで新規作成するため正常動作
 - name: Check if logical volume exists
   command:
     cmd: "lvs /dev/{{ volume_group }}/{{ logical_volume }}"
   register: lv_check
-  ignore_errors: true
+  failed_when: false
   changed_when: false
+  become: true
 
 - name: Initialize disk
+  become: true
   block:
     - name: Filter disk devices
       shell: "lsblk -d -n -o NAME,SIZE,TYPE | grep disk | cut -d ' ' -f 1"

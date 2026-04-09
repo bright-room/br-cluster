@@ -1,6 +1,6 @@
 ---
 - name: Reset k3s cluster
-  hosts: all
+  hosts: clusters
   gather_facts: false
   become: true
 

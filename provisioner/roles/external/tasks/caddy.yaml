@@ -48,6 +48,28 @@
     mode: "0644"
   notify: reload caddy
 
+- name: Create Caddy systemd override directory
+  file:
+    path: /etc/systemd/system/caddy.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Copy Caddy systemd override
+  template:
+    src: caddy-override.conf.j2
+    dest: /etc/systemd/system/caddy.service.d/override.conf
+    owner: root
+    group: root
+    mode: "0644"
+  register: caddy_override
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: true
+  when: caddy_override.changed
+
 - name: Enable and start Caddy
   systemd:
     name: caddy

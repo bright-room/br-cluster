@@ -26,6 +26,8 @@ nft_input_rules:
     - iifname $lan_interface udp dport @in_udp_accept ct state new accept
   220 input tcp from wan:
     - iifname $wan_interface tcp dport @in_wan_tcp_accept ct state new accept
+  221 input udp from wan:
+    - iifname $wan_interface udp dport @in_wan_udp_accept ct state new accept
 
 nft_output_default_rules: {}
 nft_output_rules:
@@ -85,7 +87,10 @@ nft_define:
     value: "{ domain, ntp, bootps }"
   input tcp accepted from wan:
     name: in_wan_tcp_accept
-    value: "{ ssh }"
+    value: "{ ssh, domain }"
+  input udp accepted from wan:
+    name: in_wan_udp_accept
+    value: "{ domain }"
   lan interface:
     name: lan_interface
     value: "eth0"
@@ -122,6 +127,9 @@ nft_set:
   in_wan_tcp_accept:
     - type inet_service; flags interval;
     - elements = $in_wan_tcp_accept
+  in_wan_udp_accept:
+    - type inet_service; flags interval;
+    - elements = $in_wan_udp_accept
   forward_tcp_accept:
     - type inet_service; flags interval;
     - elements = $forward_tcp_accept
