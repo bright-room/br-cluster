@@ -19,16 +19,22 @@ check: lint test packer-validate
 
 # === Cluster Operations ===
 
-bootstrap:
+dev/bootstrap:
 	uv run cluster-forge bootstrap --env dev
+
+dev/clean:
+	uv run cluster-forge clean --env dev
+
+dev/clean-all:
+	uv run cluster-forge clean --env dev --all
+
+prod/bootstrap:
 	uv run cluster-forge bootstrap --env prod
 
-clean:
-	uv run cluster-forge clean --env dev
+prod/clean:
 	uv run cluster-forge clean --env prod
 
-clean-all:
-	uv run cluster-forge clean --env dev --all
+prod/clean-all:
 	uv run cluster-forge clean --env prod --all
 
 dev/generate-config:

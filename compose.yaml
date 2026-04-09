@@ -2,6 +2,8 @@ services:
   op-connect-api:
     image: 1password/connect-api:latest
     hostname: ${ENV}-op-connect-api
+    ports:
+      - "8080:8080"
     environment:
       OP_SESSION: ${OP_SESSION}
     volumes:

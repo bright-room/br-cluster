@@ -22,6 +22,8 @@ __pycache__/
 
 ### generated ###
 .generated/
+docker/ssh
+!docker/ssh/keys/.gitkeep
 
 ### ansible ###
 provisioner/roles/ipr-cnrs.nftables/

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
@@ -79,14 +79,36 @@ class TestResolveServers:
 
 
 class TestBootstrapCommand:
+    @patch("cluster_forge.cli.load_inventory")
+    @patch("cluster_forge.cli.fetch_server_ssh_info")
+    @patch("cluster_forge.cli.write_ssh_keys")
+    @patch("cluster_forge.cli.generate_ssh_config")
+    @patch("cluster_forge.cli.ConnectClient")
     @patch("cluster_forge.cli.subprocess.run")
-    def test_bootstrap_starts_all_services(
-        self, mock_run, runner: CliRunner, fake_secret_dir: Path
+    def test_bootstrap_runs_staged_startup(
+        self,
+        mock_run,
+        mock_client_cls,
+        mock_gen_config,
+        mock_write_keys,
+        mock_fetch_info,
+        mock_load_inv,
+        runner: CliRunner,
+        fake_secret_dir: Path,
+        sample_inventory,
     ) -> None:
+        mock_load_inv.return_value = sample_inventory
+        mock_fetch_info.return_value = MagicMock()
         result = runner.invoke(main, ["bootstrap", "--env", "dev"])
         assert result.exit_code == 0
-        assert "1Password Connect + Ansible Runner (dev) started" in result.output
-        mock_run.assert_called_once()
+        assert "Bootstrap (dev) complete" in result.output
+        # docker compose called twice: connect first, then ansible-runner
+        assert mock_run.call_count == 2
+        first_call_args = mock_run.call_args_list[0][0][0]
+        assert "op-connect-api" in first_call_args
+        assert "op-connect-sync" in first_call_args
+        second_call_args = mock_run.call_args_list[1][0][0]
+        assert "ansible-runner" in second_call_args
 
 
 class TestCleanCommand:

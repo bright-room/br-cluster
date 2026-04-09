@@ -11,6 +11,12 @@ import click
 from cluster_forge import config_generator as config_gen
 from cluster_forge import packer as packer_mod
 from cluster_forge import provisioner as provisioner_mod
+from cluster_forge.bootstrap import (
+    ConnectClient,
+    fetch_server_ssh_info,
+    generate_ssh_config,
+    write_ssh_keys,
+)
 from cluster_forge.inventory import load_inventory
 from cluster_forge.models import Inventory
 from cluster_forge.secrets import OnePasswordCliProvider
@@ -19,6 +25,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 CLOUD_INIT_DIR = REPO_ROOT / ".generated" / "cloud-init"
 GENERATED_DIR = REPO_ROOT / ".generated"
 IMAGER_DIR = REPO_ROOT / "imager"
+SSH_DIR = REPO_ROOT / "docker" / "ssh"
 
 ENV_OPTION = click.option(
     "--env",
@@ -92,14 +99,47 @@ def main() -> None:
 @main.command()
 @ENV_OPTION
 def bootstrap(env: str) -> None:
-    """Start 1Password Connect and Ansible Runner."""
+    """Start 1Password Connect, fetch SSH info, and start Ansible Runner."""
+    compose_cmd = _compose_cmd(env)
+    compose_env = _compose_env(env)
+
+    # 1. Start Connect API + Sync
     click.echo("Starting 1Password Connect...")
     subprocess.run(
-        [*_compose_cmd(env), "up", "-d"],
-        env=_compose_env(env),
+        [*compose_cmd, "up", "-d", "op-connect-api", "op-connect-sync"],
+        env=compose_env,
         check=True,
     )
-    click.echo(f"1Password Connect + Ansible Runner ({env}) started.")
+
+    # 2. Wait for Connect API to be ready
+    click.echo("Waiting for Connect API...")
+    _, token = _read_secrets(env)
+    client = ConnectClient(token=token)
+    client.wait_for_ready()
+    click.echo("Connect API is ready.")
+
+    # 3. Fetch SSH info from vault
+    inventory = load_inventory()
+    vault_name = f"br-cluster-{env}"
+    server_infos = []
+    for server in inventory.servers:
+        click.echo(f"  Fetching SSH info for {server.name}...")
+        info = fetch_server_ssh_info(client, vault_name, server)
+        server_infos.append(info)
+
+    # 4. Write SSH keys and generate SSH config
+    write_ssh_keys(SSH_DIR, server_infos)
+    generate_ssh_config(SSH_DIR, server_infos)
+    click.echo("SSH keys and config generated.")
+
+    # 5. Start Ansible Runner
+    click.echo("Starting Ansible Runner...")
+    subprocess.run(
+        [*compose_cmd, "up", "-d", "ansible-runner"],
+        env=compose_env,
+        check=True,
+    )
+    click.echo(f"Bootstrap ({env}) complete.")
 
 
 @main.command("generate-config")
