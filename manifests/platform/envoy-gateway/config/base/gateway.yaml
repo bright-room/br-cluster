@@ -4,7 +4,7 @@ metadata:
   name: public-gateway
   namespace: envoy-gateway-system
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    cert-manager.io/cluster-issuer: letsencrypt-issuer
 spec:
   gatewayClassName: envoy-gateway
   addresses:
@@ -34,7 +34,7 @@ metadata:
   name: internal-gateway
   namespace: envoy-gateway-system
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    cert-manager.io/cluster-issuer: letsencrypt-issuer
 spec:
   gatewayClassName: envoy-gateway
   addresses:
