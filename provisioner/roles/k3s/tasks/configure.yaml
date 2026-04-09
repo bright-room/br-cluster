@@ -33,6 +33,14 @@
     group: "root"
     mode: "0644"
 
+- name: Copy registries configuration
+  template:
+    src: "registries.yaml.j2"
+    dest: "{{ k3s.config_dir }}/registries.yaml"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+
 - name: Copy k3s master configuration
   template:
     src: "config.yaml.master.j2"

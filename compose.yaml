@@ -27,6 +27,8 @@ services:
       OP_CONNECT_HOST: http://${ENV}-op-connect-api:8080
     volumes:
       - ${SSH_AUTH_SOCK}:/ssh-agent.sock
+      - ./docker/ssh/config:/root/.ssh/config:ro
+      - ./docker/ssh/keys:/root/.ssh/keys:ro
       - ./provisioner:/ansible
       - ./manifests:/manifests:ro
       - ./.secret/${ENV}:/.secret
