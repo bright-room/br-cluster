@@ -37,7 +37,6 @@ dns:
 # From WAN, these resolve to gateway1's wan_ip and are DNAT-forwarded
 # to the actual LAN target by gateway1's nftables rules.
 wan_exposed_domains:
-  - "backup-storage.{{ cluster_domain }}"
   - "k8s-api.{{ cluster_domain }}"
 
 ##################################
@@ -99,3 +98,5 @@ cluster_vips:
   - name: k8s-api
     ip: "172.22.10.60"
     domain: "k8s-api.{{ cluster_domain }}"
+  - name: internal-gateway
+    ip: "172.22.10.68"

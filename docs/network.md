@@ -49,7 +49,9 @@ graph TB
 | br-node6 | 172.22.10.15 | k3s Worker |
 | br-external1 | 172.22.10.50 | バックアップストレージ (Garage) |
 | k8s API VIP | 172.22.10.60 | kube-vip (フローティング IP) |
+| Envoy Public Gateway LB | 172.22.10.64 | *.b8m.app 外部公開 |
 | Fluentd LB | 172.22.10.65 | ログ収集 |
+| Envoy Internal Gateway LB | 172.22.10.68 | *.cluster-internal.bright-room.net 内部サービス |
 | DHCP 範囲 | 172.22.10.100 - .200 | 未割り当てノード用 |
 
 > IP アドレスの実際の値は 1Password に格納されています。上記は設計上の割り当て例です。
@@ -83,7 +85,7 @@ graph LR
 
     subgraph "Prerouting (NAT)"
         dnat{DNAT ルール}
-        dnat1[":443 → external1:443<br/>(Backup Storage)"]
+        dnat1[":80/443 → .68:80/443<br/>(Envoy Internal Gateway)"]
         dnat2[":6443 → VIP:6443<br/>(k8s API)"]
     end
 
@@ -141,7 +143,8 @@ graph LR
 | ルール | 変換内容 |
 |---|---|
 | Masquerade | LAN (172.22.10.0/24) → WAN 発信時にゲートウェイの WAN IP に変換 |
-| DNAT :443 | WAN:443 → 172.22.10.50:443 (バックアップストレージ) |
+| DNAT :80 | WAN:80 → 172.22.10.68:80 (Envoy Internal Gateway) |
+| DNAT :443 | WAN:443 → 172.22.10.68:443 (Envoy Internal Gateway) |
 | DNAT :6443 | WAN:6443 → 172.22.10.60:6443 (k8s API VIP) |
 | Hairpin NAT | WAN → LAN の DNAT 後に送信元もマスカレード (ヘアピン) |
 
@@ -169,19 +172,23 @@ DNS は 2 層構成です。
 
 このクラスタでは 2 つのドメインを使い分けています。
 
-| ドメイン | 用途 | DNS 管理 |
-|---|---|---|
-| `*.cluster-internal.bright-room.net` | インフラ (ノード間通信, S3, 内部 Web UI) | Gateway CoreDNS (静的 + External DNS 書込) |
-| `*.b8m.app` | K8s サービス外部公開 (Grafana, Keycloak 等) | External DNS → Gateway CoreDNS/etcd |
+| ドメイン | 用途 | DNS 管理 | アクセス経路 |
+|---|---|---|---|
+| `*.cluster-internal.bright-room.net` | インフラ (ノード間通信, S3, 内部 Web UI) | Gateway CoreDNS (静的 + External DNS 書込) | WAN → DNAT → Internal Gateway (172.22.10.68) |
+| `*.b8m.app` | K8s サービス外部公開 (Grafana, Keycloak 等) | Cloudflare DNS | Internet → Cloudflare Tunnel → Public Gateway (172.22.10.64) |
 
-**External DNS の仕組み**: Kubernetes 内の HTTPRoute リソースにホスト名が定義されると、External DNS が自動的にゲートウェイの CoreDNS (etcd バックエンド) に DNS レコードを登録します。手動での DNS 設定は不要です。
+**External DNS の仕組み**: Kubernetes 内の HTTPRoute リソースにホスト名が定義されると、External DNS が自動的にゲートウェイの CoreDNS (etcd バックエンド) に `*.cluster-internal.bright-room.net` の DNS レコードを登録します。手動での DNS 設定は不要です。
 
-### WAN 公開ドメイン (Split-horizon DNS)
+### WAN からの内部サービスアクセス (Split-horizon DNS)
 
-一部のドメインは WAN からもアクセス可能です。WAN クライアントに対してはゲートウェイの WAN IP に解決し、nftables の DNAT で LAN 内の実際のホストに転送します。
+WAN クライアント (開発 Mac 等) から `*.cluster-internal.bright-room.net` のサービスにアクセスする場合:
 
-- `backup-storage.cluster-internal.bright-room.net` → DNAT → 172.22.10.50
-- `k8s-api.cluster-internal.bright-room.net` → DNAT → 172.22.10.60
+1. DNS クエリ → Gateway の WAN 側 CoreDNS が WAN IP を返す (template によるワイルドカード応答)
+2. WAN IP:80/443 へ接続 → nftables DNAT → Internal Gateway (172.22.10.68)
+3. Internal Gateway が Host ヘッダーで適切なサービスにルーティング
+
+個別の DNAT ルール:
+- `k8s-api.cluster-internal.bright-room.net:6443` → DNAT → 172.22.10.60 (k8s API VIP)
 
 ## ノード間の通信パス
 
