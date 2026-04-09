@@ -12,7 +12,7 @@ spec:
   dependsOn:
     - name: csi-external-snapshotter-app
     - name: external-secrets-config
-  path: ./platform/longhorn/app/overlays/prod
+  path: ./manifests/platform/longhorn/app/overlays/prod
   prune: true
   wait: true
   timeout: 15m

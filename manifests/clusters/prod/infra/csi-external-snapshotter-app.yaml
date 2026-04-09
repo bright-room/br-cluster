@@ -9,7 +9,7 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
-  path: ./platform/csi-external-snapshotter/app/overlays/prod
+  path: ./manifests/platform/csi-external-snapshotter/app/overlays/prod
   prune: true
   wait: true
   timeout: 5m

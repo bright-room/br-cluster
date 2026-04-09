@@ -10,7 +10,7 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
-  path: ./platform/cert-manager/app/overlays/prod
+  path: ./manifests/platform/cert-manager/app/overlays/prod
   prune: true
   wait: true
   timeout: 5m
@@ -28,7 +28,7 @@ spec:
   dependsOn:
     - name: cert-manager-app
     - name: external-secrets-config
-  path: ./platform/cert-manager/secrets/overlays/prod
+  path: ./manifests/platform/cert-manager/secrets/overlays/prod
   prune: true
   wait: true
   timeout: 5m
@@ -46,7 +46,7 @@ spec:
   dependsOn:
     - name: cert-manager-app
     - name: cert-manager-secrets
-  path: ./platform/cert-manager/config/overlays/prod
+  path: ./manifests/platform/cert-manager/config/overlays/prod
   prune: true
   wait: true
   timeout: 5m

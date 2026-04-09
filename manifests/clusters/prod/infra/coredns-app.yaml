@@ -11,5 +11,5 @@ spec:
     name: flux-system
   dependsOn:
     - name: cilium-app
-  path: ./platform/coredns/app/overlays/prod
+  path: ./manifests/platform/coredns/app/overlays/prod
   prune: true
