@@ -20,6 +20,9 @@ k8sServicePort: 6444
 kubeProxyReplacement: true
 kubeProxyReplacementHealthzBindAddr: 0.0.0.0:10256
 
+# Attach eBPF programs to physical interface for external LB traffic
+devices: eth0
+
 # IPAM configuration
 ipam:
   operator:
