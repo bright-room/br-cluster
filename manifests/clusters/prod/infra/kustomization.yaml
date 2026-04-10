@@ -9,6 +9,7 @@ resources:
   - external-dns-app.yaml
   - external-secrets-app.yaml
   - flux-app.yaml
+  - istio-app.yaml
   - kube-vip-app.yaml
   - longhorn-app.yaml
   - onepassword-connect-app.yaml
