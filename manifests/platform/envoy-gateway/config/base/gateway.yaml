@@ -20,6 +20,7 @@ spec:
     - name: https
       protocol: HTTPS
       port: 443
+      hostname: "*.${CLUSTER_DOMAIN}"
       allowedRoutes:
         namespaces:
           from: All
@@ -50,6 +51,7 @@ spec:
     - name: https
       protocol: HTTPS
       port: 443
+      hostname: "*.${CLUSTER_INTERNAL_DOMAIN}"
       allowedRoutes:
         namespaces:
           from: All
