@@ -8,6 +8,7 @@ spec:
     type: Kubernetes
     kubernetes:
       envoyService:
+        externalTrafficPolicy: Cluster
         annotations:
           io.cilium/lb-ipam-ips: ${PUBLIC_GATEWAY_IP}
 ---
@@ -21,5 +22,6 @@ spec:
     type: Kubernetes
     kubernetes:
       envoyService:
+        externalTrafficPolicy: Cluster
         annotations:
           io.cilium/lb-ipam-ips: ${INTERNAL_GATEWAY_IP}
