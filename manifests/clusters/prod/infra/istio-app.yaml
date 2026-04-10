@@ -53,3 +53,21 @@ spec:
   prune: true
   wait: true
   timeout: 15m
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: istio-ztunnel-app
+  namespace: flux-system
+spec:
+  interval: 30m
+  targetNamespace: istio-system
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  dependsOn:
+    - name: istio-cni-app
+  path: ./manifests/platform/istio/ztunnel/overlays/prod
+  prune: true
+  wait: true
+  timeout: 5m

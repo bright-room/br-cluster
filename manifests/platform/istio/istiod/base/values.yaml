@@ -1,4 +1,2 @@
 # istio helm values (base)
-pilot:
-  cni:
-    enabled: true
+profile: ambient
