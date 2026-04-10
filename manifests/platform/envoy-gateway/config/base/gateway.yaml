@@ -6,7 +6,7 @@ metadata:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-issuer
 spec:
-  gatewayClassName: envoy-gateway
+  gatewayClassName: public-gateway
   addresses:
     - type: IPAddress
       value: ${PUBLIC_GATEWAY_IP}
@@ -37,7 +37,7 @@ metadata:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-issuer
 spec:
-  gatewayClassName: envoy-gateway
+  gatewayClassName: internal-gateway
   addresses:
     - type: IPAddress
       value: ${INTERNAL_GATEWAY_IP}
