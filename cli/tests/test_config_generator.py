@@ -105,22 +105,22 @@ class TestRenderUserData:
 class TestRenderNetworkConfig:
     def test_contains_static_ip(self) -> None:
         secrets = NetworkSecrets(
-            internal_ip="192.168.1.100",
-            external_ip="10.0.0.50",
-            gateway_ip="10.0.0.1",
+            internal_ip="192.0.2.100",
+            external_ip="198.51.100.50",
+            gateway_ip="198.51.100.1",
             ssid="MyWiFi",
             wifi_password="secret",
         )
         result = render_network_config(secrets)
-        assert "192.168.1.100/24" in result
-        assert "10.0.0.50/24" in result
-        assert "10.0.0.1" in result
+        assert "192.0.2.100/24" in result
+        assert "198.51.100.50/24" in result
+        assert "198.51.100.1" in result
 
     def test_wifi_password_is_hashed(self) -> None:
         secrets = NetworkSecrets(
-            internal_ip="192.168.1.100",
-            external_ip="10.0.0.50",
-            gateway_ip="10.0.0.1",
+            internal_ip="192.0.2.100",
+            external_ip="198.51.100.50",
+            gateway_ip="198.51.100.1",
             ssid="MyWiFi",
             wifi_password="secret",
         )

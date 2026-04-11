@@ -95,39 +95,43 @@ class OnePasswordCliProvider(SecretProvider):
 
 
 class MockSecretProvider(SecretProvider):
+    # All addresses below are from documentation-only ranges and have no
+    # relationship to real infrastructure:
+    #   - IPv4: RFC 5737 TEST-NET-1/2 (192.0.2.0/24, 198.51.100.0/24)
+    #   - MAC:  RFC 7042 documentation range (00:00:5E:00:53:00-FF)
     MOCK_SERVERS: dict[str, InventorySecrets] = {
         "br-gateway1": InventorySecrets(
-            ip_address="172.22.10.1",
-            mac_address="e4:5f:01:65:14:70",
-            wan_ip="192.168.2.50",
+            ip_address="192.0.2.1",
+            mac_address="00:00:5e:00:53:01",
+            wan_ip="198.51.100.50",
         ),
         "br-node1": InventorySecrets(
-            ip_address="172.22.10.10",
-            mac_address="d8:3a:dd:7f:89:51",
+            ip_address="192.0.2.10",
+            mac_address="00:00:5e:00:53:10",
         ),
         "br-node2": InventorySecrets(
-            ip_address="172.22.10.11",
-            mac_address="d8:3a:dd:75:fa:14",
+            ip_address="192.0.2.11",
+            mac_address="00:00:5e:00:53:11",
         ),
         "br-node3": InventorySecrets(
-            ip_address="172.22.10.12",
-            mac_address="d8:3a:dd:75:f8:b5",
+            ip_address="192.0.2.12",
+            mac_address="00:00:5e:00:53:12",
         ),
         "br-node4": InventorySecrets(
-            ip_address="172.22.10.13",
-            mac_address="d8:3a:dd:43:97:c1",
+            ip_address="192.0.2.13",
+            mac_address="00:00:5e:00:53:13",
         ),
         "br-node5": InventorySecrets(
-            ip_address="172.22.10.14",
-            mac_address="d8:3a:dd:43:8b:be",
+            ip_address="192.0.2.14",
+            mac_address="00:00:5e:00:53:14",
         ),
         "br-node6": InventorySecrets(
-            ip_address="172.22.10.15",
-            mac_address="d8:3a:dd:27:29:4a",
+            ip_address="192.0.2.15",
+            mac_address="00:00:5e:00:53:15",
         ),
         "br-external1": InventorySecrets(
-            ip_address="172.22.10.50",
-            mac_address="dc:a6:32:94:5f:d6",
+            ip_address="192.0.2.50",
+            mac_address="00:00:5e:00:53:50",
         ),
     }
 
@@ -144,9 +148,9 @@ class MockSecretProvider(SecretProvider):
 
     def get_network_secrets(self, env: str, server_name: str) -> NetworkSecrets:
         return NetworkSecrets(
-            internal_ip="192.168.1.1",
-            external_ip="10.0.0.1",
-            gateway_ip="10.0.0.254",
+            internal_ip="192.0.2.100",
+            external_ip="198.51.100.1",
+            gateway_ip="198.51.100.254",
             ssid="test-wifi",
             wifi_password="test-wifi-password",
         )
@@ -157,6 +161,6 @@ class MockSecretProvider(SecretProvider):
         if server_name in self.MOCK_SERVERS:
             return self.MOCK_SERVERS[server_name]
         return InventorySecrets(
-            ip_address="172.22.10.99",
-            mac_address="aa:bb:cc:dd:ee:ff",
+            ip_address="192.0.2.99",
+            mac_address="00:00:5e:00:53:99",
         )
