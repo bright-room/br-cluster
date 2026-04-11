@@ -115,8 +115,8 @@ class TestGenerateClusterHosts:
         provider = MockSecretProvider()
         result = generate_cluster_hosts(full_inventory, "dev", provider)
         gw = next(h for h in result if h["name"] == "br-gateway1")
-        assert gw["ip"] == "172.22.10.1"
-        assert gw["mac"] == "e4:5f:01:65:14:70"
+        assert gw["ip"] == "192.0.2.1"
+        assert gw["mac"] == "00:00:5e:00:53:01"
 
     def test_no_hostname_field(self, full_inventory: Inventory) -> None:
         provider = MockSecretProvider()
@@ -130,7 +130,7 @@ class TestGenerateGatewayHostVars:
         provider = MockSecretProvider()
         result = generate_gateway_host_vars(full_inventory, "dev", provider)
         assert "br-gateway1" in result
-        assert result["br-gateway1"]["wan_ip"] == "192.168.2.50"
+        assert result["br-gateway1"]["wan_ip"] == "198.51.100.50"
 
     def test_no_vars_for_non_gateway(self, full_inventory: Inventory) -> None:
         provider = MockSecretProvider()

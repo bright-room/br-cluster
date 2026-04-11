@@ -19,7 +19,7 @@ from cluster_forge.models import ServerDefinition, ServerType
 def gateway_info() -> ServerSSHInfo:
     return ServerSSHInfo(
         name="br-gateway1",
-        hostname="192.168.2.50",
+        hostname="198.51.100.50",
         username="bradmin",
         public_key="ssh-ed25519 AAAAGW gateway@test",
         server_type=ServerType.GATEWAY,
@@ -30,7 +30,7 @@ def gateway_info() -> ServerSSHInfo:
 def node_info() -> ServerSSHInfo:
     return ServerSSHInfo(
         name="br-node1",
-        hostname="172.22.10.10",
+        hostname="192.0.2.10",
         username="bradmin",
         public_key="ssh-ed25519 AAAAND node@test",
         server_type=ServerType.NODE,
@@ -41,7 +41,7 @@ def node_info() -> ServerSSHInfo:
 def external_info() -> ServerSSHInfo:
     return ServerSSHInfo(
         name="br-external1",
-        hostname="172.22.10.50",
+        hostname="192.0.2.50",
         username="bradmin",
         public_key="ssh-ed25519 AAAAEX external@test",
         server_type=ServerType.EXTERNAL,
@@ -116,7 +116,7 @@ class TestGenerateSSHConfig:
     ) -> None:
         generate_ssh_config(tmp_path, all_infos)
         config = (tmp_path / "config").read_text()
-        assert "HostName 192.168.2.50" in config
+        assert "HostName 198.51.100.50" in config
 
     def test_gateway_comes_first(
         self, tmp_path: Path, all_infos: list[ServerSSHInfo]
@@ -145,27 +145,27 @@ class TestFetchServerSSHInfo:
     def test_fetches_gateway_with_external_ip(self) -> None:
         client = MagicMock(spec=ConnectClient)
         client.get_field.side_effect = lambda vault, item, field: {
-            ("vault", "br-gateway1", "external_ip_address"): "192.168.2.50",
+            ("vault", "br-gateway1", "external_ip_address"): "198.51.100.50",
             ("vault", "br-gateway1", "username"): "bradmin",
             ("vault", "br-gateway1_ssh", "public key"): "ssh-ed25519 AAAA",
         }[(vault, item, field)]
 
         server = ServerDefinition(name="br-gateway1", type=ServerType.GATEWAY)
         info = fetch_server_ssh_info(client, "vault", server)
-        assert info.hostname == "192.168.2.50"
+        assert info.hostname == "198.51.100.50"
         assert info.server_type == ServerType.GATEWAY
 
     def test_fetches_node_with_internal_ip(self) -> None:
         client = MagicMock(spec=ConnectClient)
         client.get_field.side_effect = lambda vault, item, field: {
-            ("vault", "br-node1", "ip_address"): "172.22.10.10",
+            ("vault", "br-node1", "ip_address"): "192.0.2.10",
             ("vault", "br-node1", "username"): "bradmin",
             ("vault", "br-node1_ssh", "public key"): "ssh-ed25519 AAAA",
         }[(vault, item, field)]
 
         server = ServerDefinition(name="br-node1", type=ServerType.NODE)
         info = fetch_server_ssh_info(client, "vault", server)
-        assert info.hostname == "172.22.10.10"
+        assert info.hostname == "192.0.2.10"
         assert info.server_type == ServerType.NODE
 
 
