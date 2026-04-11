@@ -11,3 +11,13 @@ timezone: "Asia/Tokyo"
 tmp_dir: "/tmp"
 install_dir: "/usr/local/bin"
 gpu_memory_mb: 16
+
+##################################
+# Storage configuration
+# storage_mode:
+#   none - OS ディスク全体を root に使う (gateway1, node1-3)
+#   ext4 - OS 用 + データ用パーティションに分割 (external1, node4-6)
+##################################
+storage_mode: none
+os_partition_size_mib: 65536  # 64 GiB
+mount_opts: "defaults,noatime,discard,nofail"
