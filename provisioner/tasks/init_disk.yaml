@@ -1,81 +1,113 @@
 ---
-# LV の存在チェック: 未作成時は rc!=0 になるが、後続ブロックで新規作成するため正常動作
-- name: Check if logical volume exists
-  command:
-    cmd: "lvs /dev/{{ volume_group }}/{{ logical_volume }}"
-  register: lv_check
-  failed_when: false
-  changed_when: false
-  become: true
-
-- name: Initialize disk
+# OS ディスク上に root(拡張済) + data パーティションを構築する。
+# 各ステップを独立して冪等にし、途中失敗しても再実行で正常化できるようにする設計。
+# cloud-init の growpart/resize_rootfs は user-data.j2 で無効化済み。
+- name: Initialize data partition
+  when: storage_mode == 'ext4'
   become: true
   block:
-    - name: Filter disk devices
-      shell: "lsblk -d -n -o NAME,SIZE,TYPE | grep disk | cut -d ' ' -f 1"
-      register: physical_disks
+    - name: Detect root partition device
+      command: findmnt -n -o SOURCE /
+      register: root_source
       changed_when: false
 
-    - name: Get OS disk
-      shell: "df / | tail -1 | cut -d ' ' -f 1 | sed -E 's/[0-9]+$//' | cut -d '/' -f 3"
-      register: os_disk
-      changed_when: false
-
-    - name: Identify external disks
+    - name: Derive OS disk and partition info
       set_fact:
-        external_disks: "{{ physical_disks.stdout_lines | select('regex', '^(?!.*' ~ os_disk.stdout | regex_escape ~ ').*$') | list }}"
+        root_partition: "{{ root_source.stdout }}"
+        os_disk: "{{ root_source.stdout | regex_replace('p?[0-9]+$', '') }}"
+        root_part_num: "{{ root_source.stdout | regex_replace('^.*[^0-9]', '') | int }}"
 
-    - name: Wipe filesystem using module
-      command:
-        cmd: "wipefs -af /dev/{{ item }}"
-      with_items: "{{ external_disks }}"
+    # nvme0n1p2 や mmcblk0p2 は 'p' 付き、sda2 は 'p' 無しというカーネル命名規則
+    - name: Determine partition suffix style
+      set_fact:
+        part_prefix: "{{ 'p' if (os_disk | regex_search('[0-9]$')) else '' }}"
 
-    - name: Create Volume Group
-      lvg:
-        vg: "{{ volume_group }}"
-        pvs: "/dev/{{ item }}"
+    - name: Compute data partition device path
+      set_fact:
+        data_partition: "{{ os_disk }}{{ part_prefix }}{{ root_part_num | int + 1 }}"
+
+    # ---------- Root パーティション拡張 ----------
+    - name: Get current root partition size in bytes
+      command: "lsblk -b -n -o SIZE {{ root_partition }}"
+      register: root_part_size_raw
+      changed_when: false
+
+    - name: Compute target root partition size in bytes
+      set_fact:
+        target_root_bytes: "{{ os_partition_size_mib | int * 1024 * 1024 }}"
+
+    # マウント中パーティションの resize は parted が対話確認を要求するので
+    # ---pretend-input-tty + 'Yes' を流して承認する
+    - name: Resize root partition to os_partition_size
+      shell: >-
+        echo Yes |
+        parted ---pretend-input-tty {{ os_disk }} unit MiB
+        resizepart {{ root_part_num }} {{ os_partition_size_mib }}
+      when: (root_part_size_raw.stdout | int) < (target_root_bytes | int)
+
+    # カーネルへの通知 (parted の BLKPG ioctl と重複するが保険)
+    # マウント中パーティションでは busy で失敗することがあるが、実質影響なしなので許容
+    - name: Notify kernel of partition table (root)
+      command: "partx -u {{ os_disk }}"
+      changed_when: false
+      failed_when: false
+
+    # resize2fs は冪等: 既にパーティション全域を使っているなら no-op
+    - name: Grow root filesystem to fill partition
+      command: "resize2fs {{ root_partition }}"
+      register: resize2fs_result
+      changed_when: >-
+        'Nothing to do' not in (resize2fs_result.stderr | default(''))
+        and 'Nothing to do' not in (resize2fs_result.stdout | default(''))
+
+    # ---------- Data パーティション作成 ----------
+    - name: Check if data partition device already exists
+      stat:
+        path: "{{ data_partition }}"
+      register: data_part_stat
+
+    - name: Create data partition in remaining space
+      shell: >-
+        echo Yes |
+        parted ---pretend-input-tty {{ os_disk }} unit MiB
+        mkpart primary ext4 {{ os_partition_size_mib }} 100%
+      when: not data_part_stat.stat.exists
+
+    - name: Notify kernel of new partition
+      command: "partx -u {{ os_disk }}"
+      changed_when: false
+      failed_when: false
+
+    - name: Wait for data partition device node
+      wait_for:
+        path: "{{ data_partition }}"
         state: present
-      with_items: "{{ external_disks }}"
+        timeout: 30
 
-    - name: Create Logical Volume
-      lvol:
-        vg: "{{ volume_group }}"
-        lv: "{{ logical_volume }}"
-        size: "100%VG"
-        state: present
-        force: no
-
-    - name: Create ext4 filesystem
+    # filesystem モジュールは dev 上に既存 FS を検出すれば no-op (force: false デフォルト)
+    - name: Ensure ext4 filesystem on data partition
       filesystem:
-        fstype: "ext4"
-        dev: "/dev/{{ volume_group }}/{{ logical_volume }}"
-        force: no
+        fstype: ext4
+        dev: "{{ data_partition }}"
+        force: false
 
-    - name: Get UUID of the device
-      command:
-        cmd: "blkid -s UUID -o value /dev/{{ volume_group }}/{{ logical_volume }}"
-      register: device_uuid
+    # ---------- マウント ----------
+    - name: Get UUID of data partition
+      command: "blkid -s UUID -o value {{ data_partition }}"
+      register: data_uuid
       changed_when: false
 
     - name: Create mount point directory
       file:
-        path: "/storage"
+        path: "{{ mount_point }}"
         mode: "0755"
         state: directory
 
-    - name: Add mount entry to /etc/fstab
+    - name: Mount data partition and register in fstab
       mount:
-        path: "/storage"
-        src: "UUID={{ device_uuid.stdout }}"
-        fstype: "ext4"
-        opts: "_netdev"
-        backup: true
-        state: present
-
-    - name: Mount filesystem
-      mount:
-        path: "/storage"
-        src: "UUID={{ device_uuid.stdout }}"
-        fstype: "ext4"
+        path: "{{ mount_point }}"
+        src: "UUID={{ data_uuid.stdout }}"
+        fstype: ext4
+        opts: "{{ mount_opts }}"
         state: mounted
-  when: lv_check.rc != 0
+        backup: true

@@ -29,6 +29,13 @@ def external_server() -> ServerDefinition:
 
 
 @pytest.fixture
+def worker_node_server() -> ServerDefinition:
+    return ServerDefinition(
+        name="br-node4", type=ServerType.NODE, k8s_role=K8sRole.WORKER
+    )
+
+
+@pytest.fixture
 def sample_inventory() -> Inventory:
     return Inventory(
         environments=["dev", "prod"],

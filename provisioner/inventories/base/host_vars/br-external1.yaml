@@ -1,10 +1,10 @@
 ---
 ##################################
-# External disk configuration
-# Garage (オブジェクトストレージ) / Restic (バックアップ) が使用する
+# Storage configuration
+# OS ディスクの残り領域を Garage (S3) / Restic のデータ置き場として使う
 ##################################
-volume_group: "vg_external"
-logical_volume: "lv_external"
+storage_mode: ext4
+mount_point: /storage
 
 
 ##################################

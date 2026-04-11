@@ -39,6 +39,7 @@ def render_user_data(server: ServerDefinition, secrets: ServerSecrets) -> str:
         operator_password=hash_password(secrets.operator_password),
         operator_pubkey=secrets.operator_pubkey,
         server_type=server.type.value,
+        k8s_role=server.k8s_role.value if server.k8s_role else None,
     )
 
 

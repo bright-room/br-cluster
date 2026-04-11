@@ -69,6 +69,38 @@ class TestRenderUserData:
         assert "test-root-password" not in result
         assert "$6$" in result
 
+    def test_external_disables_root_autoexpand(
+        self, external_server: ServerDefinition
+    ) -> None:
+        secrets = MockSecretProvider().get_server_secrets("dev", external_server.name)
+        result = render_user_data(external_server, secrets)
+        assert "mode: off" in result
+        assert "resize_rootfs: false" in result
+
+    def test_worker_node_disables_root_autoexpand(
+        self, worker_node_server: ServerDefinition
+    ) -> None:
+        secrets = MockSecretProvider().get_server_secrets(
+            "dev", worker_node_server.name
+        )
+        result = render_user_data(worker_node_server, secrets)
+        assert "mode: off" in result
+        assert "resize_rootfs: false" in result
+
+    def test_primary_node_keeps_root_autoexpand(
+        self, node_server: ServerDefinition
+    ) -> None:
+        secrets = MockSecretProvider().get_server_secrets("dev", node_server.name)
+        result = render_user_data(node_server, secrets)
+        assert "resize_rootfs" not in result
+
+    def test_gateway_keeps_root_autoexpand(
+        self, gateway_server: ServerDefinition
+    ) -> None:
+        secrets = MockSecretProvider().get_server_secrets("dev", gateway_server.name)
+        result = render_user_data(gateway_server, secrets)
+        assert "resize_rootfs" not in result
+
 
 class TestRenderNetworkConfig:
     def test_contains_static_ip(self) -> None:
