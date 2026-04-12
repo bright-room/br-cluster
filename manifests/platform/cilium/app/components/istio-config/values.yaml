@@ -1,0 +1,8 @@
+# cilium helm values (istio-config)
+
+# Istio configuration
+# https://docs.cilium.io/en/latest/network/servicemesh/istio/
+socketLB:
+  hostNamespaceOnly: true
+cni:
+  exclusive: false

@@ -66,7 +66,9 @@ k3s クラスタ内で動作するプラットフォームサービスの全体�
 | fluent | Fluent Bit | DaemonSet | ノード内ログ収集 |
 | elastic | ECK Operator + Elasticsearch + Kibana | StatefulSet | ログ検索 |
 | otel | OpenTelemetry Collector | Deployment | テレメトリ収集・転送 |
-| istio-system | istiod | Deployment | サービスメッシュ |
+| istio-system | istiod | Deployment | サービスメッシュ コントロールプレーン |
+| istio-system | ztunnel | DaemonSet | Ambient L4 ノードプロキシ |
+| istio-system | istio-cni-node | DaemonSet | Istio CNI プラグイン |
 | kiali | Kiali | Deployment | メッシュ可視化 UI |
 | cnpg-system | CloudNative PG Operator | Deployment | PostgreSQL オペレータ |
 | keycloak | Keycloak + PostgreSQL | StatefulSet | SSO / IAM (OIDC) |
@@ -82,7 +84,7 @@ Master ノードには `node-role.kubernetes.io/control-plane:NoSchedule` の Ta
 
 | 配置 | 対象 |
 |---|---|
-| 全ノード (DaemonSet) | Cilium Agent, node-exporter, Fluent Bit, Longhorn Manager |
+| 全ノード (DaemonSet) | Cilium Agent, ztunnel, istio-cni-node, node-exporter, Fluent Bit, Longhorn Manager |
 | Master のみ (DaemonSet + Toleration) | Kube-VIP, Cilium Operator |
 | Worker のみ | その他すべてのワークロード |
 
@@ -393,9 +395,42 @@ kustomize-controller
 
 ### Phase 5: サービスメッシュ
 
-| コンポーネント | 依存先 |
-|---|---|
-| istio-app | cilium-config, coredns-app |
+| コンポーネント | 依存先 | 役割 |
+|---|---|---|
+| istio-base-app | cilium-config, coredns-app | CRD 定義 |
+| istio-cni-app | istio-base-app | ノード CNI プラグイン (ambient profile) |
+| istio-istiod-app | istio-base-app, istio-cni-app | コントロールプレーン (ambient profile) |
+| istio-ztunnel-app | istio-base-app, istio-cni-app, istio-istiod-app | L4 ノードプロキシ (DaemonSet) |
+
+Istio は **Ambient モード** で動作します。Pod ごとのサイドカープロキシではなく、ノード共有の ztunnel (L4) でメッシュを実現します。
+
+**Cilium との共存:**
+
+Cilium 側に以下の設定が適用されています (`cilium/app/components/istio-config`):
+
+- `cni.exclusive: false` — istio-cni プラグインの共存を許可
+- `socketLB.hostNamespaceOnly: true` — ztunnel のトラフィック傍受と競合しないよう制限
+
+加えて `cilium/config/components/istio-config` で `CiliumClusterwideNetworkPolicy` (`allow-ambient-hostprobes`) が適用され、ztunnel の SNAT ヘルスチェック (169.254.7.127/32) を許可しています。
+
+**ワークロードをメッシュに追加する手順:**
+
+Namespace に以下のラベルを付与するだけで、その Namespace 内の Pod が自動的にメッシュに参加します:
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: my-app
+  labels:
+    istio.io/dataplane-mode: ambient
+```
+
+L7 機能 (HTTP ルーティング、リトライ、認可ポリシー等) が必要な場合は、対象 Namespace に waypoint proxy を追加します:
+
+```bash
+istioctl waypoint apply -n my-app --enroll-namespace
+```
 
 ### Phase 6: メトリクス監視
 

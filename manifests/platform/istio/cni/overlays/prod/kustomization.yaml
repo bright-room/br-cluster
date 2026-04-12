@@ -1,15 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: kube-system
+namespace: istio-system
 
 resources:
   - ../../base
 
-components:
-  - ../../components/istio-config
-
 configMapGenerator:
-  - name: cilium-helm-values
+  - name: istio-cni-helm-values
     behavior: merge
     files:
       - overlay-values.yaml=values.yaml
@@ -18,5 +15,5 @@ patches:
 - target:
     group: helm.toolkit.fluxcd.io
     kind: HelmRelease
-    name: cilium
+    name: istio-cni
   path: helm-patch.yaml

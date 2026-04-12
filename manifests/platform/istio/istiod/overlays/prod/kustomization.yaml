@@ -6,7 +6,7 @@ resources:
   - ../../base
 
 configMapGenerator:
-  - name: istio-helm-values
+  - name: istio-istiod-helm-values
     behavior: merge
     files:
       - overlay-values.yaml=values.yaml
@@ -15,5 +15,5 @@ patches:
 - target:
     group: helm.toolkit.fluxcd.io
     kind: HelmRelease
-    name: istio
+    name: istio-istiod
   path: helm-patch.yaml
