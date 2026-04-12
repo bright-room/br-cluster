@@ -411,7 +411,7 @@ Cilium 側に以下の設定が適用されています (`cilium/app/components/
 - `cni.exclusive: false` — istio-cni プラグインの共存を許可
 - `socketLB.hostNamespaceOnly: true` — ztunnel のトラフィック傍受と競合しないよう制限
 
-加えて `cilium/config/components/istio-config` で `CiliumClusterwideNetworkPolicy` (`allow-ambient-hostprobes`) が適用され、ztunnel の SNAT ヘルスチェック (169.254.7.127/32) を許可しています。
+`cilium/config/components/istio-config` には `CiliumClusterwideNetworkPolicy` (`allow-ambient-hostprobes`) が定義されていますが、**CiliumNetworkPolicy で ingress を制限している namespace がある場合にのみ**有効にしてください。`endpointSelector: {}` で全 Pod に適用されるため、他に restrictive な CiliumNetworkPolicy がない状態で有効にすると全 Pod の ingress が default-deny になります。
 
 **ワークロードをメッシュに追加する手順:**
 
