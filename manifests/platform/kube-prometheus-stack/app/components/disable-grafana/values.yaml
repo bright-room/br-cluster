@@ -1,0 +1,5 @@
+# Disable Grafana bundled with kube-prometheus-stack.
+# Grafana is deployed separately in Phase 10 (grafana-app).
+grafana:
+  enabled: false
+  forceDeployDashboards: false
