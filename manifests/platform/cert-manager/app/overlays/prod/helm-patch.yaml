@@ -4,3 +4,10 @@
     kind: ConfigMap
     name: cert-manager-helm-values
     valuesKey: overlay-values.yaml
+- op: add
+  path: /spec/valuesFrom/-
+  value:
+    kind: ConfigMap
+    name: cert-manager-monitoring-values
+    valuesKey: values.yaml
+    optional: true
