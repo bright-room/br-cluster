@@ -59,6 +59,7 @@ spec:
         - name: rpc-secret
           secret:
             secretName: garage-rpc-secret
+            defaultMode: 0400
   volumeClaimTemplates:
     - metadata:
         name: data
