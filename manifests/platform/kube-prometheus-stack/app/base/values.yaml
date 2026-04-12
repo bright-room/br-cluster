@@ -1,1 +1,24 @@
 # kube-prometheus-stack helm values (base)
+
+prometheus:
+  prometheusSpec:
+    retention: 14d
+    retentionSize: 50GB
+    walCompression: true
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn
+          resources:
+            requests:
+              storage: 10Gi
+
+alertmanager:
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn
+          resources:
+            requests:
+              storage: 1Gi
