@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: garage
+  labels:
+    app: garage
+spec:
+  selector:
+    matchLabels:
+      app: garage
+  endpoints:
+    - port: admin
+      path: /metrics
+      interval: 30s
