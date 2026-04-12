@@ -1,0 +1,13 @@
+- op: add
+  path: /spec/valuesFrom/-
+  value:
+    kind: ConfigMap
+    name: loki-helm-values
+    valuesKey: overlay-values.yaml
+- op: add
+  path: /spec/valuesFrom/-
+  value:
+    kind: ConfigMap
+    name: loki-monitoring-values
+    valuesKey: values.yaml
+    optional: true

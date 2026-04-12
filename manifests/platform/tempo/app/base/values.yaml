@@ -1,0 +1,51 @@
+# tempo helm values (base)
+
+streamOverHTTPEnabled: true
+
+traces:
+  otlp:
+    grpc:
+      enabled: true
+    http:
+      enabled: true
+  zipkin:
+    enabled: true
+  jaeger:
+    thriftCompact:
+      enabled: true
+    thriftHttp:
+      enabled: true
+  opencensus:
+    enabled: true
+
+storage:
+  trace:
+    backend: s3
+    s3:
+      bucket: k3s-tempo
+      endpoint: ${CLUSTER_S3_SERVER}:${CLUSTER_S3_PORT}
+      region: ap-northeast-1
+      forcepathstyle: true
+      insecure: true
+
+distributor:
+  config:
+    log_received_spans:
+      enabled: true
+
+metricsGenerator:
+  enabled: true
+  config:
+    processor:
+      local_blocks:
+        filter_server_spans: false
+        flush_to_storage: true
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors:
+        - local-blocks
+
+minio:
+  enabled: false

@@ -1,0 +1,6 @@
+# tempo helm values (monitoring)
+# Deployed separately to ensure ServiceMonitor CRD exists (kube-prometheus-stack)
+
+metaMonitoring:
+  serviceMonitor:
+    enabled: true
