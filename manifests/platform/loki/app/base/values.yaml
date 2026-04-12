@@ -68,8 +68,19 @@ backend:
 gateway:
   enabled: true
   replicas: 1
+  nginxConfig:
+    resolver: coredns.kube-system.svc.cluster.local.
+
+chunksCache:
+  enabled: false
+
+resultsCache:
+  enabled: false
 
 minio:
+  enabled: false
+
+lokiCanary:
   enabled: false
 
 monitoring:
@@ -77,8 +88,6 @@ monitoring:
     enabled: false
     grafanaAgent:
       installOperator: false
-  lokiCanary:
-    enabled: false
 
 test:
   enabled: false
