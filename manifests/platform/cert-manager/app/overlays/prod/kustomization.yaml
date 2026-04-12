@@ -8,8 +8,6 @@ resources:
 components:
   - ../../components/dns01
   - ../../components/gateway-api
-  # monitoring コンポーネントは kube-prometheus-stack (Phase 7) デプロイ後に有効化する
-  # - ../../components/monitoring
 
 configMapGenerator:
   - name: cert-manager-helm-values

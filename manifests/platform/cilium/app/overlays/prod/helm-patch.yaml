@@ -4,3 +4,10 @@
     kind: ConfigMap
     name: cilium-helm-values
     valuesKey: overlay-values.yaml
+- op: add
+  path: /spec/valuesFrom/-
+  value:
+    kind: ConfigMap
+    name: cilium-monitoring-values
+    valuesKey: values.yaml
+    optional: true

@@ -1,0 +1,51 @@
+# cilium helm values (monitoring)
+# Deployed separately to ensure ServiceMonitor CRD exists (kube-prometheus-stack)
+
+# Prometheus monitoring for cilium-operator
+operator:
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+  dashboards:
+    enabled: true
+    annotations:
+      grafana_folder: Cilium
+
+# Prometheus monitoring for cilium-agent
+# https://docs.cilium.io/en/latest/observability/metrics/
+prometheus:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: "10s"
+    relabelings:
+      - action: replace
+        sourceLabels:
+          - __meta_kubernetes_pod_node_name
+        targetLabel: node
+        replacement: $${1}
+    trustCRDsExist: true
+
+# Grafana dashboards for cilium-agent
+dashboards:
+  enabled: true
+  annotations:
+    grafana_folder: Cilium
+
+# Hubble metrics ServiceMonitor (overrides hubble component defaults)
+hubble:
+  metrics:
+    serviceMonitor:
+      enabled: true
+      interval: "10s"
+      relabelings:
+        - action: replace
+          sourceLabels:
+            - __meta_kubernetes_pod_node_name
+          targetLabel: node
+          replacement: $${1}
+  relay:
+    prometheus:
+      serviceMonitor:
+        enabled: true
