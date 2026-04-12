@@ -1,0 +1,124 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: garage-provisioning
+  annotations:
+    kustomize.toolkit.fluxcd.io/ssa: IfNotPresent
+spec:
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        app: garage-provisioning
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: provisioning
+          image: dxflrs/garage:v1.3.1
+          env:
+            - name: GARAGE_CONFIG_FILE
+              value: /etc/garage/garage.toml
+            - name: GARAGE_ADMIN_ADDR
+              value: "garage.garage.svc.cluster.local:3903"
+            - name: LOKI_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: garage-provisioning-secret
+                  key: loki_access_key_id
+            - name: LOKI_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: garage-provisioning-secret
+                  key: loki_secret_access_key
+            - name: TEMPO_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: garage-provisioning-secret
+                  key: tempo_access_key_id
+            - name: TEMPO_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: garage-provisioning-secret
+                  key: tempo_secret_access_key
+            - name: LONGHORN_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: garage-provisioning-secret
+                  key: longhorn_access_key_id
+            - name: LONGHORN_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: garage-provisioning-secret
+                  key: longhorn_secret_access_key
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              # Wait for Garage to be ready
+              echo "Waiting for Garage admin API..."
+              until garage -c /etc/garage/garage.toml status 2>/dev/null; do
+                echo "Garage not ready yet, retrying in 5s..."
+                sleep 5
+              done
+              echo "Garage is ready."
+
+              # Get node ID and assign layout
+              NODE_ID=$(garage -c /etc/garage/garage.toml node id -q | cut -d'@' -f1)
+              echo "Node ID: ${NODE_ID}"
+
+              garage -c /etc/garage/garage.toml layout assign "${NODE_ID}" \
+                --zone dc1 \
+                --capacity 20G \
+              || echo "Layout already assigned"
+
+              garage -c /etc/garage/garage.toml layout apply --version 1 \
+              || echo "Layout already applied"
+
+              # Create buckets
+              for BUCKET in k3s-loki k3s-tempo k3s-longhorn; do
+                garage -c /etc/garage/garage.toml bucket create "${BUCKET}" \
+                || echo "Bucket ${BUCKET} already exists"
+              done
+
+              # Import keys and grant access
+              garage -c /etc/garage/garage.toml key import \
+                --yes -n loki \
+                "${LOKI_ACCESS_KEY_ID}" "${LOKI_SECRET_ACCESS_KEY}" \
+              || echo "Key loki already exists"
+
+              garage -c /etc/garage/garage.toml bucket allow \
+                --read --write --owner \
+                --key "${LOKI_ACCESS_KEY_ID}" \
+                k3s-loki \
+              || echo "Bucket allow for loki already set"
+
+              garage -c /etc/garage/garage.toml key import \
+                --yes -n tempo \
+                "${TEMPO_ACCESS_KEY_ID}" "${TEMPO_SECRET_ACCESS_KEY}" \
+              || echo "Key tempo already exists"
+
+              garage -c /etc/garage/garage.toml bucket allow \
+                --read --write --owner \
+                --key "${TEMPO_ACCESS_KEY_ID}" \
+                k3s-tempo \
+              || echo "Bucket allow for tempo already set"
+
+              garage -c /etc/garage/garage.toml key import \
+                --yes -n longhorn \
+                "${LONGHORN_ACCESS_KEY_ID}" "${LONGHORN_SECRET_ACCESS_KEY}" \
+              || echo "Key longhorn already exists"
+
+              garage -c /etc/garage/garage.toml bucket allow \
+                --read --write --owner \
+                --key "${LONGHORN_ACCESS_KEY_ID}" \
+                k3s-longhorn \
+              || echo "Bucket allow for longhorn already set"
+
+              echo "Provisioning complete."
+          volumeMounts:
+            - name: config
+              mountPath: /etc/garage
+      volumes:
+        - name: config
+          configMap:
+            name: garage-config
