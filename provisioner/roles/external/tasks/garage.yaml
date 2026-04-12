@@ -83,6 +83,7 @@
     url: "https://garagehq.deuxfleurs.fr/_releases/{{ versions.garage }}/{{ garage_arch }}-unknown-linux-musl/garage"
     dest: "{{ install_dir }}/garage"
     mode: "0755"
+  notify: restart garage
 
 # --- Configure ---
 - name: Copy Garage configuration
