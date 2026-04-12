@@ -6,3 +6,4 @@ resources:
   - statefulset.yaml
   - service.yaml
   - garage-externalsecret.yaml
+  - admin-externalsecret.yaml

@@ -34,6 +34,9 @@ spec:
             - name: rpc-secret
               mountPath: /secrets/rpc
               readOnly: true
+            - name: admin-secret
+              mountPath: /secrets/admin
+              readOnly: true
           livenessProbe:
             httpGet:
               path: /health
@@ -59,6 +62,10 @@ spec:
         - name: rpc-secret
           secret:
             secretName: garage-rpc-secret
+            defaultMode: 0400
+        - name: admin-secret
+          secret:
+            secretName: garage-admin-secret
             defaultMode: 0400
   volumeClaimTemplates:
     - metadata:
