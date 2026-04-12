@@ -1,5 +1,8 @@
 # longhorn helm values (prod overlay)
 defaultSettings:
   defaultDataPath: /var/lib/longhorn
-  backupTarget: s3://k3s-longhorn@ap-northeast-1/
-  backupTargetCredentialSecret: longhorn-backup-secret
+longhornSettings:
+  - name: backup-target
+    value: "s3://k3s-longhorn@ap-northeast-1/"
+  - name: backup-target-credential-secret
+    value: longhorn-backup-secret
