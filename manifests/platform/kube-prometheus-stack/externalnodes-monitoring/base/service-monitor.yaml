@@ -9,7 +9,7 @@ spec:
     - port: metrics
       interval: 30s
       relabelings:
-        - sourceLabels: [__meta_kubernetes_endpoint_address_target_name]
+        - sourceLabels: [__meta_kubernetes_endpointslice_endpoint_node_name]
           targetLabel: instance
   selector:
     matchLabels:
