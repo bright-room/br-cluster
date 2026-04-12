@@ -18,3 +18,4 @@ data:
 
     [admin]
     api_bind_addr = "[::]:3903"
+    admin_token_file = "/secrets/admin/admin_token"
