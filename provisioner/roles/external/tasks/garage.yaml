@@ -134,8 +134,21 @@
   environment:
     GARAGE_CONFIG_FILE: "{{ garage.config_dir }}/garage.toml"
 
+- name: Get staged layout version
+  shell: >
+    garage -c {{ garage.config_dir }}/garage.toml layout show 2>&1
+    | grep -oP 'apply --version \K\d+'
+  register: staged_layout_version
+  changed_when: false
+  failed_when: false
+  environment:
+    GARAGE_CONFIG_FILE: "{{ garage.config_dir }}/garage.toml"
+
 - name: Apply layout
-  command: "garage -c {{ garage.config_dir }}/garage.toml layout apply --version 1"
+  command: >
+    garage -c {{ garage.config_dir }}/garage.toml layout apply
+    --version {{ staged_layout_version.stdout }}
+  when: staged_layout_version.stdout | length > 0
   register: layout_apply
   changed_when: '"already up to date" not in layout_apply.stderr'
   failed_when: false

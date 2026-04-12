@@ -4,6 +4,7 @@ data_dir = "{{ garage.data_dir }}"
 db_engine = "lmdb"
 
 replication_factor = 1
+consistency_mode = "consistent"
 
 rpc_bind_addr = "[::]:{{ garage.server.rpc_port }}"
 rpc_public_addr = "{{ ext.ip }}:{{ garage.server.rpc_port }}"
