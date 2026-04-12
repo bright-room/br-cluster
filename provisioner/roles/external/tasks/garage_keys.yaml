@@ -6,8 +6,7 @@
   no_log: true
 
 - name: Check if key already exists
-  command: >
-    garage -c {{ garage.config_dir }}/garage.toml key info {{ _garage_access_key }}
+  command: garage key info {{ _garage_access_key }}
   register: key_check
   changed_when: false
   failed_when: false
@@ -16,9 +15,8 @@
 
 - name: Import key if not exists
   command: >
-    garage -c {{ garage.config_dir }}/garage.toml key import
-    --yes
-    -n {{ garage_user_item.name }}
+    garage key import
+    --yes -n {{ garage_user_item.name }}
     {{ _garage_access_key }} {{ _garage_secret_key }}
   when: key_check.rc != 0
   no_log: true
@@ -27,10 +25,10 @@
 
 - name: Grant bucket access to key
   command: >
-    garage -c {{ garage.config_dir }}/garage.toml bucket allow
+    garage bucket allow
     --read --write --owner
-    --key {{ _garage_access_key }}
     {{ garage_user_item.bucket_acl.bucket_name }}
+    --key {{ _garage_access_key }}
   register: bucket_allow
   changed_when: '"updated" in bucket_allow.stdout'
   failed_when: false
