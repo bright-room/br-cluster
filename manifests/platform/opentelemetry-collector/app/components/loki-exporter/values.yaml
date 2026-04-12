@@ -1,0 +1,19 @@
+# opentelemetry-collector helm values (loki-exporter)
+config:
+  processors:
+    transform/loki:
+      log_statements:
+        - context: log
+          statements:
+            - set(resource.attributes["exporter"], "OTLP")
+            - set(resource.attributes["k8s.namespace.name"], log.attributes["k8s.namespace.name"])
+            - delete_key(log.attributes, "k8s.namespace.name")
+  exporters:
+    otlphttp/loki:
+      endpoint: http://loki-gateway.loki/otlp
+  service:
+    pipelines:
+      logs/loki:
+        receivers: [otlp]
+        processors: [memory_limiter, resource, batch, transform/loki]
+        exporters: [otlphttp/loki]

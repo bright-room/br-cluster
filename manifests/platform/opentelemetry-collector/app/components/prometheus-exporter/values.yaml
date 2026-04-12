@@ -1,0 +1,13 @@
+# opentelemetry-collector helm values (prometheus-exporter)
+config:
+  exporters:
+    otlphttp/prometheus:
+      endpoint: http://kube-prometheus-stack-prometheus.kube-prom-stack.svc:9090/api/v1/otlp
+      tls:
+        insecure: true
+  service:
+    pipelines:
+      metrics:
+        receivers: [otlp, spanmetrics]
+        processors: [memory_limiter, resource, batch]
+        exporters: [otlphttp/prometheus]
