@@ -1,1 +1,2 @@
-# istio helm values (base)
+# istio-istiod helm values (base)
+profile: ambient

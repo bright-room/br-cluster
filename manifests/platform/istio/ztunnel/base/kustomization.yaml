@@ -4,7 +4,7 @@ resources:
   - helm.yaml
 
 configMapGenerator:
-  - name: istio-istiod-helm-values
+  - name: istio-ztunnel-helm-values
     files:
       - base-values.yaml=values.yaml
 configurations:
