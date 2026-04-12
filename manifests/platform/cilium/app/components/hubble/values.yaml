@@ -1,0 +1,40 @@
+# cilium helm values (hubble)
+
+# Hubble observability
+# https://docs.cilium.io/en/latest/observability/hubble/
+hubble:
+  enabled: true
+  metrics:
+    enabled:
+      - dns:query
+      - drop
+      - tcp
+      - flow
+      - port-distribution
+      - icmp
+      - http
+    serviceMonitor:
+      enabled: true
+      interval: "10s"
+      relabelings:
+        - action: replace
+          sourceLabels:
+            - __meta_kubernetes_pod_node_name
+          targetLabel: node
+          replacement: $${1}
+    dashboards:
+      enabled: true
+      annotations:
+        grafana_folder: Cilium
+  relay:
+    enabled: true
+    rollOutPods: true
+    prometheus:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+  ui:
+    enabled: true
+    rollOutPods: true
+    ingress:
+      enabled: false
