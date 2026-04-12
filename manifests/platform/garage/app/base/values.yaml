@@ -17,6 +17,7 @@ garage:
     db_engine = "lmdb"
     replication_factor = 1
     consistency_mode = "consistent"
+    allow_world_readable_secrets = true
     rpc_bind_addr = "[::]:3901"
     rpc_secret = "__RPC_SECRET_REPLACE__"
 
