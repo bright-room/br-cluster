@@ -83,6 +83,7 @@
     url: "https://garagehq.deuxfleurs.fr/_releases/{{ versions.garage }}/{{ garage_arch }}-unknown-linux-musl/garage"
     dest: "{{ install_dir }}/garage"
     mode: "0755"
+  notify: restart garage
 
 # --- Configure ---
 - name: Copy Garage configuration
@@ -116,7 +117,7 @@
 
 # --- Layout configuration ---
 - name: Get Garage node ID
-  command: "garage -c {{ garage.config_dir }}/garage.toml node id -q"
+  command: garage node id -q
   register: garage_node_id
   changed_when: false
   environment:
@@ -124,18 +125,30 @@
 
 - name: Assign layout to node
   command: >
-    garage -c {{ garage.config_dir }}/garage.toml layout assign
+    garage layout assign
     {{ garage_node_id.stdout | trim | split('@') | first }}
-    --zone dc1
-    --capacity {{ garage.capacity }}
+    -z dc1 -c {{ garage.capacity }}
   register: layout_assign
   changed_when: '"already assigned" not in layout_assign.stderr'
   failed_when: false
   environment:
     GARAGE_CONFIG_FILE: "{{ garage.config_dir }}/garage.toml"
 
+- name: Get staged layout version
+  shell: >
+    garage layout show 2>&1
+    | grep -oP 'apply --version \K\d+'
+  register: staged_layout_version
+  changed_when: false
+  failed_when: false
+  environment:
+    GARAGE_CONFIG_FILE: "{{ garage.config_dir }}/garage.toml"
+
 - name: Apply layout
-  command: "garage -c {{ garage.config_dir }}/garage.toml layout apply --version 1"
+  command: >
+    garage layout apply
+    --version {{ staged_layout_version.stdout }}
+  when: staged_layout_version.stdout | length > 0
   register: layout_apply
   changed_when: '"already up to date" not in layout_apply.stderr'
   failed_when: false

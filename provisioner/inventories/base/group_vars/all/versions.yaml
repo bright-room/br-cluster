@@ -3,7 +3,7 @@ versions:
   k3s: "v1.35.3+k3s1"
   kubectl: "v1.35.0"
   helm: "v4.0.0"
-  garage: "v1.3.1"
+  garage: "v2.2.0"
   restic: "0.18.1"
   etcd: "v3.6.0"
   coredns: "1.14.2"
