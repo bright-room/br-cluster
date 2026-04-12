@@ -2,8 +2,14 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - namespace.yaml
-  - configmap.yaml
-  - statefulset.yaml
-  - service.yaml
-  - garage-externalsecret.yaml
+  - helm.yaml
   - admin-externalsecret.yaml
+  - garage-externalsecret.yaml
+  - admin-service.yaml
+
+configMapGenerator:
+  - name: garage-helm-values
+    files:
+      - base-values.yaml=values.yaml
+configurations:
+  - kustomizeconfig.yaml
