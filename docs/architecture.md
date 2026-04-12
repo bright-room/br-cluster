@@ -215,7 +215,7 @@ graph TD
 
 ```
 manifests/
-├── clusters/prod/infra/     # クラスタ固有の Kustomization (prod 環境)
+├── clusters/prod/platform/  # クラスタ固有の Kustomization (prod 環境)
 └── platform/                # 再利用可能な Platform Components
     ├── cert-manager/        # TLS 証明書自動発行 (ACME + DNS01)
     ├── cilium/              # CNI プラグイン
