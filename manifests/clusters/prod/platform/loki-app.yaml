@@ -10,17 +10,11 @@ spec:
     kind: GitRepository
     name: flux-system
   dependsOn:
-    - name: external-secrets-config
     - name: longhorn-app
-    - name: garage-app
   path: ./manifests/platform/loki/app/overlays/prod
   prune: true
   wait: true
   timeout: 15m
-  postBuild:
-    substituteFrom:
-      - kind: ConfigMap
-        name: cluster-settings
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization

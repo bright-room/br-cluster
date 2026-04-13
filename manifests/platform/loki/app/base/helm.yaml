@@ -32,11 +32,3 @@ spec:
     - kind: ConfigMap
       name: loki-helm-values
       valuesKey: base-values.yaml
-    - kind: Secret
-      name: loki-s3-credentials
-      valuesKey: access_key_id
-      targetPath: loki.storage.s3.access_key_id
-    - kind: Secret
-      name: loki-s3-credentials
-      valuesKey: secret_access_key
-      targetPath: loki.storage.s3.secret_access_key

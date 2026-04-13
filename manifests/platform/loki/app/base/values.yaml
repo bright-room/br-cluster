@@ -1,9 +1,31 @@
 # loki helm values (base)
+#
+# SingleBinary deployment with filesystem storage on a Longhorn PVC.
+# This homelab does not need horizontal scale or object storage.
 
-deploymentMode: SimpleScalable
+deploymentMode: SingleBinary
 
 loki:
   auth_enabled: false
+
+  commonConfig:
+    replication_factor: 1
+
+  schemaConfig:
+    configs:
+      - from: 2024-04-01
+        store: tsdb
+        index:
+          prefix: loki_index_
+          period: 24h
+        object_store: filesystem
+        schema: v13
+
+  storage:
+    type: filesystem
+    filesystem:
+      chunks_directory: /var/loki/chunks
+      rules_directory: /var/loki/rules
 
   limits_config:
     allow_structured_metadata: true
@@ -21,49 +43,25 @@ loki:
 
   compactor:
     compaction_interval: 10m
-    delete_request_store: s3
+    delete_request_store: filesystem
     retention_delete_delay: 2h
     retention_enabled: true
     working_directory: /var/loki/retention
 
-  storage:
-    bucketNames:
-      chunks: k3s-loki
-      ruler: k3s-loki
-    type: s3
-    s3:
-      endpoint: ${CLUSTER_S3_SERVER}:${CLUSTER_S3_PORT}
-      region: ap-northeast-1
-      s3ForcePathStyle: true
-      insecure: true
+singleBinary:
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: longhorn
 
-  schemaConfig:
-    configs:
-      - from: 2024-04-01
-        store: tsdb
-        index:
-          prefix: loki_index_
-          period: 24h
-        object_store: s3
-        schema: v13
-
+# Disable scalable components — SingleBinary mode owns everything.
 write:
-  replicas: 1
-  persistence:
-    size: 1Gi
-    storageClass: longhorn
-
+  replicas: 0
 read:
-  replicas: 1
-  persistence:
-    size: 1Gi
-    storageClass: longhorn
-
+  replicas: 0
 backend:
-  replicas: 2
-  persistence:
-    size: 1Gi
-    storageClass: longhorn
+  replicas: 0
 
 gateway:
   enabled: true

@@ -32,11 +32,3 @@ spec:
     - kind: ConfigMap
       name: tempo-helm-values
       valuesKey: base-values.yaml
-    - kind: Secret
-      name: tempo-s3-credentials
-      valuesKey: access_key_id
-      targetPath: tempo.storage.trace.s3.access_key
-    - kind: Secret
-      name: tempo-s3-credentials
-      valuesKey: secret_access_key
-      targetPath: tempo.storage.trace.s3.secret_key

@@ -1,39 +1,18 @@
 # loki helm values (prod overlay)
-
-# Keep heavy Loki components off control-plane nodes (Pi 4GB).
+#
+# Pin SingleBinary + gateway to workers (Pi 4GB) with modest limits.
 # See incident-2026-04-13-observability-cascade.md.
-write:
-  nodeSelector:
-    node_type: worker
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
 
-read:
+singleBinary:
   nodeSelector:
     node_type: worker
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 200m
+      memory: 384Mi
     limits:
-      cpu: 500m
-      memory: 512Mi
-
-backend:
-  nodeSelector:
-    node_type: worker
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 300m
-      memory: 256Mi
+      cpu: 1000m
+      memory: 768Mi
 
 gateway:
   nodeSelector:

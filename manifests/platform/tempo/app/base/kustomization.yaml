@@ -3,7 +3,6 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - helm.yaml
-  - tempo-s3-externalsecret.yaml
 
 configMapGenerator:
   - name: tempo-helm-values
