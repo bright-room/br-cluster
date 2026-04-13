@@ -30,13 +30,6 @@
     - name: net.bridge.bridge-nf-call-ip6tables
       value: 1
 
-# --- Disable swap ---
-- name: Disable swap
-  command: swapoff -a
-  changed_when: false
-
-- name: Disable swap in fstab
-  replace:
-    path: /etc/fstab
-    regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
-    replace: '# \1'
+# Swap is intentionally left enabled; kubelet is configured with
+# failSwapOn=false + memorySwap.swapBehavior=LimitedSwap in kubelet.config.j2.
+# See incident-2026-04-13-observability-cascade.md for the rationale.

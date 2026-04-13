@@ -2,3 +2,17 @@ apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 shutdownGracePeriod: 30s
 shutdownGracePeriodCriticalPods: 10s
+failSwapOn: false
+featureGates:
+  NodeSwap: true
+memorySwap:
+  swapBehavior: LimitedSwap
+systemReserved:
+  cpu: 200m
+  memory: 300Mi
+kubeReserved:
+  cpu: 200m
+  memory: 300Mi
+evictionHard:
+  memory.available: "150Mi"
+  nodefs.available: "10%"
