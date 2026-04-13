@@ -129,9 +129,9 @@ class MockSecretProvider(SecretProvider):
             ip_address="192.0.2.15",
             mac_address="00:00:5e:00:53:15",
         ),
-        "br-external1": InventorySecrets(
-            ip_address="192.0.2.50",
-            mac_address="00:00:5e:00:53:50",
+        "br-node7": InventorySecrets(
+            ip_address="192.0.2.16",
+            mac_address="00:00:5e:00:53:16",
         ),
     }
 

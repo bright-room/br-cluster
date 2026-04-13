@@ -30,6 +30,7 @@
             {
                 "id": 1,
                 "subnet": "{{ cluster_network.subnet }}/{{ cluster_network.prefix_length }}",
+                "match-client-id": false,
                 "pools": [
                     {
                         "pool": "{{ dhcp.range_begin }} - {{ dhcp.range_end }}"

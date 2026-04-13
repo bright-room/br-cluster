@@ -56,7 +56,7 @@ graph LR
 
 ### ハードウェア
 
-- Raspberry Pi (ARM64) x 8 台 (gateway x1, master x3, worker x3, external x1)
+- Raspberry Pi (ARM64) x 8 台 (gateway x1, master x3, worker x4)
 - Ethernet スイッチ
 - microSD カード
 

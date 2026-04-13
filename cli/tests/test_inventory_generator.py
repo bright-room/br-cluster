@@ -46,7 +46,7 @@ class TestGenerateHostsYaml:
         assert "br-node4" in hosts
         assert "br-node5" in hosts
         assert "br-node6" in hosts
-        assert "br-external1" in hosts
+        assert "br-node7" in hosts
 
     def test_br_cluster_contains_all_k8s_members(
         self, full_inventory: Inventory
@@ -54,7 +54,7 @@ class TestGenerateHostsYaml:
         result = generate_hosts_yaml(full_inventory)
         cluster = result["all"]["children"]["br_cluster"]["hosts"]
         assert "br-gateway1" in cluster
-        assert "br-external1" in cluster
+        assert "br-node7" in cluster
         assert "br-node1" in cluster
         assert "br-node6" in cluster
 
