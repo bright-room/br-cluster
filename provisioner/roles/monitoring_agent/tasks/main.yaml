@@ -2,7 +2,3 @@
 - name: Install node_exporter
   include_tasks: node_exporter.yaml
   tags: [node_exporter]
-
-- name: Install Fluent Bit
-  include_tasks: fluent_bit.yaml
-  tags: [fluent_bit]

@@ -1,2 +1,0 @@
----
-# Defaults are defined in group_vars/all/network.yaml (restic, restic_config)

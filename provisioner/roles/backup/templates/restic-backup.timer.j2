@@ -1,9 +1,0 @@
-[Unit]
-Description=Restic backup
-
-[Timer]
-OnCalendar={{ restic_config.environment.backup.scheduling }}
-RandomizedDelaySec={{ restic_config.environment.backup.randomized_delay_sec }}
-
-[Install]
-WantedBy=timers.target

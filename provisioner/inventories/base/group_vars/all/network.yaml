@@ -50,47 +50,6 @@ ntp:
     - "ntp3.jst.mfeed.ad.jp"
 
 ##################################
-# Monitoring configuration
-##################################
-fluentd_load_balancer_ip: "172.22.10.65"
-
-##################################
-# Restic backup configuration
-##################################
-restic:
-  binary_path: "{{ install_dir }}/restic"
-  force_install: false
-  config_dir: "/etc/restic"
-  operator:
-    user: "root"
-    group: "root"
-
-restic_config:
-  file_path: "{{ restic.config_dir }}/restic.conf"
-  environment:
-    repository: "s3:https://backup-storage.{{ cluster_domain }}:3900/restic"
-    log_dir_path: "/var/log"
-    log_file_prefix: "restic"
-    backup_dirs:
-      - path: "/etc"
-      - path: "/var/log"
-      - path: "/root"
-        exclude:
-          - pattern: ".cache"
-          - pattern: ".ignore"
-      - path: "/home/bradmin"
-        exclude:
-          - pattern: ".cache"
-          - pattern: ".ignore"
-    backup:
-      scheduling: "*-*-* 03:00:00"
-      randomized_delay_sec: 0
-    clean:
-      scheduling: "*-*-* 06:00:00"
-      randomized_delay_sec: 0
-      forget_keep_within: "7d"
-
-##################################
 # Cluster VIPs (floating IPs exposed via DNS)
 # k8s-api: kube-vip DaemonSet on control-plane nodes (ARP L2 failover)
 ##################################
