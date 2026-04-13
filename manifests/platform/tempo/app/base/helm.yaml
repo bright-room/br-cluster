@@ -15,8 +15,8 @@ spec:
   interval: 30m
   chart:
     spec:
-      chart: tempo-distributed
-      version: 1.61.3
+      chart: tempo
+      version: 1.18.2
       sourceRef:
         kind: HelmRepository
         name: tempo
@@ -35,8 +35,8 @@ spec:
     - kind: Secret
       name: tempo-s3-credentials
       valuesKey: access_key_id
-      targetPath: storage.trace.s3.access_key
+      targetPath: tempo.storage.trace.s3.access_key
     - kind: Secret
       name: tempo-s3-credentials
       valuesKey: secret_access_key
-      targetPath: storage.trace.s3.secret_key
+      targetPath: tempo.storage.trace.s3.secret_key
