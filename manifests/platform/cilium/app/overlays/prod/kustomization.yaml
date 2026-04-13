@@ -7,7 +7,6 @@ resources:
 
 components:
   - ../../components/hubble
-  - ../../components/istio-config
 
 configMapGenerator:
   - name: cilium-helm-values

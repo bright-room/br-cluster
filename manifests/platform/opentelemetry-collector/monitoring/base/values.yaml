@@ -1,5 +1,0 @@
-# opentelemetry-collector helm values (monitoring)
-# Deployed separately to ensure ServiceMonitor CRD exists (kube-prometheus-stack)
-
-serviceMonitor:
-  enabled: true
