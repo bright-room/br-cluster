@@ -1,1 +1,61 @@
 # kube-prometheus-stack helm values (prod overlay)
+
+# Keep stateful / heavy components off control-plane nodes (Pi 4GB).
+# node-exporter DaemonSet intentionally omits nodeSelector so it continues
+# to scrape control-plane nodes.
+# See incident-2026-04-13-observability-cascade.md.
+
+prometheus:
+  prometheusSpec:
+    nodeSelector:
+      node_type: worker
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+alertmanager:
+  alertmanagerSpec:
+    nodeSelector:
+      node_type: worker
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+prometheusOperator:
+  nodeSelector:
+    node_type: worker
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+kube-state-metrics:
+  nodeSelector:
+    node_type: worker
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi

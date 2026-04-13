@@ -1,1 +1,15 @@
 # tempo helm values (prod overlay)
+
+# Keep Tempo off control-plane nodes (Pi 4GB).
+# See incident-2026-04-13-observability-cascade.md.
+tempo:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+nodeSelector:
+  node_type: worker
