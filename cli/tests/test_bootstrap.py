@@ -38,13 +38,13 @@ def node_info() -> ServerSSHInfo:
 
 
 @pytest.fixture
-def external_info() -> ServerSSHInfo:
+def external_worker_info() -> ServerSSHInfo:
     return ServerSSHInfo(
         name="br-external1",
         hostname="192.0.2.50",
         username="bradmin",
         public_key="ssh-ed25519 AAAAEX external@test",
-        server_type=ServerType.EXTERNAL,
+        server_type=ServerType.NODE,
     )
 
 
@@ -52,9 +52,9 @@ def external_info() -> ServerSSHInfo:
 def all_infos(
     gateway_info: ServerSSHInfo,
     node_info: ServerSSHInfo,
-    external_info: ServerSSHInfo,
+    external_worker_info: ServerSSHInfo,
 ) -> list[ServerSSHInfo]:
-    return [gateway_info, node_info, external_info]
+    return [gateway_info, node_info, external_worker_info]
 
 
 class TestWriteSSHKeys:

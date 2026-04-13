@@ -8,7 +8,6 @@ from pydantic import BaseModel
 class ServerType(StrEnum):
     GATEWAY = "gateway"
     NODE = "node"
-    EXTERNAL = "external"
 
 
 class K8sRole(StrEnum):

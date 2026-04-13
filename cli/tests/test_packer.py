@@ -19,12 +19,6 @@ class TestGeneratePkrvars:
         assert "user-data" in result
         assert "network-config" not in result
 
-    def test_external_excludes_network_config(self, tmp_path: Path) -> None:
-        server = ServerDefinition(name="br-external1", type=ServerType.EXTERNAL)
-        result = generate_pkrvars(server, "dev", tmp_path)
-        assert "user-data" in result
-        assert "network-config" not in result
-
     def test_valid_hcl_format(self, tmp_path: Path) -> None:
         server = ServerDefinition(name="br-node1", type=ServerType.NODE)
         result = generate_pkrvars(server, "dev", tmp_path)

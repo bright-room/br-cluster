@@ -24,11 +24,6 @@ def node_server() -> ServerDefinition:
 
 
 @pytest.fixture
-def external_server() -> ServerDefinition:
-    return ServerDefinition(name="br-external1", type=ServerType.EXTERNAL)
-
-
-@pytest.fixture
 def worker_node_server() -> ServerDefinition:
     return ServerDefinition(
         name="br-node4", type=ServerType.NODE, k8s_role=K8sRole.WORKER
@@ -44,7 +39,9 @@ def sample_inventory() -> Inventory:
             ServerDefinition(
                 name="br-node1", type=ServerType.NODE, k8s_role=K8sRole.PRIMARY
             ),
-            ServerDefinition(name="br-external1", type=ServerType.EXTERNAL),
+            ServerDefinition(
+                name="br-external1", type=ServerType.NODE, k8s_role=K8sRole.WORKER
+            ),
         ],
     )
 
@@ -55,7 +52,9 @@ def full_inventory() -> Inventory:
         environments=["dev", "prod"],
         servers=[
             ServerDefinition(name="br-gateway1", type=ServerType.GATEWAY),
-            ServerDefinition(name="br-external1", type=ServerType.EXTERNAL),
+            ServerDefinition(
+                name="br-external1", type=ServerType.NODE, k8s_role=K8sRole.WORKER
+            ),
             ServerDefinition(
                 name="br-node1", type=ServerType.NODE, k8s_role=K8sRole.PRIMARY
             ),
