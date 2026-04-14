@@ -5,6 +5,8 @@ environments:
 servers:
   - name: br-gateway1
     type: gateway
+  - name: br-external1
+    type: external
   - name: br-node1
     type: node
     k8s_role: primary
@@ -21,8 +23,5 @@ servers:
     type: node
     k8s_role: worker
   - name: br-node6
-    type: node
-    k8s_role: worker
-  - name: br-node7
     type: node
     k8s_role: worker

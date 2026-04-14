@@ -1,0 +1,42 @@
+---
+- name: Configure external server
+  hosts: external
+  gather_facts: true
+  become: true
+
+  collections:
+    - onepassword.connect
+
+  environment:
+    OP_CONNECT_TOKEN: "{{ lookup('env', 'OP_CONNECT_TOKEN') }}"
+    OP_CONNECT_HOST: "{{ lookup('env', 'OP_CONNECT_HOST') }}"
+
+  pre_tasks:
+    # init_disk で root を os_partition_size まで拡張してから apt upgrade を走らせないと
+    # dist-upgrade 中にディスクフルで失敗する (3.4G では入らない)
+    - name: Setup initialize disk
+      include_tasks: ../tasks/init_disk.yaml
+      tags: [system]
+
+    - name: Package update
+      include_tasks: ../tasks/update.yaml
+      tags: [always]
+
+  roles:
+    - name: Fetch required secrets
+      role: secrets
+      vars:
+        required_secrets:
+          - cloudflare_token
+          - admin_email
+          - garage_rpc_secret
+          - garage_operators
+      tags: [always]
+
+    - name: Common system configuration
+      role: common
+      tags: [system]
+
+    - name: External services configuration
+      role: external
+      tags: [external]

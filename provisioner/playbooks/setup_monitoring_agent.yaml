@@ -1,6 +1,6 @@
 ---
-- name: Deploy node_exporter to br-gateway1
-  hosts: gateway
+- name: Deploy monitoring agents to non-k3s nodes
+  hosts: gateway:external
   gather_facts: true
   become: true
 

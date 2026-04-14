@@ -1,0 +1,16 @@
+---
+- name: Pre-configuration
+  include_tasks: pre_configuration.yaml
+  tags: [system]
+
+- name: Certbot configuration
+  include_tasks: certbot.yaml
+  tags: [certbot]
+
+- name: Garage S3 configuration
+  include_tasks: garage.yaml
+  tags: [garage]
+
+- name: Caddy reverse proxy configuration
+  include_tasks: caddy.yaml
+  tags: [caddy]
