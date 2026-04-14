@@ -1,0 +1,7 @@
+#!/bin/bash
+{% set ext = cluster_hosts | selectattr('name', 'equalto', 'br-external1') | first %}
+cp {{ lets_encrypt.certificate_dir }}/{{ ext.domains.object_storage }}/fullchain.pem {{ garage.ssl_dir }}/public.crt
+cp {{ lets_encrypt.certificate_dir }}/{{ ext.domains.object_storage }}/privkey.pem {{ garage.ssl_dir }}/private.key
+chown {{ garage.operator.user }}:{{ garage.operator.group }} {{ garage.ssl_dir }}/public.crt {{ garage.ssl_dir }}/private.key
+chmod 0640 {{ garage.ssl_dir }}/public.crt {{ garage.ssl_dir }}/private.key
+systemctl reload caddy

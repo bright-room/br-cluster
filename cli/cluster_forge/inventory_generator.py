@@ -22,6 +22,8 @@ def _build_domains(server: ServerDefinition, cluster_domain_ref: str) -> dict:
     if server.type == ServerType.GATEWAY:
         domains["dns"] = f"dns.{cluster_domain_ref}"
         domains["ntp"] = f"ntp.{cluster_domain_ref}"
+    elif server.type == ServerType.EXTERNAL:
+        domains["object_storage"] = f"object-storage.{cluster_domain_ref}"
     return domains
 
 
@@ -35,7 +37,9 @@ def _build_interfaces(server: ServerDefinition) -> dict:
 
 def generate_hosts_yaml(inventory: Inventory) -> dict:
     """Generate Ansible hosts.yaml structure from servers.yaml."""
+    # Collect servers by type and role
     gateways = [s for s in inventory.servers if s.type == ServerType.GATEWAY]
+    externals = [s for s in inventory.servers if s.type == ServerType.EXTERNAL]
     nodes_with_k8s = [
         s for s in inventory.servers if s.type == ServerType.NODE and s.k8s_role
     ]
@@ -43,7 +47,8 @@ def generate_hosts_yaml(inventory: Inventory) -> dict:
     secondaries = [s for s in nodes_with_k8s if s.k8s_role == K8sRole.SECONDARY]
     workers = [s for s in nodes_with_k8s if s.k8s_role == K8sRole.WORKER]
 
-    cluster_members = [*gateways, *nodes_with_k8s]
+    # All cluster members (gateway + external + k8s nodes)
+    cluster_members = [*gateways, *externals, *nodes_with_k8s]
 
     def hosts_dict(servers: list[ServerDefinition]) -> dict:
         return {s.name: None for s in servers}
@@ -64,6 +69,7 @@ def generate_hosts_yaml(inventory: Inventory) -> dict:
                         "worker": {"hosts": hosts_dict(workers)},
                     },
                 },
+                "external": {"hosts": hosts_dict(externals)},
             },
         },
     }
