@@ -16,10 +16,6 @@ prometheus:
       limits:
         cpu: 1000m
         memory: 1Gi
-    storageSpec:
-      volumeClaimTemplate:
-        spec:
-          storageClassName: longhorn-observability
 
 alertmanager:
   alertmanagerSpec:
@@ -32,10 +28,6 @@ alertmanager:
       limits:
         cpu: 100m
         memory: 128Mi
-    storage:
-      volumeClaimTemplate:
-        spec:
-          storageClassName: longhorn-observability
 
 prometheusOperator:
   nodeSelector:
