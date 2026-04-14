@@ -9,5 +9,5 @@ volumeBindingMode: Immediate
 parameters:
   numberOfReplicas: "2"
   staleReplicaTimeout: "30"
-  dataLocality: "best-effort"
+  dataLocality: "disabled"
   fsType: "ext4"
