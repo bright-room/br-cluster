@@ -1,3 +1,11 @@
 [tools]
 uv = "0.11.2"
 packer = "1.15.1"
+flux2 = "latest"
+k9s = "latest"
+helm = "latest"
+stern = "latest"
+kustomize = "latest"
+
+[env]
+KUBECONFIG = ".secret/prod/config"

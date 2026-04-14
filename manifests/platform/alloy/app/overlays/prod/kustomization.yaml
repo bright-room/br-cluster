@@ -1,15 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: kube-system
+namespace: alloy
 
 resources:
   - ../../base
 
-components:
-  - ../../components/hubble
-
 configMapGenerator:
-  - name: cilium-helm-values
+  - name: alloy-helm-values
     behavior: merge
     files:
       - overlay-values.yaml=values.yaml
@@ -18,5 +15,5 @@ patches:
 - target:
     group: helm.toolkit.fluxcd.io
     kind: HelmRelease
-    name: cilium
+    name: alloy
   path: helm-patch.yaml

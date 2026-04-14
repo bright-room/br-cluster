@@ -1,6 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
+  - alloy-app.yaml
   - cert-manager-app.yaml
   - cilium-app.yaml
   - coredns-app.yaml
@@ -8,15 +9,11 @@ resources:
   - envoy-gateway-app.yaml
   - external-dns-app.yaml
   - external-secrets-app.yaml
-  - fluent-app.yaml
   - flux-app.yaml
-  - garage-app.yaml
-  - istio-app.yaml
   - kube-prometheus-stack-app.yaml
   - kube-vip-app.yaml
   - loki-app.yaml
   - longhorn-app.yaml
   - metrics-server-app.yaml
   - onepassword-connect-app.yaml
-  - opentelemetry-collector-app.yaml
   - tempo-app.yaml

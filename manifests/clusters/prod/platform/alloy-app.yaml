@@ -1,17 +1,19 @@
+---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: loki-app
+  name: alloy-app
   namespace: flux-system
 spec:
   interval: 30m
-  targetNamespace: loki
+  targetNamespace: alloy
   sourceRef:
     kind: GitRepository
     name: flux-system
   dependsOn:
-    - name: longhorn-app
-  path: ./manifests/platform/loki/app/overlays/prod
+    - name: loki-app
+    - name: tempo-app
+  path: ./manifests/platform/alloy/app/overlays/prod
   prune: true
   wait: true
   timeout: 15m
@@ -19,16 +21,16 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: loki-monitoring
+  name: alloy-monitoring
   namespace: flux-system
 spec:
   interval: 30m
-  targetNamespace: loki
+  targetNamespace: alloy
   sourceRef:
     kind: GitRepository
     name: flux-system
   dependsOn:
-    - name: loki-app
+    - name: alloy-app
     - name: kube-prometheus-stack-app
-  path: ./manifests/platform/loki/monitoring/overlays/prod
+  path: ./manifests/platform/alloy/monitoring/overlays/prod
   prune: true

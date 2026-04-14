@@ -21,7 +21,6 @@ class TestGenerateHostsYaml:
         assert "br_cluster" in children
         assert "gateway" in children
         assert "clusters" in children
-        assert "external" in children
 
     def test_gateway_group(self, full_inventory: Inventory) -> None:
         result = generate_hosts_yaml(full_inventory)
@@ -47,11 +46,7 @@ class TestGenerateHostsYaml:
         assert "br-node4" in hosts
         assert "br-node5" in hosts
         assert "br-node6" in hosts
-
-    def test_external_group(self, full_inventory: Inventory) -> None:
-        result = generate_hosts_yaml(full_inventory)
-        ext_hosts = result["all"]["children"]["external"]["hosts"]
-        assert "br-external1" in ext_hosts
+        assert "br-node7" in hosts
 
     def test_br_cluster_contains_all_k8s_members(
         self, full_inventory: Inventory
@@ -59,7 +54,7 @@ class TestGenerateHostsYaml:
         result = generate_hosts_yaml(full_inventory)
         cluster = result["all"]["children"]["br_cluster"]["hosts"]
         assert "br-gateway1" in cluster
-        assert "br-external1" in cluster
+        assert "br-node7" in cluster
         assert "br-node1" in cluster
         assert "br-node6" in cluster
 
@@ -102,14 +97,6 @@ class TestGenerateClusterHosts:
         gw = next(h for h in result if h["name"] == "br-gateway1")
         assert "dns" in gw["domains"]
         assert "ntp" in gw["domains"]
-
-    def test_external_has_backup_storage_domain(
-        self, full_inventory: Inventory
-    ) -> None:
-        provider = MockSecretProvider()
-        result = generate_cluster_hosts(full_inventory, "dev", provider)
-        ext = next(h for h in result if h["name"] == "br-external1")
-        assert "backup_storage" in ext["domains"]
 
     def test_uses_secrets_for_ip_and_mac(self, full_inventory: Inventory) -> None:
         provider = MockSecretProvider()

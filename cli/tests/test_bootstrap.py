@@ -38,13 +38,13 @@ def node_info() -> ServerSSHInfo:
 
 
 @pytest.fixture
-def external_info() -> ServerSSHInfo:
+def external_worker_info() -> ServerSSHInfo:
     return ServerSSHInfo(
-        name="br-external1",
-        hostname="192.0.2.50",
+        name="br-node7",
+        hostname="192.0.2.16",
         username="bradmin",
-        public_key="ssh-ed25519 AAAAEX external@test",
-        server_type=ServerType.EXTERNAL,
+        public_key="ssh-ed25519 AAAAEX worker@test",
+        server_type=ServerType.NODE,
     )
 
 
@@ -52,9 +52,9 @@ def external_info() -> ServerSSHInfo:
 def all_infos(
     gateway_info: ServerSSHInfo,
     node_info: ServerSSHInfo,
-    external_info: ServerSSHInfo,
+    external_worker_info: ServerSSHInfo,
 ) -> list[ServerSSHInfo]:
-    return [gateway_info, node_info, external_info]
+    return [gateway_info, node_info, external_worker_info]
 
 
 class TestWriteSSHKeys:
@@ -90,7 +90,7 @@ class TestGenerateSSHConfig:
         config = (tmp_path / "config").read_text()
         assert "Host br-gateway1" in config
         assert "Host br-node1" in config
-        assert "Host br-external1" in config
+        assert "Host br-node7" in config
 
     def test_gateway_has_no_proxy_jump(
         self, tmp_path: Path, all_infos: list[ServerSSHInfo]

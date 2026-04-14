@@ -1,0 +1,7 @@
+---
+##################################
+# Storage configuration
+# OS ディスクの残り領域を Longhorn (k3s) のレプリカ置き場として使う
+##################################
+storage_mode: ext4
+mount_point: /var/lib/longhorn

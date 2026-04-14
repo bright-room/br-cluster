@@ -1,0 +1,48 @@
+---
+- name: Check if swapfile exists
+  stat:
+    path: /swapfile
+  register: swapfile_stat
+
+- name: Allocate swapfile
+  command: "fallocate -l {{ swap_size_mb }}M /swapfile"
+  args:
+    creates: /swapfile
+  when: not swapfile_stat.stat.exists
+
+- name: Set swapfile permissions
+  file:
+    path: /swapfile
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Format swapfile
+  command: mkswap /swapfile
+  when: not swapfile_stat.stat.exists
+  register: mkswap_result
+  changed_when: mkswap_result.rc == 0
+
+- name: Enable swapfile in fstab
+  lineinfile:
+    path: /etc/fstab
+    regexp: '^/swapfile\s'
+    line: "/swapfile none swap sw 0 0"
+    state: present
+
+- name: Activate swapfile
+  command: swapon /swapfile
+  when: not swapfile_stat.stat.exists
+  register: swapon_result
+  changed_when: swapon_result.rc == 0
+  failed_when:
+    - swapon_result.rc != 0
+    - "'already active' not in (swapon_result.stderr | default(''))"
+
+- name: Set vm.swappiness
+  sysctl:
+    name: vm.swappiness
+    value: "{{ swap_swappiness }}"
+    sysctl_set: true
+    state: present
+    reload: true

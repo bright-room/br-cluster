@@ -1,0 +1,18 @@
+# alloy helm values (prod overlay)
+#
+# Pin Alloy DaemonSet to worker nodes (Pi 4GB) and set modest limits.
+# See incident-2026-04-13-observability-cascade.md.
+
+controller:
+  nodeSelector:
+    node_type: worker
+  tolerations: []
+
+alloy:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi

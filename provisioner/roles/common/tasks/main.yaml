@@ -7,6 +7,10 @@
   include_tasks: system.yaml
   tags: [system]
 
+- name: Configure swap
+  include_tasks: swap.yaml
+  tags: [system, swap]
+
 - name: Blacklist storage devices in multipath configuration
   include_tasks: multipath.yaml
   tags: [system]
