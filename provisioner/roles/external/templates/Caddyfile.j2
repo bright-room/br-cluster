@@ -4,13 +4,13 @@
     admin off
 }
 
-{{ ext.domains.backup_storage }}:{{ garage.server.s3_port }} {
+{{ ext.domains.object_storage }}:{{ garage.server.s3_port }} {
     bind {{ ext.ip }}
     tls {{ garage.ssl_dir }}/public.crt {{ garage.ssl_dir }}/private.key
     reverse_proxy 127.0.0.1:{{ garage.server.s3_port }}
 }
 
-{{ ext.domains.backup_storage }}:443 {
+{{ ext.domains.object_storage }}:443 {
     bind {{ ext.ip }}
     tls {{ garage.ssl_dir }}/public.crt {{ garage.ssl_dir }}/private.key
     reverse_proxy 127.0.0.1:{{ garage.server.web_port }}

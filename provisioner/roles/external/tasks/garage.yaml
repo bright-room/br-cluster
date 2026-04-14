@@ -41,7 +41,7 @@
       --non-interactive \
       --rsa-key-size 4096 \
       --email {{ secret_admin_email }} \
-      --domain {{ external_host.domains.backup_storage }}
+      --domain {{ external_host.domains.object_storage }}
   register: certbot_create
   changed_when:
     - certbot_create.rc == 0
@@ -49,7 +49,7 @@
 
 - name: Copy SSL certificates for Garage
   copy:
-    src: "{{ lets_encrypt.certificate_dir }}/{{ external_host.domains.backup_storage }}/{{ item.src }}"
+    src: "{{ lets_encrypt.certificate_dir }}/{{ external_host.domains.object_storage }}/{{ item.src }}"
     dest: "{{ garage.ssl_dir }}/{{ item.dest }}"
     group: "{{ garage.operator.group }}"
     owner: "{{ garage.operator.user }}"

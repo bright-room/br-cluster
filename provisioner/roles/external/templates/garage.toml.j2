@@ -13,11 +13,11 @@ rpc_secret = "{{ secret_garage_rpc_secret }}"
 [s3_api]
 s3_region = "{{ garage.provisioning.region }}"
 api_bind_addr = "127.0.0.1:{{ garage.server.s3_port }}"
-root_domain = ".s3.{{ ext.domains.backup_storage }}"
+root_domain = ".s3.{{ ext.domains.object_storage }}"
 
 [s3_web]
 bind_addr = "127.0.0.1:{{ garage.server.web_port }}"
-root_domain = ".web.{{ ext.domains.backup_storage }}"
+root_domain = ".web.{{ ext.domains.object_storage }}"
 
 [admin]
 api_bind_addr = "127.0.0.1:{{ garage.server.admin_port }}"

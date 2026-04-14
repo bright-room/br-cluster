@@ -103,13 +103,13 @@ class TestGenerateClusterHosts:
         assert "dns" in gw["domains"]
         assert "ntp" in gw["domains"]
 
-    def test_external_has_backup_storage_domain(
+    def test_external_has_object_storage_domain(
         self, full_inventory: Inventory
     ) -> None:
         provider = MockSecretProvider()
         result = generate_cluster_hosts(full_inventory, "dev", provider)
         ext = next(h for h in result if h["name"] == "br-external1")
-        assert "backup_storage" in ext["domains"]
+        assert "object_storage" in ext["domains"]
 
     def test_uses_secrets_for_ip_and_mac(self, full_inventory: Inventory) -> None:
         provider = MockSecretProvider()

@@ -23,7 +23,7 @@ def _build_domains(server: ServerDefinition, cluster_domain_ref: str) -> dict:
         domains["dns"] = f"dns.{cluster_domain_ref}"
         domains["ntp"] = f"ntp.{cluster_domain_ref}"
     elif server.type == ServerType.EXTERNAL:
-        domains["backup_storage"] = f"backup-storage.{cluster_domain_ref}"
+        domains["object_storage"] = f"object-storage.{cluster_domain_ref}"
     return domains
 
 
