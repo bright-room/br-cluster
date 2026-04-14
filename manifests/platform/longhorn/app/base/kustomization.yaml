@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - helm.yaml
+  - storageclass-observability.yaml
 
 configMapGenerator:
   - name: longhorn-helm-values

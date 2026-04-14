@@ -13,3 +13,6 @@ tempo:
 
 nodeSelector:
   node_type: worker
+
+persistence:
+  storageClassName: longhorn-observability

@@ -15,8 +15,21 @@ kubeProxy:
 kubeScheduler:
   enabled: false
 
+# K3s embedded etcd exposes metrics on 2381/http when
+# `etcd-expose-metrics: true` is set in the k3s server config
+# (see provisioner/roles/k3s/templates/config.yaml.master.j2).
 kubeEtcd:
-  enabled: false
+  enabled: true
+  endpoints:
+    - 172.22.10.10
+    - 172.22.10.11
+    - 172.22.10.12
+  service:
+    enabled: true
+    port: 2381
+    targetPort: 2381
+  serviceMonitor:
+    scheme: http
 
 # Kubelet is the single scrape target for K3s metrics
 kubelet:

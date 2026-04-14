@@ -13,6 +13,8 @@ singleBinary:
     limits:
       cpu: 1000m
       memory: 768Mi
+  persistence:
+    storageClass: longhorn-observability
 
 gateway:
   nodeSelector:
