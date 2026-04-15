@@ -11,6 +11,7 @@ spec:
     name: flux-system
   dependsOn:
     - name: longhorn-app
+    - name: external-secrets-config
   path: ./manifests/platform/loki/app/overlays/prod
   prune: true
   wait: true
