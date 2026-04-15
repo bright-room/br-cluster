@@ -1,7 +1,8 @@
 # loki helm values (base)
 #
-# SingleBinary deployment with filesystem storage on a Longhorn PVC.
-# This homelab does not need horizontal scale or object storage.
+# SingleBinary deployment backed by Garage (S3-compatible) on br-external1.
+# Longhorn PVC is kept only as a 1Gi WAL buffer — chunks/index/ruler live in S3.
+# See implementation-plan-v2026.04.md §Phase 2.
 
 deploymentMode: SingleBinary
 
@@ -18,14 +19,25 @@ loki:
         index:
           prefix: loki_index_
           period: 24h
-        object_store: filesystem
+        object_store: s3
         schema: v13
 
   storage:
-    type: filesystem
-    filesystem:
-      chunks_directory: /var/loki/chunks
-      rules_directory: /var/loki/rules
+    type: s3
+    bucketNames:
+      chunks: loki
+      ruler: loki
+    s3:
+      endpoint: https://object-storage.cluster-internal.bright-room.net:3900
+      region: us-east-1
+      accessKeyId: ${S3_ACCESS_KEY_ID}
+      secretAccessKey: ${S3_SECRET_ACCESS_KEY}
+      s3ForcePathStyle: true
+      insecure: false
+      http_config:
+        idle_conn_timeout: 90s
+        response_header_timeout: 0s
+        insecure_skip_verify: false
 
   limits_config:
     allow_structured_metadata: true
@@ -43,7 +55,7 @@ loki:
 
   compactor:
     compaction_interval: 10m
-    delete_request_store: filesystem
+    delete_request_store: s3
     retention_delete_delay: 2h
     retention_enabled: true
     working_directory: /var/loki/retention
@@ -52,8 +64,21 @@ singleBinary:
   replicas: 1
   persistence:
     enabled: true
-    size: 10Gi
+    size: 1Gi
     storageClass: longhorn
+  extraArgs:
+    - '-config.expand-env=true'
+  extraEnv:
+    - name: S3_ACCESS_KEY_ID
+      valueFrom:
+        secretKeyRef:
+          name: loki-s3-secret
+          key: S3_ACCESS_KEY_ID
+    - name: S3_SECRET_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: loki-s3-secret
+          key: S3_SECRET_ACCESS_KEY
 
 # Disable scalable components — SingleBinary mode owns everything.
 write:

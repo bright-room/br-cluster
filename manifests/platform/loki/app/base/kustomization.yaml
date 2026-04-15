@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - helm.yaml
+  - externalsecret.yaml
 
 configMapGenerator:
   - name: loki-helm-values
