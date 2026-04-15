@@ -12,6 +12,11 @@ endpoints:
     nodeName: br-gateway1
     conditions:
       ready: true
+  - addresses:
+      - 172.22.10.50
+    nodeName: br-external1
+    conditions:
+      ready: true
 ports:
   - name: metrics
     port: 9100
