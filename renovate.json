@@ -8,10 +8,16 @@
   "prHourlyLimit": 0,
   "separateMinorPatch": true,
   "minimumReleaseAge": "3 days",
-  "automerge": true,
+  "automerge": false,
   "major": {
     "minimumReleaseAge": "7 days",
     "automerge": false
+  },
+  "flux": {
+    "managerFilePatterns": ["/manifests/.+\\.ya?ml$/"]
+  },
+  "kustomize": {
+    "managerFilePatterns": ["/manifests/.+/kustomization\\.ya?ml$/"]
   },
   "customManagers": [
     {
