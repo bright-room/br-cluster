@@ -70,12 +70,12 @@ config:
   exporters:
     debug: null
     # Traces → Tempo (gRPC OTLP, in-cluster service)
-    otlp/tempo:
+    otlp_grpc/tempo:
       endpoint: tempo.tempo.svc.cluster.local:4317
       tls:
         insecure: true
     # Logs (if any arrive via OTLP) → Loki gateway
-    otlphttp/loki:
+    otlp_http/loki:
       endpoint: http://loki-gateway.loki.svc.cluster.local/otlp
     # Metrics → Prometheus remote write receiver (kube-prometheus-stack)
     prometheusremotewrite:
@@ -87,7 +87,7 @@ config:
       traces:
         receivers: [otlp]
         processors: [memory_limiter, tail_sampling, batch]
-        exporters: [otlp/tempo]
+        exporters: [otlp_grpc/tempo]
       metrics:
         receivers: [otlp]
         processors: [memory_limiter, batch]
@@ -95,7 +95,7 @@ config:
       logs:
         receivers: [otlp]
         processors: [memory_limiter, batch]
-        exporters: [otlphttp/loki]
+        exporters: [otlp_http/loki]
 
 ports:
   otlp:
