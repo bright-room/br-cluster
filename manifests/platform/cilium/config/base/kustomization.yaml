@@ -3,5 +3,4 @@ kind: Kustomization
 
 resources:
   - cilium-l2-announcement-policy.yaml
-  - hubble-httproute.yaml
   - ip-pool-lb.yaml
