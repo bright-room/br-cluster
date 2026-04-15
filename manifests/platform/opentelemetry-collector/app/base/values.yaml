@@ -1,0 +1,129 @@
+# opentelemetry-collector helm values (base, open-telemetry/opentelemetry-collector chart)
+#
+# Phase A: gateway-mode Collector that sits between Alloy (agent) and the
+# storage backends. See implementation-plan-v2026.04.md §Phase A and
+# observability-decision.md §4.
+#
+# Responsibility split:
+#   - Alloy (DaemonSet) = pod log collection + OTLP receive + Logs→Loki direct push
+#   - this Collector    = Traces / Metrics processing and fan-out
+# Logs from apps still go through Alloy directly to Loki — they do NOT pass
+# through this Collector to avoid a double path.
+
+# tail_sampling needs the contrib distribution.
+mode: deployment
+image:
+  repository: otel/opentelemetry-collector-contrib
+
+replicaCount: 2
+
+# We supply a full config below; do not let the chart inject preset receivers.
+presets:
+  logsCollection:
+    enabled: false
+  hostMetrics:
+    enabled: false
+  kubernetesAttributes:
+    enabled: false
+  kubeletMetrics:
+    enabled: false
+  kubernetesEvents:
+    enabled: false
+  clusterMetrics:
+    enabled: false
+
+# Disable chart-default receivers so only our explicit pipeline is used.
+config:
+  receivers:
+    jaeger: null
+    zipkin: null
+    prometheus: null
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+  processors:
+    memory_limiter:
+      check_interval: 5s
+      limit_percentage: 80
+      spike_limit_percentage: 25
+    batch:
+      send_batch_size: 1024
+      send_batch_max_size: 2048
+      timeout: 5s
+    # Tail sampling: keep all errors + 10% of the rest. Pi 規模なので軽め。
+    tail_sampling:
+      decision_wait: 10s
+      num_traces: 10000
+      expected_new_traces_per_sec: 100
+      policies:
+        - name: errors
+          type: status_code
+          status_code:
+            status_codes: [ERROR]
+        - name: probabilistic-10pct
+          type: probabilistic
+          probabilistic:
+            sampling_percentage: 10
+  exporters:
+    debug: null
+    # Traces → Tempo (gRPC OTLP, in-cluster service)
+    otlp/tempo:
+      endpoint: tempo.tempo.svc.cluster.local:4317
+      tls:
+        insecure: true
+    # Logs (if any arrive via OTLP) → Loki gateway
+    otlphttp/loki:
+      endpoint: http://loki-gateway.loki.svc.cluster.local/otlp
+    # Metrics → Prometheus remote write receiver (kube-prometheus-stack)
+    prometheusremotewrite:
+      endpoint: http://kube-prometheus-stack-prometheus.kube-prom-stack.svc.cluster.local:9090/api/v1/write
+      tls:
+        insecure: true
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, tail_sampling, batch]
+        exporters: [otlp/tempo]
+      metrics:
+        receivers: [otlp]
+        processors: [memory_limiter, batch]
+        exporters: [prometheusremotewrite]
+      logs:
+        receivers: [otlp]
+        processors: [memory_limiter, batch]
+        exporters: [otlphttp/loki]
+
+ports:
+  otlp:
+    enabled: true
+    containerPort: 4317
+    servicePort: 4317
+    protocol: TCP
+  otlp-http:
+    enabled: true
+    containerPort: 4318
+    servicePort: 4318
+    protocol: TCP
+  jaeger-compact:
+    enabled: false
+  jaeger-thrift:
+    enabled: false
+  jaeger-grpc:
+    enabled: false
+  zipkin:
+    enabled: false
+  metrics:
+    enabled: true
+    containerPort: 8888
+    servicePort: 8888
+    protocol: TCP
+
+service:
+  type: ClusterIP
+
+serviceMonitor:
+  enabled: false

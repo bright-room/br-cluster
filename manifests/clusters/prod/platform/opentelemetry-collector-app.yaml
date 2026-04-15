@@ -1,0 +1,36 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: opentelemetry-collector-app
+  namespace: flux-system
+spec:
+  interval: 30m
+  targetNamespace: opentelemetry-collector
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  dependsOn:
+    - name: loki-app
+    - name: tempo-app
+    - name: kube-prometheus-stack-app
+  path: ./manifests/platform/opentelemetry-collector/app/overlays/prod
+  prune: true
+  wait: true
+  timeout: 15m
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: opentelemetry-collector-monitoring
+  namespace: flux-system
+spec:
+  interval: 30m
+  targetNamespace: opentelemetry-collector
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  dependsOn:
+    - name: opentelemetry-collector-app
+    - name: kube-prometheus-stack-app
+  path: ./manifests/platform/opentelemetry-collector/monitoring/overlays/prod
+  prune: true
