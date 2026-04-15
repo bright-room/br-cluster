@@ -30,8 +30,11 @@ tempo:
         insecure: false
         forcepathstyle: true
 
+  # tempo chart の templates/statefulset.yaml は extraArgs を
+  # `range $key, $value` で舐めるため map 形式で書く必要がある
+  # (list だと --0=... のようなゴミ flag が生成されて tempo が crash する)。
   extraArgs:
-    - '-config.expand-env=true'
+    config.expand-env: "true"
   extraEnv:
     - name: S3_ACCESS_KEY_ID
       valueFrom:
