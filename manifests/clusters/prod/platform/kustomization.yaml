@@ -16,4 +16,5 @@ resources:
   - longhorn-app.yaml
   - metrics-server-app.yaml
   - onepassword-connect-app.yaml
+  - opentelemetry-collector-app.yaml
   - tempo-app.yaml

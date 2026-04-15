@@ -1,9 +1,14 @@
 # alloy helm values (base)
 #
-# Single agent replacing the retired fluent-bit + fluentd + otel-collector
-# stack. Runs as a DaemonSet on workers only, collects container logs from
-# /var/log/containers via the Kubernetes API, receives OTLP from app Pods,
-# and forwards everything to Loki and Tempo.
+# Single agent replacing the retired fluent-bit + fluentd stack. Runs as a
+# DaemonSet on workers only, collects container logs from /var/log/containers
+# via the Kubernetes API, and receives OTLP from app Pods.
+#
+# Responsibility split with the OTel Collector gateway (Phase A):
+#   - Alloy (this file) = pod log collection + OTLP receive + Logs→Loki direct push
+#   - opentelemetry-collector (gateway) = Traces / Metrics processing and fan-out
+# Logs go Alloy → Loki directly to keep the path single. Traces go
+# Alloy → Collector → Tempo so tail_sampling / batching live in one place.
 
 alloy:
   configMap:
@@ -71,7 +76,7 @@ alloy:
       otelcol.processor.batch "default" {
         output {
           logs   = [otelcol.exporter.loki.default.input]
-          traces = [otelcol.exporter.otlp.tempo.input]
+          traces = [otelcol.exporter.otlp.gateway.input]
         }
       }
 
@@ -79,9 +84,11 @@ alloy:
         forward_to = [loki.write.default.receiver]
       }
 
-      otelcol.exporter.otlp "tempo" {
+      // Traces fan out via the OTel Collector gateway, not direct to Tempo,
+      // so tail_sampling lives in one place (see Phase A).
+      otelcol.exporter.otlp "gateway" {
         client {
-          endpoint = "tempo.tempo.svc.cluster.local:4317"
+          endpoint = "opentelemetry-collector.opentelemetry-collector.svc.cluster.local:4317"
           tls {
             insecure = true
           }

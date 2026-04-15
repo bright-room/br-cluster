@@ -5,6 +5,8 @@ prometheus:
     retention: 14d
     retentionSize: 50GB
     walCompression: true
+    # Accept remote_write from the OTel Collector gateway (Phase A).
+    enableRemoteWriteReceiver: true
     storageSpec:
       volumeClaimTemplate:
         spec:
