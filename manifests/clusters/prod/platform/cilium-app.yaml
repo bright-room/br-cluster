@@ -31,8 +31,27 @@ spec:
     name: flux-system
   dependsOn:
     - name: cilium-app
-    - name: envoy-gateway-app
   path: ./manifests/platform/cilium/config/overlays/prod
+  prune: true
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cilium-routes
+  namespace: flux-system
+spec:
+  interval: 30m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  dependsOn:
+    - name: cilium-app
+    - name: envoy-gateway-app
+  path: ./manifests/platform/cilium/routes/overlays/prod
   prune: true
   postBuild:
     substituteFrom:
