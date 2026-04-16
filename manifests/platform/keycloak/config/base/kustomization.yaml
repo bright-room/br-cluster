@@ -3,4 +3,5 @@ kind: Kustomization
 resources:
   - httproute.yaml
   - git-repository.yaml
+  - tf-runner.yaml
   - terraform.yaml
