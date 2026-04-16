@@ -2,7 +2,7 @@
 ##################################
 # Cluster configuration
 ##################################
-cluster_domain: cluster-internal.bright-room.net
+cluster_domain: cluster-platform.bright-room.net
 
 ##################################
 # Network configuration
