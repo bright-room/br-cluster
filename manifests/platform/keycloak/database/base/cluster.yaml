@@ -13,7 +13,7 @@ spec:
 
   storage:
     size: 3Gi
-    storageClassName: longhorn
+    storageClass: longhorn
 
   resources:
     requests:
