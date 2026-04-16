@@ -50,6 +50,7 @@ spec:
   dependsOn:
     - name: keycloak-app
     - name: envoy-gateway-config
+    - name: tofu-controller
   path: ./manifests/platform/keycloak/config/overlays/prod
   prune: true
   timeout: 5m

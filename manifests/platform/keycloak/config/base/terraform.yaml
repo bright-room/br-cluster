@@ -1,0 +1,24 @@
+apiVersion: infra.contrib.fluxcd.io/v1alpha2
+kind: Terraform
+metadata:
+  name: config-keycloak
+  namespace: keycloak
+spec:
+  interval: 30m
+  approvePlan: auto
+  destroyResourcesOnDeletion: true
+  path: ./
+  sourceRef:
+    kind: GitRepository
+    name: keycloak-config
+    namespace: flux-system
+  vars:
+    - name: keycloak_url
+      value: "http://keycloak.keycloak.svc:80"
+    - name: cluster_internal_domain
+      value: "${CLUSTER_INTERNAL_DOMAIN}"
+  varsFrom:
+    - kind: Secret
+      name: keycloak-admin-secret
+  writeOutputsToSecret:
+    name: tf-config-keycloak-output
