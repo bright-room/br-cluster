@@ -1,4 +1,15 @@
 apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: backend-keycloak
+  namespace: longhorn-system
+spec:
+  endpoints:
+    - fqdn:
+        hostname: keycloak.keycloak.svc.cluster.local
+        port: 80
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata:
   name: longhorn-oidc
@@ -10,7 +21,14 @@ spec:
       name: longhorn-ui
   oidc:
     provider:
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: backend-keycloak
+          port: 80
       issuer: "https://keycloak.${CLUSTER_INTERNAL_DOMAIN}/realms/platform"
+      authorizationEndpoint: "https://keycloak.${CLUSTER_INTERNAL_DOMAIN}/realms/platform/protocol/openid-connect/auth"
+      tokenEndpoint: "https://keycloak.${CLUSTER_INTERNAL_DOMAIN}/realms/platform/protocol/openid-connect/token"
     clientID: "${OIDC_CLIENT_ID}"
     clientSecret:
       name: oidc-client-secret
