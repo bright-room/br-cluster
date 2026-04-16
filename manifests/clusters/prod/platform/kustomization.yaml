@@ -4,6 +4,7 @@ resources:
   - alloy-app.yaml
   - cert-manager-app.yaml
   - cilium-app.yaml
+  - cloudflared-app.yaml
   - cloudnative-pg-app.yaml
   - coredns-app.yaml
   - csi-external-snapshotter-app.yaml

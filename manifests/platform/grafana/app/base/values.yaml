@@ -15,7 +15,7 @@ envFromSecrets:
 
 grafana.ini:
   server:
-    root_url: https://grafana.cluster-internal.bright-room.net
+    root_url: https://grafana.cluster-platform.bright-room.net
   auth.generic_oauth:
     enabled: true
     name: Keycloak
@@ -24,9 +24,9 @@ grafana.ini:
     client_id: grafana
     client_secret: $__env{OIDC_CLIENT_SECRET}
     scopes: openid email profile
-    auth_url: https://keycloak.cluster-internal.bright-room.net/realms/platform/protocol/openid-connect/auth
-    token_url: https://keycloak.cluster-internal.bright-room.net/realms/platform/protocol/openid-connect/token
-    api_url: https://keycloak.cluster-internal.bright-room.net/realms/platform/protocol/openid-connect/userinfo
+    auth_url: https://keycloak.cluster-platform.bright-room.net/realms/platform/protocol/openid-connect/auth
+    token_url: https://keycloak.cluster-platform.bright-room.net/realms/platform/protocol/openid-connect/token
+    api_url: https://keycloak.cluster-platform.bright-room.net/realms/platform/protocol/openid-connect/userinfo
     role_attribute_path: "'Admin'"
     allow_assign_grafana_admin: true
 

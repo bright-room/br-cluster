@@ -58,7 +58,7 @@ spec:
                   key: admin-password
             # Hostname (consistent issuer URL regardless of access path)
             - name: KC_HOSTNAME
-              value: "https://keycloak.cluster-internal.bright-room.net"
+              value: "https://keycloak.cluster-platform.bright-room.net"
             - name: KC_HOSTNAME_STRICT
               value: "true"
             - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC

@@ -5,8 +5,9 @@ metadata:
   namespace: flux-system
 data:
   CLUSTER_DOMAIN: "b8m.app"
-  CLUSTER_INTERNAL_DOMAIN: "cluster-internal.bright-room.net"
+  CLUSTER_INTERNAL_DOMAIN: "cluster-platform.bright-room.net"
   KUBE_VIP_ADDRESS: "172.22.10.60"
   PUBLIC_GATEWAY_IP: "172.22.10.64"
   INTERNAL_GATEWAY_IP: "172.22.10.68"
   TRUSTED_INTERNAL_POD_CIDR: "10.42.0.0/16"
+  CLOUDFLARED_CLUSTER_INTERNAL_TUNNEL_ID: "5d0d45d3-d3fa-4b29-8fa1-3705cf8c99da"
