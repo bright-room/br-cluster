@@ -56,13 +56,18 @@ spec:
                 secretKeyRef:
                   name: keycloak-admin-secret
                   key: admin-password
+            # Hostname (consistent issuer URL regardless of access path)
+            - name: KC_HOSTNAME
+              value: "keycloak.cluster-internal.bright-room.net"
+            - name: KC_HOSTNAME_STRICT
+              value: "true"
+            - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC
+              value: "true"
             # Proxy / HTTP
             - name: KC_PROXY_HEADERS
               value: xforwarded
             - name: KC_HTTP_ENABLED
               value: "true"
-            - name: KC_HOSTNAME_STRICT
-              value: "false"
             # Metrics
             - name: KC_HEALTH_ENABLED
               value: "true"
