@@ -54,5 +54,5 @@ datasources:
             datasourceUid: prometheus
           nodeGraph:
             enabled: true
-          serviceMap:
-            datasourceUid: prometheus
+          # serviceMap requires Tempo metrics-generator which is not enabled
+          # (too heavy for Pi). Re-enable if metrics-generator is added later.
