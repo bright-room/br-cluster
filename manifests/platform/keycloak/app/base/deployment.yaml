@@ -68,17 +68,21 @@ spec:
               value: "true"
             - name: KC_METRICS_ENABLED
               value: "true"
+          startupProbe:
+            httpGet:
+              path: /health/started
+              port: health
+            failureThreshold: 30
+            periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /health/ready
               port: health
-            initialDelaySeconds: 60
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /health/live
               port: health
-            initialDelaySeconds: 120
             periodSeconds: 30
           resources:
             requests:
@@ -86,4 +90,4 @@ spec:
               memory: 512Mi
             limits:
               cpu: "1"
-              memory: 768Mi
+              memory: 1Gi
