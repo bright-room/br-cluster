@@ -58,3 +58,21 @@
     group: "root"
     mode: "0644"
   when: "'worker' in group_names"
+
+- name: Create k3s systemd drop-in directory
+  file:
+    path: /etc/systemd/system/k3s.service.d
+    state: directory
+    owner: "root"
+    group: "root"
+    mode: "0755"
+  when: "'master' in group_names"
+
+- name: Configure GOMEMLIMIT for k3s server
+  template:
+    src: "gomemlimit.conf.j2"
+    dest: /etc/systemd/system/k3s.service.d/gomemlimit.conf
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  when: "'master' in group_names"
