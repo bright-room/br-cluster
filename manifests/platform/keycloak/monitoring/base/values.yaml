@@ -1,7 +1,0 @@
-# keycloak helm values (monitoring)
-# Deployed separately to ensure ServiceMonitor CRD exists (kube-prometheus-stack)
-
-metrics:
-  enabled: true
-  serviceMonitor:
-    enabled: true
