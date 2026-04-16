@@ -25,7 +25,7 @@ spec:
               app.kubernetes.io/name: cloudflared
       containers:
         - name: cloudflared
-          image: cloudflare/cloudflared:2025.4.1
+          image: cloudflare/cloudflared:2026.3.0-arm64
           args:
             - tunnel
             - --config
