@@ -1,0 +1,13 @@
+- op: add
+  path: /spec/valuesFrom/-
+  value:
+    kind: ConfigMap
+    name: cloudnative-pg-helm-values
+    valuesKey: overlay-values.yaml
+- op: add
+  path: /spec/valuesFrom/-
+  value:
+    kind: ConfigMap
+    name: cloudnative-pg-monitoring-values
+    valuesKey: values.yaml
+    optional: true
