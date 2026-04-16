@@ -1,4 +1,5 @@
 # tofu-controller helm values (base)
+allowCrossNamespaceRefs: true
 runner:
   grpc:
     maxMessageSize: 20
