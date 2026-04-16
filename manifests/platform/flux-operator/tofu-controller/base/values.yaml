@@ -1,0 +1,4 @@
+# tofu-controller helm values (base)
+runner:
+  grpc:
+    maxMessageSize: 20
