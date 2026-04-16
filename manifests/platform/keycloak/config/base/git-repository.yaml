@@ -5,6 +5,7 @@ metadata:
   namespace: flux-system
 spec:
   interval: 5m
+  provider: github
   url: https://github.com/bright-room/br-cluster-keycloak-terraform.git
   ref:
     branch: main
