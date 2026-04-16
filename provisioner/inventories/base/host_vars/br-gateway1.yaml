@@ -49,8 +49,6 @@ nft_forward_rules:
     - iifname $lan_interface ip saddr $lan_network oifname $wan_interface udp dport @forward_udp_accept ct state new accept
   220 ssh from wan:
     - iifname $wan_interface oifname $lan_interface ip daddr $lan_network tcp dport ssh ct state new accept
-  230 http from wan:
-    - iifname $wan_interface oifname $lan_interface ip daddr $lan_network tcp dport { http, https } ct state new accept
   250 k8s api from wan:
     - iifname $wan_interface oifname $lan_interface ip daddr {{ (cluster_vips | selectattr('name', 'equalto', 'k8s-api') | first).ip }} tcp dport 6443 ct state new accept
 
@@ -59,10 +57,6 @@ nft__nat_default_prerouting_rules: {}
 nft__nat_prerouting_rules:
   000 policy:
     - type nat hook prerouting priority -100;
-  010 dnat http to internal gateway:
-    - iifname $wan_interface tcp dport 80 dnat ip to {{ (cluster_vips | selectattr('name', 'equalto', 'internal-gateway') | first).ip }}:80
-  011 dnat https to internal gateway:
-    - iifname $wan_interface tcp dport 443 dnat ip to {{ (cluster_vips | selectattr('name', 'equalto', 'internal-gateway') | first).ip }}:443
   020 dnat k8s api:
     - iifname $wan_interface tcp dport 6443 dnat ip to {{ (cluster_vips | selectattr('name', 'equalto', 'k8s-api') | first).ip }}:6443
 
