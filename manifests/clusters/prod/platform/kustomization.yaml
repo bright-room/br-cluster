@@ -12,6 +12,7 @@ resources:
   - external-secrets-app.yaml
   - flux-app.yaml
   - grafana-app.yaml
+  - keycloak-app.yaml
   - kube-prometheus-stack-app.yaml
   - kube-vip-app.yaml
   - loki-app.yaml

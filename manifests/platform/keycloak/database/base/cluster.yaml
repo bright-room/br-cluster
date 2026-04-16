@@ -1,0 +1,31 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: keycloak-postgresql
+spec:
+  instances: 1
+  primaryUpdateStrategy: unsupervised
+
+  bootstrap:
+    initdb:
+      database: keycloak
+      owner: keycloak
+
+  storage:
+    size: 3Gi
+    storageClassName: longhorn
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+
+  nodeMaintenanceWindow:
+    inProgress: false
+    reusePVC: true
+
+  affinity:
+    nodeSelector:
+      node_type: worker
