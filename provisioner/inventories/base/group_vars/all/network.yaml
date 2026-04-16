@@ -33,9 +33,8 @@ dns:
     - "8.8.8.8"
     - "8.8.4.4"
 
-# Domains exposed to WAN clients via split-horizon DNS.
-# From WAN, these resolve to gateway1's wan_ip and are DNAT-forwarded
-# to the actual LAN target by gateway1's nftables rules.
+# Domains resolved to gateway1's wan_ip from WAN side.
+# Traffic is DNAT-forwarded to the LAN target by nftables.
 wan_exposed_domains:
   - "k8s-api.{{ cluster_domain }}"
 
