@@ -7,7 +7,7 @@ spec:
   interval: 30m
   approvePlan: auto
   destroyResourcesOnDeletion: true
-  path: ./
+  path: ./terraform
   sourceRef:
     kind: GitRepository
     name: keycloak-config
