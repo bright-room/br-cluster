@@ -109,10 +109,10 @@ nft_define:
     value: "{ domain, 2379 }"
   forward tcp accept:
     name: forward_tcp_accept
-    value: "{ http, https, domain }"
+    value: "{ http, https, domain, 7844 }"
   forward udp accept:
     name: forward_udp_accept
-    value: "{ domain, ntp }"
+    value: "{ domain, ntp, 7844 }"
 
 nft_set_default: {}
 nft_set:
