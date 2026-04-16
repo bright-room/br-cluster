@@ -8,6 +8,11 @@ admin:
   userKey: admin-user
   passwordKey: admin-password
 
+# RWO PVC requires Recreate strategy — RollingUpdate causes Multi-Attach errors
+# because the new pod tries to claim the volume before the old one releases it.
+deploymentStrategy:
+  type: Recreate
+
 persistence:
   enabled: true
   storageClassName: longhorn
