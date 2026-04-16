@@ -4,3 +4,5 @@ k3s_packages:
   - nfs-common
   - cryptsetup
   - dmsetup
+
+k3s_server_gomemlimit: "900MiB"
