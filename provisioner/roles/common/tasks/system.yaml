@@ -53,6 +53,14 @@
     line: '\1 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory'
     backrefs: true
 
+- name: Disable UAS for RTL9210 NVMe adapter to prevent I/O errors
+  lineinfile:
+    path: "/boot/firmware/cmdline.txt"
+    regexp: '^((?!.*\busb-storage\.quirks=0bda:9210:u\b).*)$'
+    line: '\1 usb-storage.quirks=0bda:9210:u'
+    backrefs: true
+  notify: reboot
+
 - name: Update NTP server
   lineinfile:
     dest: /etc/systemd/timesyncd.conf
