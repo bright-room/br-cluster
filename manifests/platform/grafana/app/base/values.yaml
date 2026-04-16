@@ -1,12 +1,34 @@
 # grafana helm values (base)
 #
 # Phase B: standalone Grafana with Prometheus/Loki/Tempo DataSources.
-# Break-glass local admin is always enabled (Keycloak OIDC comes in Phase E).
+# Phase E: Keycloak OIDC via Grafana built-in auth.generic_oauth.
+# Break-glass local admin is always enabled.
 
 admin:
   existingSecret: grafana-admin-secret
   userKey: admin-user
   passwordKey: admin-password
+
+envFromSecrets:
+  - name: grafana-oidc-secret
+    optional: true
+
+grafana.ini:
+  server:
+    root_url: https://grafana.cluster-internal.bright-room.net
+  auth.generic_oauth:
+    enabled: true
+    name: Keycloak
+    allow_sign_up: true
+    auto_login: false
+    client_id: grafana
+    client_secret: $__env{OIDC_CLIENT_SECRET}
+    scopes: openid email profile
+    auth_url: https://keycloak.cluster-internal.bright-room.net/realms/platform/protocol/openid-connect/auth
+    token_url: https://keycloak.cluster-internal.bright-room.net/realms/platform/protocol/openid-connect/token
+    api_url: https://keycloak.cluster-internal.bright-room.net/realms/platform/protocol/openid-connect/userinfo
+    role_attribute_path: "'Admin'"
+    allow_assign_grafana_admin: true
 
 # RWO PVC requires Recreate strategy — RollingUpdate causes Multi-Attach errors
 # because the new pod tries to claim the volume before the old one releases it.
