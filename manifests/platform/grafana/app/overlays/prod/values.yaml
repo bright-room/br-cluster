@@ -1,0 +1,22 @@
+# grafana helm values (prod overlay)
+#
+# Pin to worker nodes with modest limits for Pi (8GB workers).
+
+nodeSelector:
+  node_type: worker
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 192Mi
+  limits:
+    cpu: 500m
+    memory: 384Mi
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: grafana

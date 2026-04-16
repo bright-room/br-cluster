@@ -10,6 +10,7 @@ resources:
   - external-dns-app.yaml
   - external-secrets-app.yaml
   - flux-app.yaml
+  - grafana-app.yaml
   - kube-prometheus-stack-app.yaml
   - kube-vip-app.yaml
   - loki-app.yaml
