@@ -12,6 +12,7 @@ admin:
 # because the new pod tries to claim the volume before the old one releases it.
 deploymentStrategy:
   type: Recreate
+  rollingUpdate: null
 
 persistence:
   enabled: true
