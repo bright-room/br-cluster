@@ -1,0 +1,18 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: hubble-oidc
+  namespace: kube-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: hubble-ui
+  oidc:
+    provider:
+      issuer: "https://keycloak.${CLUSTER_INTERNAL_DOMAIN}/realms/platform"
+    clientID: "${OIDC_CLIENT_ID}"
+    clientSecret:
+      name: oidc-client-secret
+    redirectURL: "https://hubble.${CLUSTER_INTERNAL_DOMAIN}/oauth2/callback"
+    logoutPath: "/oauth2/logout"

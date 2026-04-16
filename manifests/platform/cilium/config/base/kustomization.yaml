@@ -4,3 +4,5 @@ kind: Kustomization
 resources:
   - cilium-l2-announcement-policy.yaml
   - ip-pool-lb.yaml
+  - oidc-externalsecret.yaml
+  - security-policy.yaml
