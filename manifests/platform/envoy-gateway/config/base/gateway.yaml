@@ -59,3 +59,28 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: internal-gateway-tls
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: cluster-gateway
+  namespace: envoy-gateway-system
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-issuer
+spec:
+  gatewayClassName: cluster-gateway
+  addresses:
+    - type: IPAddress
+      value: ${CLUSTER_GATEWAY_IP}
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: "*.${CLUSTER_DOMAIN}"
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: cluster-gateway-tls
