@@ -14,6 +14,5 @@ data:
   CLUSTER_GATEWAY_IP: "172.22.10.70"
   TRUSTED_INTERNAL_POD_CIDR: "10.42.0.0/16"
   CLOUDFLARED_CLUSTER_INTERNAL_TUNNEL_ID: "5d0d45d3-d3fa-4b29-8fa1-3705cf8c99da"
-  # Task #9 で新 Tunnel (br-cluster) 適用後に TF output から転記する
-  # CLOUDFLARED_TUNNEL_ID: "<br-cluster tunnel id>"
-  # CLOUDFLARED_TUNNEL_CNAME: "<br-cluster tunnel id>.cfargotunnel.com"
+  CLOUDFLARED_TUNNEL_ID: "a033f223-65e3-4bb5-aa55-d258e1c368b5"
+  CLOUDFLARED_TUNNEL_CNAME: "a033f223-65e3-4bb5-aa55-d258e1c368b5.cfargotunnel.com"
