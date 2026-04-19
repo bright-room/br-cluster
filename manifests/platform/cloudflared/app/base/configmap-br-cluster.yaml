@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudflared-br-cluster-config
+data:
+  config.yaml: |
+    tunnel: ${CLOUDFLARED_TUNNEL_ID}
+    credentials-file: /etc/cloudflared/credentials.json
+    protocol: quic
+    metrics: 0.0.0.0:2000
+    no-autoupdate: true
+    ingress:
+      - hostname: "*.${CLUSTER_DOMAIN}"
+        service: https://${CLUSTER_GATEWAY_IP}:443
+        originRequest:
+          noTLSVerify: true
+      - service: http_status:404
