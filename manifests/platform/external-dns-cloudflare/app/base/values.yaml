@@ -2,6 +2,14 @@
 provider:
   name: cloudflare
 
+# Pin image to app v0.21.0 (chart 1.20.0 still ships 0.20.0).
+# v0.21.0 migrates the gateway-api source to Gateway API v1 natively.
+# Prior versions watched v1beta1 and lost annotations on v1 HTTPRoutes,
+# which caused external-dns.alpha.kubernetes.io/target to be ignored
+# and A records (gateway IP) to be created instead of CNAMEs.
+image:
+  tag: v0.21.0
+
 sources:
   - gateway-httproute
 
