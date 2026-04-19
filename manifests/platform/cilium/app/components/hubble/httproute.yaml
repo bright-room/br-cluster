@@ -40,7 +40,6 @@ metadata:
   name: hubble-ui-b8m
   namespace: kube-system
   annotations:
-    external-dns.alpha.kubernetes.io/target: "${CLOUDFLARED_TUNNEL_CNAME}"
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
 spec:
   parentRefs:
