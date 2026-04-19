@@ -40,7 +40,6 @@ metadata:
   name: grafana-b8m
   namespace: grafana
   annotations:
-    external-dns.alpha.kubernetes.io/target: "${CLOUDFLARED_TUNNEL_CNAME}"
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
 spec:
   parentRefs:
