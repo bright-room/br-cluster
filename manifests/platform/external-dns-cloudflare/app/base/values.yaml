@@ -1,0 +1,23 @@
+# external-dns helm values (base) — Cloudflare provider
+provider:
+  name: cloudflare
+
+sources:
+  - gateway-httproute
+
+domainFilters:
+  - b8m.app
+
+# Conservative default — overlays can switch to sync once stable
+policy: upsert-only
+
+# Distinct owner ID so records don't collide with any other external-dns instance
+txtOwnerId: br-cluster-prod
+registry: txt
+
+env:
+  - name: CF_API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: externaldns-cloudflare-token
+        key: apiToken

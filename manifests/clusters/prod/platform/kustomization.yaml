@@ -10,6 +10,7 @@ resources:
   - csi-external-snapshotter-app.yaml
   - envoy-gateway-app.yaml
   - external-dns-app.yaml
+  - external-dns-cloudflare-app.yaml
   - external-secrets-app.yaml
   - flux-app.yaml
   - grafana-app.yaml

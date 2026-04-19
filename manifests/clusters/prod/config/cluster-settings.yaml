@@ -5,9 +5,15 @@ metadata:
   namespace: flux-system
 data:
   CLUSTER_DOMAIN: "b8m.app"
+  # 段階移行中のため CLUSTER_INTERNAL_DOMAIN / PUBLIC_GATEWAY_IP / INTERNAL_GATEWAY_IP
+  # / CLOUDFLARED_CLUSTER_INTERNAL_TUNNEL_ID を一時併存。cluster-gateway への移行完了後に削除予定。
   CLUSTER_INTERNAL_DOMAIN: "cluster-platform.bright-room.net"
   KUBE_VIP_ADDRESS: "172.22.10.60"
   PUBLIC_GATEWAY_IP: "172.22.10.64"
   INTERNAL_GATEWAY_IP: "172.22.10.68"
+  CLUSTER_GATEWAY_IP: "172.22.10.70"
   TRUSTED_INTERNAL_POD_CIDR: "10.42.0.0/16"
   CLOUDFLARED_CLUSTER_INTERNAL_TUNNEL_ID: "5d0d45d3-d3fa-4b29-8fa1-3705cf8c99da"
+  # Task #9 で新 Tunnel (br-cluster) 適用後に TF output から転記する
+  # CLOUDFLARED_TUNNEL_ID: "<br-cluster tunnel id>"
+  # CLOUDFLARED_TUNNEL_CNAME: "<br-cluster tunnel id>.cfargotunnel.com"
