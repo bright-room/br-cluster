@@ -6,6 +6,7 @@ metadata:
   namespace: flux-system
 spec:
   interval: 30m
+  targetNamespace: platform-pg
   sourceRef:
     kind: GitRepository
     name: flux-system
