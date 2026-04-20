@@ -1,8 +1,14 @@
 # alloy helm values (base)
 #
 # Single agent replacing the retired fluent-bit + fluentd stack. Runs as a
-# DaemonSet on workers only, collects container logs from /var/log/containers
-# via the Kubernetes API, and receives OTLP from app Pods.
+# DaemonSet on workers only, tails container log files from /var/log/pods
+# directly (no apiserver log-follow), and receives OTLP from app Pods.
+#
+# Why file tailing, not loki.source.kubernetes:
+# loki.source.kubernetes opens one apiserver log-follow stream per pod. On
+# nodes with many pods that trips client-go QPS throttling, causes http2
+# connection loss, and the resulting tailer restarts pin CPU at the limit.
+# Reading /var/log/pods/*/*/*.log directly scales with disk I/O instead.
 #
 # Responsibility split with the OTel Collector gateway (Phase A):
 #   - Alloy (this file) = pod log collection + OTLP receive + Logs→Loki direct push
@@ -11,6 +17,9 @@
 # Alloy → Collector → Tempo so tail_sampling / batching live in one place.
 
 alloy:
+  mounts:
+    varlog: true
+
   configMap:
     create: true
     content: |
@@ -19,43 +28,48 @@ alloy:
         format = "logfmt"
       }
 
-      // --- Pod log collection ---------------------------------------------
+      // --- Pod log collection (file tailing) ------------------------------
 
-      discovery.kubernetes "pods" {
-        role = "pod"
-        selectors {
-          role  = "pod"
-          field = "spec.nodeName=" + sys.env("NODE_NAME")
-        }
+      local.file_match "pods" {
+        path_targets = [{"__path__" = "/var/log/pods/*/*/*.log"}]
       }
 
-      discovery.relabel "pods" {
-        targets = discovery.kubernetes.pods.targets
-        rule {
-          source_labels = ["__meta_kubernetes_namespace"]
-          target_label  = "namespace"
-        }
-        rule {
-          source_labels = ["__meta_kubernetes_pod_name"]
-          target_label  = "pod"
-        }
-        rule {
-          source_labels = ["__meta_kubernetes_pod_container_name"]
-          target_label  = "container"
-        }
-        rule {
-          source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
-          target_label  = "app"
-        }
-        rule {
-          source_labels = ["__meta_kubernetes_pod_node_name"]
-          target_label  = "node"
-        }
-      }
-
-      loki.source.kubernetes "pods" {
-        targets    = discovery.relabel.pods.output
+      loki.process "pods" {
         forward_to = [loki.write.default.receiver]
+
+        // Extract namespace / pod / container from the kubelet log path:
+        //   /var/log/pods/<namespace>_<pod>_<uid>/<container>/<N>.log
+        stage.regex {
+          source     = "filename"
+          expression = "/var/log/pods/(?P<namespace>[^_]+)_(?P<pod>.+)_[^/]+/(?P<container>[^/]+)/[^/]+\\.log"
+        }
+        stage.labels {
+          values = {
+            namespace = "",
+            pod       = "",
+            container = "",
+          }
+        }
+        stage.static_labels {
+          values = {
+            node = sys.env("NODE_NAME"),
+          }
+        }
+
+        // filename has one value per log file — high cardinality. Drop it
+        // after we've used it to derive the labels above.
+        stage.label_drop {
+          values = ["filename"]
+        }
+
+        // CRI log line format: <time> <stream> <tag> <content>
+        // Drop the wrapper, keep the app payload.
+        stage.cri { }
+      }
+
+      loki.source.file "pods" {
+        targets    = local.file_match.pods.targets
+        forward_to = [loki.process.pods.receiver]
       }
 
       // --- OTLP receiver for application telemetry ------------------------
