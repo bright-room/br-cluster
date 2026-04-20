@@ -1,0 +1,39 @@
+# zitadel helm values (base)
+#
+# Authentication flow:
+#   - Envoy Gateway terminates TLS for auth.b8m.app and proxies HTTP to this service.
+#   - Cloudflare Access gates the hostname with WARP-only policy (no login block),
+#     plus an admin allowlist on /ui/console*. OIDC endpoints are Access-bypassed.
+#
+# Secrets wiring (via ExternalSecret -> onepassword-backend -> secret "zitadel-secrets"):
+#   - masterkey (32 bytes, ASCII) consumed through masterkeySecretName
+#   - dsn (full postgres:// URL)  consumed through ZITADEL_DATABASE_POSTGRES_DSN env
+#
+# SMTP: intentionally unset. Mail (invites / password reset) is disabled until
+# Resend signup + DNS (SPF/DKIM/DMARC) is complete. See plan Phase 1-F/G/H.
+
+zitadel:
+  masterkeySecretName: zitadel-secrets
+
+  configmapConfig:
+    ExternalDomain: auth.b8m.app
+    ExternalSecure: true
+    ExternalPort: 443
+    # Envoy terminates TLS; Zitadel serves plain HTTP in-cluster.
+    TLS:
+      Enabled: false
+    # DB connection is injected via ZITADEL_DATABASE_POSTGRES_DSN (see env below).
+    # When DSN is set, ZITADEL ignores discrete Database.Postgres.* fields.
+
+  # DSN mode (chart-recommended). Points at the platform-pg CNPG cluster.
+  env:
+    - name: ZITADEL_DATABASE_POSTGRES_DSN
+      valueFrom:
+        secretKeyRef:
+          name: zitadel-secrets
+          key: dsn
+
+service:
+  type: ClusterIP
+
+replicaCount: 1

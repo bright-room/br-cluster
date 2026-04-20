@@ -1,0 +1,14 @@
+# zitadel helm values (prod overlay)
+#
+# Pin to worker nodes with modest limits for Pi (8GB workers).
+
+nodeSelector:
+  node_type: worker
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
