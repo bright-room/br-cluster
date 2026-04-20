@@ -1,32 +1,27 @@
 # grafana helm values (base)
 #
-# Phase B: standalone Grafana with Prometheus/Loki/Tempo DataSources.
-# Phase E: Keycloak OIDC via Grafana built-in auth.generic_oauth.
-# Break-glass local admin is always enabled.
+# Authentication:
+#   - Cloudflare Access (GitHub SSO) validates the user at the edge and injects
+#     a signed JWT as `Cf-Access-Jwt-Assertion`. Grafana verifies it with the
+#     CF Access JWKS and auto-signs in the user.
+#   - Break-glass local admin is always enabled (reachable via kubectl port-forward).
 
 admin:
   existingSecret: grafana-admin-secret
   userKey: admin-user
   passwordKey: admin-password
 
-envFromSecrets:
-  - name: grafana-oidc-secret
-    optional: true
-
 grafana.ini:
   server:
-    root_url: https://grafana.cluster-platform.bright-room.net
-  auth.generic_oauth:
+    root_url: https://grafana.b8m.app
+  auth.jwt:
     enabled: true
-    name: Keycloak
-    allow_sign_up: true
-    auto_login: false
-    client_id: grafana
-    client_secret: $__env{OIDC_CLIENT_SECRET}
-    scopes: openid email profile
-    auth_url: https://keycloak.cluster-platform.bright-room.net/realms/platform/protocol/openid-connect/auth
-    token_url: https://keycloak.cluster-platform.bright-room.net/realms/platform/protocol/openid-connect/token
-    api_url: https://keycloak.cluster-platform.bright-room.net/realms/platform/protocol/openid-connect/userinfo
+    header_name: Cf-Access-Jwt-Assertion
+    email_claim: email
+    username_claim: email
+    jwk_set_url: https://bright-room.cloudflareaccess.com/cdn-cgi/access/certs
+    cache_ttl: 60m
+    auto_sign_up: true
     role_attribute_path: "'Admin'"
     allow_assign_grafana_admin: true
 
