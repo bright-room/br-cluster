@@ -14,6 +14,12 @@ admin:
 grafana.ini:
   server:
     root_url: https://grafana.b8m.app
+  # CF Access が既に GitHub Organization でメンバーシップを絞っているため、
+  # 自動サインアップ時のデフォルト Org ロールは Admin にしている。
+  # JMESPath リテラル ("'Admin'") は auth.jwt では期待通り動かなかったため
+  # auto_assign_org_role に寄せる運用。
+  users:
+    auto_assign_org_role: Admin
   auth.jwt:
     enabled: true
     header_name: Cf-Access-Jwt-Assertion
@@ -22,8 +28,6 @@ grafana.ini:
     jwk_set_url: https://bright-room.cloudflareaccess.com/cdn-cgi/access/certs
     cache_ttl: 60m
     auto_sign_up: true
-    role_attribute_path: "'Admin'"
-    allow_assign_grafana_admin: true
 
 # RWO PVC requires Recreate strategy — RollingUpdate causes Multi-Attach errors
 # because the new pod tries to claim the volume before the old one releases it.
