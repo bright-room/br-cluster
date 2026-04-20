@@ -4,6 +4,8 @@ resources:
   - namespace.yaml
   - helm.yaml
   - httproute.yaml
+  - externalsecret-alertmanager-oidc.yaml
+  - securitypolicy-alertmanager.yaml
 
 configMapGenerator:
   - name: kube-prometheus-stack-helm-values
