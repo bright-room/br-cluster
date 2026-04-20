@@ -7,10 +7,16 @@
 #
 # Secrets wiring (via ExternalSecret -> onepassword-backend -> secret "zitadel-secrets"):
 #   - masterkey (32 bytes, ASCII) consumed through masterkeySecretName
-#   - dsn (full postgres:// URL)  consumed through ZITADEL_DATABASE_POSTGRES_DSN env
+#   - db_password consumed via env (ZITADEL_DATABASE_POSTGRES_{USER,ADMIN}_PASSWORD)
+#
+# Database:
+#   - platform-pg CNPG cluster already created the zitadel database and role
+#     via bootstrap.initdb. The zitadel role owns the database, so no CREATE
+#     privileges are needed. initJob.command is set to "zitadel" to skip
+#     database/user/grant provisioning and only run ZITADEL's own schema init.
 #
 # SMTP: intentionally unset. Mail (invites / password reset) is disabled until
-# Resend signup + DNS (SPF/DKIM/DMARC) is complete. See plan Phase 1-F/G/H.
+# Resend signup + DNS (SPF/DKIM/DMARC) is complete.
 
 zitadel:
   masterkeySecretName: zitadel-secrets
@@ -22,16 +28,43 @@ zitadel:
     # Envoy terminates TLS; Zitadel serves plain HTTP in-cluster.
     TLS:
       Enabled: false
-    # DB connection is injected via ZITADEL_DATABASE_POSTGRES_DSN (see env below).
-    # When DSN is set, ZITADEL ignores discrete Database.Postgres.* fields.
 
-  # DSN mode (chart-recommended). Points at the platform-pg CNPG cluster.
-  env:
-    - name: ZITADEL_DATABASE_POSTGRES_DSN
-      valueFrom:
-        secretKeyRef:
-          name: zitadel-secrets
-          key: dsn
+    Database:
+      Postgres:
+        Host: platform-pg-rw.platform-pg.svc.cluster.local
+        Port: 5432
+        Database: zitadel
+        MaxOpenConns: 10
+        MaxIdleConns: 5
+        MaxConnLifetime: 30m
+        MaxConnIdleTime: 5m
+        User:
+          Username: zitadel
+          SSL:
+            Mode: require
+        # CNPG already provisioned DB + owner role; re-use the same role as
+        # Admin since it owns the database.
+        Admin:
+          Username: zitadel
+          SSL:
+            Mode: require
+
+# Top-level env (chart values expects it here, not under zitadel.*).
+env:
+  - name: ZITADEL_DATABASE_POSTGRES_USER_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: zitadel-secrets
+        key: db_password
+  - name: ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: zitadel-secrets
+        key: db_password
+
+# Skip database/user/grant creation; CNPG already handled them.
+initJob:
+  command: "zitadel"
 
 service:
   type: ClusterIP
