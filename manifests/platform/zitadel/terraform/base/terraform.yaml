@@ -1,0 +1,27 @@
+# Drives `terraform plan` / `apply` inside the cluster against this cluster's
+# own Zitadel instance. State is stored as a Secret under the tofu-controller
+# namespace (kubernetes backend, injected by the controller), so state lifecycle
+# matches the cluster lifecycle. Service-user auth comes from the Helm-generated
+# iam-admin-pat Secret — no external credential store needed on the hot path.
+apiVersion: infra.contrib.fluxcd.io/v1alpha2
+kind: Terraform
+metadata:
+  name: zitadel
+spec:
+  interval: 10m
+  path: ./terraform
+  approvePlan: auto
+  sourceRef:
+    kind: GitRepository
+    name: zitadel-terraform
+  vars:
+    - name: zitadel_domain
+      value: auth.b8m.app
+  runnerPodTemplate:
+    spec:
+      env:
+        - name: TF_VAR_zitadel_service_user_token
+          valueFrom:
+            secretKeyRef:
+              name: iam-admin-pat
+              key: pat
