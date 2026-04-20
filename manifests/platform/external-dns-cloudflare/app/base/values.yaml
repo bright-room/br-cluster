@@ -29,3 +29,12 @@ env:
       secretKeyRef:
         name: externaldns-cloudflare-token
         key: apiToken
+
+# Raspberry Pi kube-apiserver gets throttled at the default client QPS when
+# informers have to list-watch many Gateway API resources at startup. The
+# initial cache sync then exceeds external-dns's 1m hard deadline and the
+# process crashes with "failed to sync *v1.Gateway after 1m0s". Raising
+# the client QPS / burst lets the startup list complete in time.
+extraArgs:
+  - --kube-api-qps=50
+  - --kube-api-burst=100
