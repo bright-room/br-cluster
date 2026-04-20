@@ -13,6 +13,17 @@ spec:
   hostnames:
     - "auth.${CLUSTER_DOMAIN}"
   rules:
+    # Zitadel v4+ ships the login UI as a separate Next.js deployment reachable
+    # only under /ui/v2/login. Requests to that prefix must go to the dedicated
+    # zitadel-login service; everything else (console, OIDC endpoints, APIs)
+    # stays on the main zitadel service.
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /ui/v2/login
+      backendRefs:
+        - name: zitadel-login
+          port: 3000
     - backendRefs:
         - name: zitadel
           port: 8080
