@@ -1,0 +1,34 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: zitadel
+spec:
+  interval: 30m
+  url: https://charts.zitadel.com
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: zitadel
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: zitadel
+      version: 9.34.0
+      sourceRef:
+        kind: HelmRepository
+        name: zitadel
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: zitadel-helm-values
+      valuesKey: base-values.yaml

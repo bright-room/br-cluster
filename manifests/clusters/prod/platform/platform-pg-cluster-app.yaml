@@ -1,0 +1,19 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: platform-pg-cluster
+  namespace: flux-system
+spec:
+  interval: 30m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  dependsOn:
+    - name: cloudnative-pg-app
+    - name: longhorn-app
+    - name: external-secrets-config
+  path: ./manifests/platform/cloudnative-pg/clusters/platform-pg/overlays/prod
+  prune: true
+  wait: true
+  timeout: 10m

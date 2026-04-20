@@ -20,4 +20,6 @@ resources:
   - metrics-server-app.yaml
   - onepassword-connect-app.yaml
   - opentelemetry-collector-app.yaml
+  - platform-pg-cluster-app.yaml
   - tempo-app.yaml
+  - zitadel-app.yaml
