@@ -1,42 +1,6 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: hubble-ui-redirect
-  namespace: kube-system
-spec:
-  parentRefs:
-    - name: internal-gateway
-      namespace: envoy-gateway-system
-      sectionName: http
-  hostnames:
-    - "hubble.${CLUSTER_INTERNAL_DOMAIN}"
-  rules:
-    - filters:
-        - type: RequestRedirect
-          requestRedirect:
-            scheme: https
-            statusCode: 301
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: hubble-ui
-  namespace: kube-system
-spec:
-  parentRefs:
-    - name: internal-gateway
-      namespace: envoy-gateway-system
-      sectionName: https
-  hostnames:
-    - "hubble.${CLUSTER_INTERNAL_DOMAIN}"
-  rules:
-    - backendRefs:
-        - name: hubble-ui
-          port: 80
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
   name: hubble-ui-b8m
   namespace: kube-system
   annotations:
