@@ -1,6 +1,8 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+# No top-level namespace: gitrepository.yaml targets flux-system while the
+# rest live in zitadel. Each resource declares its own namespace.
 resources:
-  - externalsecret-repo-auth.yaml
   - gitrepository.yaml
+  - tf-runner.yaml
   - terraform.yaml

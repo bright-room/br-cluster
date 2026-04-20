@@ -7,13 +7,16 @@ apiVersion: infra.contrib.fluxcd.io/v1alpha2
 kind: Terraform
 metadata:
   name: zitadel
+  namespace: zitadel
 spec:
   interval: 10m
-  path: ./terraform
   approvePlan: auto
+  path: ./terraform
+  serviceAccountName: tf-runner
   sourceRef:
     kind: GitRepository
     name: zitadel-terraform
+    namespace: flux-system
   vars:
     - name: zitadel_domain
       value: auth.b8m.app
@@ -25,3 +28,5 @@ spec:
             secretKeyRef:
               name: iam-admin-pat
               key: pat
+  writeOutputsToSecret:
+    name: tf-zitadel-output

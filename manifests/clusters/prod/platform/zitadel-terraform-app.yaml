@@ -6,13 +6,12 @@ metadata:
   namespace: flux-system
 spec:
   interval: 30m
-  targetNamespace: zitadel
   sourceRef:
     kind: GitRepository
     name: flux-system
   dependsOn:
     - name: zitadel-app
-    - name: external-secrets-config
+    - name: envoy-gateway-config
   path: ./manifests/platform/zitadel/terraform/overlays/prod
   prune: true
   wait: true
