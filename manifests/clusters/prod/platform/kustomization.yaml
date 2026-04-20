@@ -23,3 +23,4 @@ resources:
   - platform-pg-cluster-app.yaml
   - tempo-app.yaml
   - zitadel-app.yaml
+  - zitadel-terraform-app.yaml
