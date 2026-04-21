@@ -7,8 +7,13 @@
 # attribute wants a filesystem path to the IAM admin's JWT profile JSON.
 # Mount the Helm-generated iam-admin Secret (single key iam-admin.json) at
 # /secrets/zitadel-admin/ in the runner pod; the provider block in the TF
-# repo reads it from there. Keeping the key name in the Secret intact means
-# the mounted file lands at /secrets/zitadel-admin/iam-admin.json.
+# repo reads it from there.
+#
+# DNS: the provider's domain is auth.b8m.app because that's the
+# ExternalDomain Zitadel was configured with. The CoreDNS base values
+# rewrite that name to zitadel.zitadel.svc.cluster.local cluster-wide,
+# so the runner pod (and anyone else inside the cluster) reaches Zitadel
+# without going through the CF Tunnel and getting blocked by Access.
 apiVersion: infra.contrib.fluxcd.io/v1alpha2
 kind: Terraform
 metadata:
