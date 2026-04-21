@@ -4,6 +4,26 @@ metadata:
   name: cluster-proxy
   namespace: envoy-gateway-system
 spec:
+  # Swap Envoy's default c-ares DNS resolver for the Linux getaddrinfo-based
+  # resolver. The bundled c-ares silently fails in this cluster when resolving
+  # the in-cluster hostname for SecurityPolicy OIDC provider STRICT_DNS
+  # clusters (auth.b8m.app resolves fine for pods via CoreDNS, but Envoy's
+  # own c-ares returns nothing — observed ~9500 dns.cares.get_addr_failure
+  # in /stats). getaddrinfo uses the same /etc/resolv.conf CoreDNS path as
+  # every other pod in the cluster, so resolution is consistent.
+  #
+  # Trade-off: getaddrinfo is synchronous; each resolve blocks an Envoy
+  # worker thread briefly. At this cluster's request volume that's fine,
+  # but if DNS-heavy workloads land here later, revisit and either pin
+  # back to c-ares with explicit nameservers or keep getaddrinfo but
+  # grow the worker pool.
+  bootstrap:
+    type: Merge
+    value: |
+      typed_dns_resolver_config:
+        name: envoy.network.dns_resolver.getaddrinfo
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
   provider:
     type: Kubernetes
     kubernetes:
