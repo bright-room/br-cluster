@@ -12,6 +12,12 @@ spec:
     - group: gateway.envoyproxy.io
       kind: SecurityPolicy
       namespace: kube-prom-stack
+    - group: gateway.envoyproxy.io
+      kind: SecurityPolicy
+      namespace: kube-system
+    - group: gateway.envoyproxy.io
+      kind: SecurityPolicy
+      namespace: longhorn-system
   to:
     - group: ""
       kind: Service
