@@ -194,6 +194,91 @@ graph TB
 
 ---
 
+---
+
+## 理想像 / ロードマップ
+
+上記の「既知のギャップ」を段階的に解消する案。RPi クラスタのリソース制約を前提に、**既存の Alloy + OTel Collector 構成は維持**した上で、主にホスト OS 層の可観測性を強化する方針とする。
+
+### 目指す全体像
+
+```mermaid
+graph LR
+  classDef host fill:#fff3e0,color:#000
+  classDef pod fill:#326ce5,color:#fff
+  classDef sink fill:#f44336,color:#fff
+  classDef rule fill:#ab47bc,color:#fff
+
+  subgraph lan["全ノード (統一管理)"]
+    direction TB
+    unified["systemd node_exporter<br/>+ --collector.textfile<br/>+ vcgencmd timer (30s)<br/>→ 温度/スロットル/クロック/電圧"]:::host
+  end
+
+  subgraph k3s["k3s"]
+    prom[("Prometheus")]:::sink
+    rules["PrometheusRule<br/>- HighTemperature<br/>- Throttled<br/>- Undervoltage"]:::rule
+    am["Alertmanager"]:::pod
+    k8s_metrics["ServiceMonitor 群<br/>(変更なし)"]:::pod
+  end
+
+  unified -.->|"scrape (EndpointSlice)"| prom
+  k8s_metrics -.-> prom
+  prom --> rules
+  rules --> am
+```
+
+### フェーズ分け
+
+#### Phase 1: node_exporter を k3s 外に統一
+
+| 項目 | 内容 |
+|---|---|
+| 目的 | 全 8 ノードを単一実装 (systemd + Ansible) に統合。k3s 障害時にも監視継続 |
+| 変更範囲 | ホスト OS メトリクス層のみ。k8s ワークロード系 ServiceMonitor は**一切触らない** |
+| 作業 | 1. `monitoring_agent` role を `br-node*` にも適用<br/>2. `externalnodes-monitoring` EndpointSlice に `br-node1〜6` 追加 (できれば `servers.yaml` から生成)<br/>3. kube-prometheus-stack Helm values で `prometheus-node-exporter` を無効化 |
+| 得るもの | ・保守対象が 1 経路に集約<br/>・後続 Phase で hostPath マウント体操が不要<br/>・過去の observability-cascade 系インシデント再発耐性 |
+
+#### Phase 2: RPi 固有メトリクス収集 (textfile collector + vcgencmd)
+
+| 項目 | 内容 |
+|---|---|
+| 取得する値 | 温度 (`measure_temp`) / スロットリング状態 (`get_throttled`) / 実クロック (`measure_clock arm`) / コア電圧 (`measure_volts core`) |
+| 手段 | **既存の node_exporter の内蔵機能** (`--collector.textfile`) に乗せる。別エクスポータ (rpi_exporter 等) は導入しない |
+| 実装箇所 | `provisioner/roles/monitoring_agent/` 配下<br/>・`node_exporter.service.j2` に textfile フラグ追加<br/>・`/run/node_exporter/textfile` ディレクトリ (tmpfs, SD 摩耗回避)<br/>・`rpi-metrics.sh` (vcgencmd を叩いて `.prom` に書き出し)<br/>・`rpi-metrics.service` + `rpi-metrics.timer` (30秒間隔) |
+| リソース影響 | 常駐プロセスなし。CPU 平均 < 0.3%、メモリ 0 (timer 起動時のみ一時数MB) |
+| Phase 1 依存 | あり。Phase 1 完了後なら hostPath マウント設定が不要で最もシンプル |
+
+#### Phase 3: PrometheusRule (アラート) 追加
+
+現状 `PrometheusRule` は 0 件。RPi 運用で特に価値が高いルールを定義する:
+
+| アラート名 | 条件 | 重大度 |
+|---|---|---|
+| `NodeHighTemperature` | `node_thermal_temperature_celsius > 75` for 5m | warning |
+| `NodeCriticalTemperature` | `node_thermal_temperature_celsius > 80` for 2m | critical |
+| `NodeThrottlingDetected` | `rpi_throttled_state != 0` for 1m | warning |
+| `NodeUndervoltage` | `rpi_throttled_state & 0x1 == 1` for 1m | critical |
+| `NodeFrequencyCapped` | `rpi_arm_clock_hertz < expected` for 5m | warning |
+
+Phase 2 でメトリクスが出るようになってから追加。
+
+### 将来的検討 (優先度低)
+
+Pi クラスタの規模感では直近必須ではないもの:
+
+- **外部ノード (br-gateway1, br-external1) の journald → Loki ログ収集**: `alloy` の systemd 版 or `promtail` 同等品を systemd で
+- **control-plane の Pod ログ収集**: Alloy の `nodeSelector` を外すか、CP 専用の軽量 Alloy を配置
+- **メトリクス長期保存**: Thanos / Mimir。現状 14 日保持で運用上問題なし
+- **Blackbox exporter**: 外形監視。家庭内サービスなので優先度低
+
+### 非目標 (やらないこと)
+
+- **Alloy の OTel Collector への置き換え**: Pi 制約下ではメモリ +200〜400Mi 悪化、得るメリット小
+- **rpi_exporter の導入**: 常駐 10〜20MB が無駄。textfile 方式で完全代替可能
+- **Prometheus の水平分散**: 単一インスタンスで十分
+
+---
+
 ## 関連ファイル
 
 - `manifests/platform/kube-prometheus-stack/app/` — Prometheus / Alertmanager / node-exporter / kube-state-metrics
