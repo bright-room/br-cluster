@@ -107,6 +107,7 @@ graph LR
 
 ## 関連ドキュメント
 
+- `docs/observability.md` — メトリクス/ログ/トレースの収集アーキテクチャ
 - `docs/incidents/` — 過去のインシデント記録
 - `README.md` — セットアップ/運用コマンド
 - `CLAUDE.md` — プロジェクトの規約・ツール利用方針
