@@ -1,0 +1,18 @@
+# Allows SecurityPolicy resources in other namespaces (kube-prom-stack,
+# longhorn-system, etc.) to reference the zitadel Service via the
+# SecurityPolicy.oidc.provider.backendRefs field. Needed as a workaround
+# for Envoy's c-ares resolver failing on in-cluster STRICT_DNS lookups of
+# auth.b8m.app; we bypass DNS by pointing at this Service through EDS.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: securitypolicy-to-zitadel
+spec:
+  from:
+    - group: gateway.envoyproxy.io
+      kind: SecurityPolicy
+      namespace: kube-prom-stack
+  to:
+    - group: ""
+      kind: Service
+      name: zitadel
