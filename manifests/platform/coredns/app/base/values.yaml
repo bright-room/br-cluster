@@ -3,3 +3,37 @@ replicaCount: 2
 rollingUpdate:
   maxUnavailable: 0
   maxSurge: 1
+
+# Override the default server block so we can slip a `rewrite` rule in
+# front of the kubernetes plugin. The rule keeps `auth.b8m.app` queries
+# from leaving the cluster (where they would otherwise hit the CF Tunnel
+# and be blocked by Access) by rewriting them to the zitadel Service's
+# cluster-local DNS name. Everything else mirrors the chart defaults.
+servers:
+  - zones:
+      - zone: .
+        use_tcp: true
+    port: 53
+    plugins:
+      - name: errors
+      - name: health
+        configBlock: |-
+          lameduck 10s
+      - name: ready
+      - name: rewrite
+        parameters: name auth.b8m.app zitadel.zitadel.svc.cluster.local
+      - name: kubernetes
+        parameters: cluster.local in-addr.arpa ip6.arpa
+        configBlock: |-
+          pods insecure
+          fallthrough in-addr.arpa ip6.arpa
+          ttl 30
+      - name: prometheus
+        parameters: 0.0.0.0:9153
+      - name: forward
+        parameters: . /etc/resolv.conf
+      - name: cache
+        parameters: 30
+      - name: loop
+      - name: reload
+      - name: loadbalance
