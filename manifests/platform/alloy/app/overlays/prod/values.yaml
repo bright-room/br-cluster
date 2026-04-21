@@ -15,4 +15,4 @@ alloy:
       memory: 128Mi
     limits:
       cpu: 500m
-      memory: 256Mi
+      memory: 384Mi
