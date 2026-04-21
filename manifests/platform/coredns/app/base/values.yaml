@@ -4,11 +4,14 @@ rollingUpdate:
   maxUnavailable: 0
   maxSurge: 1
 
-# Override the default server block so we can slip a `rewrite` rule in
-# front of the kubernetes plugin. The rule keeps `auth.b8m.app` queries
-# from leaving the cluster (where they would otherwise hit the CF Tunnel
-# and be blocked by Access) by rewriting them to the zitadel Service's
-# cluster-local DNS name. Everything else mirrors the chart defaults.
+# Override the default server block so we can slip a `hosts` entry in
+# front of the kubernetes plugin. `auth.b8m.app` must resolve to the
+# Envoy Gateway VIP (CLUSTER_GATEWAY_IP, pinned by kube-vip) instead of
+# going out through the CF Tunnel. The Gateway terminates TLS with the
+# *.b8m.app cert and routes to the zitadel Service on 8080 via the
+# existing HTTPRoute, so in-cluster clients (tofu-controller runner,
+# envoy-gateway SecurityPolicy OIDC discovery) never touch CF Access.
+# Everything else mirrors the chart defaults.
 servers:
   - zones:
       - zone: .
@@ -20,8 +23,10 @@ servers:
         configBlock: |-
           lameduck 10s
       - name: ready
-      - name: rewrite
-        parameters: name auth.b8m.app zitadel.zitadel.svc.cluster.local
+      - name: hosts
+        configBlock: |-
+          ${CLUSTER_GATEWAY_IP} auth.b8m.app
+          fallthrough
       - name: kubernetes
         parameters: cluster.local in-addr.arpa ip6.arpa
         configBlock: |-

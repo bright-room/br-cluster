@@ -13,3 +13,7 @@ spec:
     - name: cilium-app
   path: ./manifests/platform/coredns/app/overlays/prod
   prune: true
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
