@@ -109,7 +109,8 @@ nft_define:
     value: "{ domain, 2379 }"
   forward tcp accept:
     name: forward_tcp_accept
-    value: "{ http, https, domain, 7844 }"
+    # submission (587) is egress SMTP for Zitadel -> Resend.
+    value: "{ http, https, domain, 7844, submission }"
   forward udp accept:
     name: forward_udp_accept
     value: "{ domain, ntp, 7844 }"
