@@ -4,6 +4,7 @@ resources:
   - namespace.yaml
   - helm.yaml
   - externalsecret.yaml
+  - externalsecret-oidc.yaml
 
 configMapGenerator:
   - name: grafana-helm-values
