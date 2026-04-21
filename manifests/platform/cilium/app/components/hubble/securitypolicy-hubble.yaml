@@ -1,0 +1,30 @@
+# Gates hubble.b8m.app behind Zitadel OIDC at the Envoy Gateway layer.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: hubble-oidc
+  namespace: kube-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: hubble-ui-b8m
+  oidc:
+    provider:
+      issuer: https://auth.b8m.app
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: zitadel
+          namespace: zitadel
+          port: 8080
+    clientIDRef:
+      name: hubble-oidc
+    clientSecret:
+      name: hubble-oidc
+    redirectURL: https://hubble.b8m.app/oauth2/callback
+    logoutPath: /oauth2/logout
+    scopes:
+      - openid
+      - profile
+      - email
