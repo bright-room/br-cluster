@@ -12,10 +12,13 @@ prometheus:
     resources:
       requests:
         cpu: 200m
-        memory: 512Mi
+        memory: 768Mi
       limits:
-        cpu: 1000m
-        memory: 1Gi
+        cpu: 1500m
+        # 1Gi だとベースで 663Mi 使用 (66%)。P0-E で SM を 10+ 追加すると
+        # series が 1.5〜2 倍に膨らむため先行して 2Gi へ引き上げ。
+        # Pi 4B 8GB worker の空き容量には収まる。
+        memory: 2Gi
 
 alertmanager:
   alertmanagerSpec:
