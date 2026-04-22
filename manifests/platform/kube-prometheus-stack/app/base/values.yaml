@@ -46,44 +46,16 @@ alertmanager:
           resources:
             requests:
               storage: 1Gi
-    # Mount the Discord webhook URL secret at
-    # /etc/alertmanager/secrets/alertmanager-discord-webhook/webhook_url so the
-    # config below can reference it via webhook_url_file. Keeps the config
-    # plain-text in PRs — only the URL is a secret.
-    secrets:
-      - alertmanager-discord-webhook
 
-  # Routing tree and receivers. Discord is the only receiver for now — add
-  # ntfy / email / pagerduty etc. as operations mature (see
-  # docs/observability-plan.md P0-B). Cadence is intentionally conservative
-  # until real alert patterns are known; tighten repeat_interval later.
-  config:
-    global:
-      resolve_timeout: 5m
-    route:
-      receiver: discord
-      group_by: [alertname, namespace]
-      group_wait: 30s
-      group_interval: 5m
-      repeat_interval: 4h
-      routes:
-        # Watchdog is a perma-firing sanity alert: if it stops arriving, the
-        # alerting pipeline itself is broken. Longer cadence so it doesn't drown
-        # real alerts.
-        - matchers:
-            - alertname = "Watchdog"
-          receiver: discord
-          repeat_interval: 24h
-    receivers:
-      - name: "null"
-      - name: discord
-        discord_configs:
-          - webhook_url_file: /etc/alertmanager/secrets/alertmanager-discord-webhook/webhook_url
-            send_resolved: true
-    inhibit_rules:
-      # critical が鳴っているときに同じ alert の warning は抑止する
-      - source_matchers:
-          - severity = "critical"
-        target_matchers:
-          - severity = "warning"
-        equal: [alertname, namespace]
+    # Feed the whole alertmanager.yaml from a Secret managed by ExternalSecret
+    # (see externalsecret-alertmanager-config.yaml). Bypasses
+    # prometheus-operator's schema validation, which rejects fields the
+    # upstream Alertmanager supports but the operator doesn't yet know about
+    # (e.g. webhook_url_file on discordConfigs in v0.90.1). The ExternalSecret
+    # template embeds the Discord webhook URL directly at render time, so the
+    # final YAML Alertmanager reads never contains a file reference.
+    configSecret: alertmanager-config
+
+  # `config:` is intentionally NOT set — configSecret wins, but leaving both
+  # causes confusion. The routing / receivers / inhibit rules live inside the
+  # ExternalSecret template instead.
