@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: host-nodes
+spec:
+  endpoints:
+    - port: metrics
+      interval: 30s
+      relabelings:
+        # Expose the k8s-known node name as the series label.
+        - sourceLabels: [__meta_kubernetes_endpointslice_endpoint_node_name]
+          targetLabel: instance
+        # Namespace this job under `node-exporter-host` so it doesn't collide
+        # with the in-cluster DaemonSet's `node-exporter` job. Dashboards can
+        # then select either layer via the `job` label.
+        - targetLabel: job
+          replacement: node-exporter-host
+  selector:
+    matchLabels:
+      app: host-node-exporter

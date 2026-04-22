@@ -5,8 +5,17 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
+# RuntimeDirectory creates /run/node_exporter/textfile on start (tmpfs, so no
+# SD-card wear from frequent rewrites), mode 0755. Any sibling unit (e.g. the
+# rpi-metrics timer in P1-B) writes atomically-renamed .prom files here.
+RuntimeDirectory=node_exporter/textfile
+RuntimeDirectoryMode=0755
+
 ExecStart={{ install_dir }}/node_exporter \
-  --web.listen-address=:{{ node_exporter.port }}
+  --web.listen-address=:{{ node_exporter.port }} \
+  --collector.hwmon \
+  --collector.thermal_zone \
+  --collector.textfile.directory={{ node_exporter.textfile_dir }}
 
 Restart=always
 RestartSec=5
