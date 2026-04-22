@@ -1,3 +1,7 @@
 ---
 node_exporter:
-  port: 9100
+  # :9100 is already occupied by the prometheus-node-exporter DaemonSet on
+  # k3s nodes (hostNetwork). The systemd-managed instance binds :9101 so both
+  # coexist on the same node — see docs/observability-plan.md P1-A.
+  port: 9101
+  textfile_dir: /run/node_exporter/textfile

@@ -79,7 +79,9 @@ nft_define:
     value: "{ ff02::16 }"
   input tcp accepted from lan:
     name: in_tcp_accept
-    value: "{ ssh, domain, 2379, 9100 }"
+    # 9100: prometheus-node-exporter DaemonSet on k3s nodes (hostNetwork)
+    # 9101: systemd node_exporter on every node (docs/observability-plan.md P1-A)
+    value: "{ ssh, domain, 2379, 9100, 9101 }"
   input udp accepted from lan:
     name: in_udp_accept
     value: "{ domain, ntp, bootps }"

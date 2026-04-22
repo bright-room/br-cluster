@@ -1,6 +1,12 @@
 ---
-- name: Deploy monitoring agents to non-k3s nodes
-  hosts: gateway:external
+# Deploys systemd-managed node_exporter (port :9101) to every node in the
+# inventory. On k3s nodes it coexists with the in-cluster
+# prometheus-node-exporter DaemonSet (:9100) — the DS is intentionally left
+# in place for observability-cascade resilience; see
+# docs/incidents/2026-04-13-observability-cascade.md and P1-A in
+# docs/observability-plan.md.
+- name: Deploy monitoring agents to all nodes
+  hosts: br_cluster
   gather_facts: true
   become: true
 

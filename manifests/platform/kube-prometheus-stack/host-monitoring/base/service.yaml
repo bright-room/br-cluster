@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: external-nodes
+  name: host-nodes
   labels:
-    app: external-node-exporter
+    app: host-node-exporter
 spec:
   type: ClusterIP
   clusterIP: None
   ports:
     - name: metrics
-      port: 9100
-      targetPort: 9100
+      port: 9101
+      targetPort: 9101
       protocol: TCP
