@@ -8,6 +8,12 @@ prometheus:
     # Accept remote_write from the OTel Collector gateway (Phase A).
     enableRemoteWriteReceiver: true
 
+    # Public URL used when Prometheus generates `generatorURL` on alerts (the
+    # "Source" link Alertmanager passes to receivers). Without this, Discord /
+    # other receivers would get the in-cluster Service URL which isn't
+    # reachable from a browser.
+    externalUrl: https://prometheus.b8m.app
+
     # Generate scrape configs with kubernetes_sd_configs role=endpointslice
     # rather than the default role=endpoints. Required so ServiceMonitors
     # backed by a manually-created EndpointSlice (host-monitoring, where the
@@ -46,6 +52,12 @@ alertmanager:
           resources:
             requests:
               storage: 1Gi
+
+    # Public URL used when Alertmanager constructs silence / alert links that
+    # receivers (Discord etc.) embed into notifications. Without this, the
+    # Source / Silence URLs resolve to the in-cluster Service and aren't
+    # clickable from the operator's browser.
+    externalUrl: https://alertmanager.b8m.app
 
     # Feed the whole alertmanager.yaml from a Secret managed by ExternalSecret
     # (see externalsecret-alertmanager-config.yaml). Bypasses
