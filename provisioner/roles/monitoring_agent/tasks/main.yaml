@@ -2,3 +2,7 @@
 - name: Install node_exporter
   include_tasks: node_exporter.yaml
   tags: [node_exporter]
+
+- name: Install rpi-metrics timer (textfile collector source)
+  include_tasks: rpi_metrics.yaml
+  tags: [rpi_metrics]
