@@ -5,6 +5,7 @@ resources:
   - helm.yaml
   - httproute.yaml
   - externalsecret-alertmanager-oidc.yaml
+  - externalsecret-alertmanager-discord.yaml
   - securitypolicy-alertmanager.yaml
   - externalsecret-prometheus-oidc.yaml
   - securitypolicy-prometheus.yaml
