@@ -8,6 +8,15 @@ prometheus:
     # Accept remote_write from the OTel Collector gateway (Phase A).
     enableRemoteWriteReceiver: true
 
+    # Generate scrape configs with kubernetes_sd_configs role=endpointslice
+    # rather than the default role=endpoints. Required so ServiceMonitors
+    # backed by a manually-created EndpointSlice (host-monitoring, where the
+    # headless Service has no pod selector) get picked up without needing
+    # the deprecated classic v1 Endpoints API. prometheus-operator auto-
+    # translates the default relabelings to the endpointslice-flavored meta
+    # labels, so chart-shipped SMs continue to work unchanged.
+    serviceDiscoveryRole: EndpointSlice
+
     # Pick up ServiceMonitor / PodMonitor / PrometheusRule / Probe resources
     # in any namespace regardless of labels. Default chart behavior requires
     # the `release: kube-prometheus-stack` label, which caused 10+ upstream
