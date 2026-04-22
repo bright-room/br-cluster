@@ -7,6 +7,19 @@ prometheus:
     walCompression: true
     # Accept remote_write from the OTel Collector gateway (Phase A).
     enableRemoteWriteReceiver: true
+
+    # Pick up ServiceMonitor / PodMonitor / PrometheusRule / Probe resources
+    # in any namespace regardless of labels. Default chart behavior requires
+    # the `release: kube-prometheus-stack` label, which caused 10+ upstream
+    # chart-shipped SMs (alloy / cert-manager / cilium / hubble / longhorn /
+    # loki / tempo / otel-collector / external-dns / grafana) to stay dark.
+    # Homelab scale — no multi-tenant isolation concerns.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    scrapeConfigSelectorNilUsesHelmValues: false
+
     storageSpec:
       volumeClaimTemplate:
         spec:
