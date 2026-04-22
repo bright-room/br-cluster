@@ -55,3 +55,21 @@ spec:
     - name: kube-prometheus-stack-app
   path: ./manifests/platform/grafana/monitoring/overlays/prod
   prune: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: grafana-dashboards
+  namespace: flux-system
+spec:
+  interval: 30m
+  targetNamespace: grafana
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  dependsOn:
+    - name: grafana-app
+  path: ./manifests/platform/grafana/dashboards/overlays/prod
+  prune: true
+  wait: true
+  timeout: 5m
