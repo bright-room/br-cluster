@@ -6,3 +6,4 @@ resources:
   - rule-workload.yaml
   - rule-storage.yaml
   - rule-cert.yaml
+  - rule-rpi.yaml
