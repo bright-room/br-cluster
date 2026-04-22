@@ -1,0 +1,77 @@
+# Host-level health. Works for both DaemonSet node-exporter (k3s nodes)
+# and systemd node_exporter (external nodes, and br-node1〜6 once P1-A lands).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: node-health
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: node
+      rules:
+        - alert: KubeNodeNotReady
+          expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: Node {{ $labels.node }} is NotReady
+            description: Node {{ $labels.node }} has been NotReady for 15 minutes.
+
+        - alert: NodeFilesystemAlmostFull
+          expr: |
+            (
+              node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs|overlay|squashfs"}
+              /
+              node_filesystem_size_bytes{fstype!~"tmpfs|fuse.lxcfs|overlay|squashfs"}
+            ) < 0.05
+            and
+            node_filesystem_readonly == 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Filesystem {{ $labels.mountpoint }} on {{ $labels.instance }} has less than 5% free
+            description: |
+              {{ $labels.device }} mounted on {{ $labels.mountpoint }} is
+              {{ $value | humanizePercentage }} free. SD wear / log growth /
+              Longhorn replicas are common causes on RPi nodes.
+
+        - alert: NodeMemoryHighUtilization
+          expr: |
+            (
+              node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes
+            ) / node_memory_MemTotal_bytes > 0.90
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Node {{ $labels.instance }} memory usage above 90%
+            description: |
+              Memory usage has been above 90% for 15 minutes. On Pi 4B nodes
+              this often precedes the OOMKiller hitting kubelet / k3s itself
+              (see docs/incidents/2026-04-13-observability-cascade.md).
+
+        - alert: NodeClockSkew
+          expr: |
+            (
+              node_timex_offset_seconds > 0.05
+              and
+              deriv(node_timex_offset_seconds[5m]) >= 0
+            )
+            or
+            (
+              node_timex_offset_seconds < -0.05
+              and
+              deriv(node_timex_offset_seconds[5m]) <= 0
+            )
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: Clock skew detected on {{ $labels.instance }}
+            description: |
+              Node {{ $labels.instance }} clock is drifting by
+              {{ $value | humanizeDuration }}. TLS handshakes / log ordering /
+              etcd leader election can break.
