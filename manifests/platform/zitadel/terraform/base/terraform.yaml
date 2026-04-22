@@ -31,6 +31,11 @@ spec:
   vars:
     - name: zitadel_domain
       value: auth.b8m.app
+  # SMTP creds for the zitadel_smtp_config resource. Keys in the Secret
+  # become TF_VAR_* names; variable names are declared in the TF repo.
+  varsFrom:
+    - kind: Secret
+      name: zitadel-smtp-creds
   runnerPodTemplate:
     spec:
       volumes:

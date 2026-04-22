@@ -1,33 +1,37 @@
 # grafana helm values (base)
 #
 # Authentication:
-#   - Cloudflare Access (GitHub SSO) validates the user at the edge and injects
-#     a signed JWT as `Cf-Access-Jwt-Assertion`. Grafana verifies it with the
-#     CF Access JWKS and auto-signs in the user.
-#   - Break-glass local admin is always enabled (reachable via kubectl port-forward).
+#   - Zitadel OIDC via Grafana's native auth.generic_oauth. Layering Envoy's
+#     SecurityPolicy OIDC on top would force a double login dance, so
+#     grafana.b8m.app is intentionally excluded from the gateway-level
+#     SecurityPolicy set.
+#   - Client credentials arrive as env vars (GF_AUTH_GENERIC_OAUTH_CLIENT_ID /
+#     _SECRET) through the grafana-oidc Secret (see externalsecret-oidc.yaml).
+#   - Break-glass local admin stays enabled (reachable via kubectl port-forward)
+#     as a last-resort recovery path if OIDC goes sideways.
+#   - Every OIDC-signed-in user becomes Org Admin because the cluster has a
+#     single operator; tighten this once there's anyone to tighten against.
 
 admin:
   existingSecret: grafana-admin-secret
   userKey: admin-user
   passwordKey: admin-password
 
+envFromSecret: grafana-oidc
+
 grafana.ini:
   server:
     root_url: https://grafana.b8m.app
-  # CF Access が既に GitHub Organization でメンバーシップを絞っているため、
-  # 自動サインアップ時のデフォルト Org ロールは Admin にしている。
-  # JMESPath リテラル ("'Admin'") は auth.jwt では期待通り動かなかったため
-  # auto_assign_org_role に寄せる運用。
   users:
     auto_assign_org_role: Admin
-  auth.jwt:
+  auth.generic_oauth:
     enabled: true
-    header_name: Cf-Access-Jwt-Assertion
-    email_claim: email
-    username_claim: email
-    jwk_set_url: https://bright-room.cloudflareaccess.com/cdn-cgi/access/certs
-    cache_ttl: 60m
-    auto_sign_up: true
+    name: Zitadel
+    scopes: openid profile email
+    auth_url: https://auth.b8m.app/oauth/v2/authorize
+    token_url: https://auth.b8m.app/oauth/v2/token
+    api_url: https://auth.b8m.app/oidc/v1/userinfo
+    allow_sign_up: true
 
 # RWO PVC requires Recreate strategy — RollingUpdate causes Multi-Attach errors
 # because the new pod tries to claim the volume before the old one releases it.

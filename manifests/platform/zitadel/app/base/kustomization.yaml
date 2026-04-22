@@ -4,6 +4,8 @@ resources:
   - namespace.yaml
   - helm.yaml
   - externalsecret.yaml
+  - externalsecret-smtp.yaml
+  - referencegrant.yaml
 
 configMapGenerator:
   - name: zitadel-helm-values

@@ -14,6 +14,18 @@ spec:
   oidc:
     provider:
       issuer: https://auth.b8m.app
+      # Envoy's c-ares DNS resolver silently fails to resolve in-cluster
+      # STRICT_DNS names on this cluster (~10k dns.cares.get_addr_failure
+      # hits observed), so the server-side token / userinfo / jwks calls
+      # never find an endpoint. Bypass c-ares by pointing at the Zitadel
+      # Service directly via EDS. The browser-facing authorize redirect
+      # still takes the public path through CF Access.
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: zitadel
+          namespace: zitadel
+          port: 8080
     clientIDRef:
       name: alertmanager-oidc
     clientSecret:
