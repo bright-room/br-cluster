@@ -19,6 +19,28 @@ admin:
 
 envFromSecret: grafana-oidc
 
+# Dashboard provisioning via sidecar. ConfigMaps in any namespace with label
+# `grafana_dashboard=1` are watched; the optional `grafana_folder` annotation
+# places them in a folder of that name. Dashboards live in
+# manifests/platform/grafana/dashboards/ (fetched via
+# scripts/fetch-grafana-dashboards.sh); Cilium / Hubble also ship their own
+# dashboards from the cilium chart using the same label convention.
+#
+# datasources are NOT handled by the sidecar — they are declared directly in
+# the `datasources` block below because they are few, static, and need
+# predictable UIDs (referenced by dashboards and the Tempo→Loki trace link).
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    folderAnnotation: grafana_folder
+    provider:
+      foldersFromFilesStructure: true
+    searchNamespace: ALL
+  datasources:
+    enabled: false
+
 grafana.ini:
   server:
     root_url: https://grafana.b8m.app
