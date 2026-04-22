@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# Writes Raspberry Pi-specific metrics (throttle state / ARM clock / core
+# voltage) into the node_exporter textfile directory.
+#
+# Runs as root via systemd-timer (rpi-metrics.timer, 60s). Defensive against
+# the GPU-mailbox wedge we hit on 2026-04-23: every vcgencmd call is timeout-
+# bounded, and the script exits silently (leaving the previous .prom in place)
+# if the mailbox device is unavailable or any call fails. Atomic rename
+# ensures node_exporter never reads a half-written file.
+set -u
+# Note: no -e — we want to keep going even if one vcgencmd hiccups, and we
+# fall through to "leave previous .prom intact" on any failure.
+
+TEXTFILE_DIR="{{ node_exporter.textfile_dir }}"
+OUT="${TEXTFILE_DIR}/rpi.prom"
+TMP="${OUT}.$$"
+
+# ---- safety shortcuts -------------------------------------------------------
+
+# If the firmware mailbox device isn't present, bail out — nothing to do on
+# non-Pi hardware.
+if [ ! -c /dev/vcio ]; then
+  exit 0
+fi
+
+VCGENCMD=/usr/bin/vcgencmd
+if [ ! -x "$VCGENCMD" ]; then
+  exit 0
+fi
+
+# Each vcgencmd call is bounded to 3 seconds to avoid hanging the timer if
+# vchiq is wedged (observed once with interactive bursts on 2026-04-23;
+# systemd+root at 60s interval has not reproduced).
+call() {
+  timeout --kill-after=2s 3s "$VCGENCMD" "$@" 2>/dev/null
+}
+
+throttled_raw=$(call get_throttled | awk -F= 'NR==1{print $2}')
+arm_clock=$(call measure_clock arm | awk -F= 'NR==1{print $2}')
+core_volts_raw=$(call measure_volts core | awk -F= 'NR==1{print $2}')
+
+# If any call failed (timeout / mailbox error), abandon this run rather than
+# emit garbage. Next 60s tick tries again.
+if [ -z "${throttled_raw:-}" ] || [ -z "${arm_clock:-}" ] || [ -z "${core_volts_raw:-}" ]; then
+  exit 0
+fi
+
+# ---- parse ------------------------------------------------------------------
+
+# throttled=0x50005 → integer
+throttled_dec=$(printf '%d' "$throttled_raw" 2>/dev/null) || exit 0
+
+# volt=0.8500V → 0.8500
+core_volts=${core_volts_raw%V}
+
+# throttle bit map (from `vcgencmd get_throttled` docs):
+#   bit 0  : under-voltage detected (now)
+#   bit 1  : ARM frequency capped  (now)
+#   bit 2  : currently throttled
+#   bit 3  : soft temp limit active (now)
+#   bit 16 : under-voltage has occurred since boot
+#   bit 17 : ARM frequency capping has occurred since boot
+#   bit 18 : throttling has occurred since boot
+#   bit 19 : soft temp limit has occurred since boot
+uv_now=$(( (throttled_dec >> 0)  & 1 ))
+fc_now=$(( (throttled_dec >> 1)  & 1 ))
+tr_now=$(( (throttled_dec >> 2)  & 1 ))
+st_now=$(( (throttled_dec >> 3)  & 1 ))
+uv_occ=$(( (throttled_dec >> 16) & 1 ))
+fc_occ=$(( (throttled_dec >> 17) & 1 ))
+tr_occ=$(( (throttled_dec >> 18) & 1 ))
+st_occ=$(( (throttled_dec >> 19) & 1 ))
+
+# ---- emit -------------------------------------------------------------------
+
+cat > "$TMP" <<EOF
+# HELP rpi_throttled_state Raw vcgencmd get_throttled value (decimal).
+# TYPE rpi_throttled_state gauge
+rpi_throttled_state ${throttled_dec}
+
+# HELP rpi_throttled_undervoltage_now 1 if under-voltage is currently active.
+# TYPE rpi_throttled_undervoltage_now gauge
+rpi_throttled_undervoltage_now ${uv_now}
+# HELP rpi_throttled_freq_capped_now 1 if ARM frequency is currently capped.
+# TYPE rpi_throttled_freq_capped_now gauge
+rpi_throttled_freq_capped_now ${fc_now}
+# HELP rpi_throttled_now 1 if the SoC is currently being throttled.
+# TYPE rpi_throttled_now gauge
+rpi_throttled_now ${tr_now}
+# HELP rpi_throttled_soft_temp_now 1 if soft temperature limit is active now.
+# TYPE rpi_throttled_soft_temp_now gauge
+rpi_throttled_soft_temp_now ${st_now}
+
+# HELP rpi_throttled_undervoltage_occurred 1 if under-voltage has occurred since boot.
+# TYPE rpi_throttled_undervoltage_occurred gauge
+rpi_throttled_undervoltage_occurred ${uv_occ}
+# HELP rpi_throttled_freq_capped_occurred 1 if frequency capping has occurred since boot.
+# TYPE rpi_throttled_freq_capped_occurred gauge
+rpi_throttled_freq_capped_occurred ${fc_occ}
+# HELP rpi_throttled_occurred 1 if throttling has occurred since boot.
+# TYPE rpi_throttled_occurred gauge
+rpi_throttled_occurred ${tr_occ}
+# HELP rpi_throttled_soft_temp_occurred 1 if soft temp limit has occurred since boot.
+# TYPE rpi_throttled_soft_temp_occurred gauge
+rpi_throttled_soft_temp_occurred ${st_occ}
+
+# HELP rpi_arm_clock_hertz Current ARM CPU clock frequency.
+# TYPE rpi_arm_clock_hertz gauge
+rpi_arm_clock_hertz ${arm_clock}
+
+# HELP rpi_core_volts SoC core voltage (volts).
+# TYPE rpi_core_volts gauge
+rpi_core_volts ${core_volts}
+EOF
+
+mv -f "$TMP" "$OUT"
