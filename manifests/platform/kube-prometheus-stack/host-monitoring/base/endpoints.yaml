@@ -1,59 +1,40 @@
-# Single EndpointSlice covering the systemd-managed node_exporter (port 9101)
-# on every host — gateway / external / k3s control-plane / k3s workers.
-# This is intentionally parallel to the in-cluster prometheus-node-exporter
-# DaemonSet (:9100) which keeps running on k3s nodes; both are scraped so
-# host-OS metrics survive either path failing (observability-cascade
-# resilience — see docs/incidents/2026-04-13-observability-cascade.md).
-apiVersion: discovery.k8s.io/v1
-kind: EndpointSlice
+# Classic v1 Endpoints object (NOT EndpointSlice).
+#
+# kube-prometheus-stack's Prometheus CR generates scrape configs with
+# `kubernetes_sd_configs.role: endpoints`, which reads classic Endpoints only.
+# Kubernetes' EndpointSliceMirroring controller mirrors Endpoints →
+# EndpointSlice automatically, so Cilium / kube-proxy still see the addresses;
+# the reverse direction (EndpointSlice → Endpoints) has no standard controller.
+#
+# A previous EndpointSlice-only iteration (2026-04-22 P1-A) left this SM
+# `dark` because the generated scrape config found no classic Endpoints.
+# Keep this file as v1 Endpoints until prometheus-operator defaults to
+# `role: endpointslice` or we opt-in via Prometheus.spec.serviceDiscoveryRole.
+apiVersion: v1
+kind: Endpoints
 metadata:
   name: host-nodes
   labels:
     app: host-node-exporter
-    kubernetes.io/service-name: host-nodes
-addressType: IPv4
-endpoints:
+subsets:
   - addresses:
-      - 172.22.10.1
-    nodeName: br-gateway1
-    conditions:
-      ready: true
-  - addresses:
-      - 172.22.10.50
-    nodeName: br-external1
-    conditions:
-      ready: true
-  - addresses:
-      - 172.22.10.10
-    nodeName: br-node1
-    conditions:
-      ready: true
-  - addresses:
-      - 172.22.10.11
-    nodeName: br-node2
-    conditions:
-      ready: true
-  - addresses:
-      - 172.22.10.12
-    nodeName: br-node3
-    conditions:
-      ready: true
-  - addresses:
-      - 172.22.10.13
-    nodeName: br-node4
-    conditions:
-      ready: true
-  - addresses:
-      - 172.22.10.14
-    nodeName: br-node5
-    conditions:
-      ready: true
-  - addresses:
-      - 172.22.10.15
-    nodeName: br-node6
-    conditions:
-      ready: true
-ports:
-  - name: metrics
-    port: 9101
-    protocol: TCP
+      - ip: 172.22.10.1
+        nodeName: br-gateway1
+      - ip: 172.22.10.50
+        nodeName: br-external1
+      - ip: 172.22.10.10
+        nodeName: br-node1
+      - ip: 172.22.10.11
+        nodeName: br-node2
+      - ip: 172.22.10.12
+        nodeName: br-node3
+      - ip: 172.22.10.13
+        nodeName: br-node4
+      - ip: 172.22.10.14
+        nodeName: br-node5
+      - ip: 172.22.10.15
+        nodeName: br-node6
+    ports:
+      - name: metrics
+        port: 9101
+        protocol: TCP

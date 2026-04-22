@@ -8,7 +8,10 @@ spec:
       interval: 30s
       relabelings:
         # Expose the k8s-known node name as the series label.
-        - sourceLabels: [__meta_kubernetes_endpointslice_endpoint_node_name]
+        # Uses __meta_kubernetes_endpoint_node_name (role: endpoints). The
+        # equivalent endpointslice label is unavailable here because the CR
+        # generates role: endpoints scrape configs.
+        - sourceLabels: [__meta_kubernetes_endpoint_node_name]
           targetLabel: instance
         # Namespace this job under `node-exporter-host` so it doesn't collide
         # with the in-cluster DaemonSet's `node-exporter` job. Dashboards can
