@@ -356,14 +356,20 @@ flowchart LR
 
 ## 6. まとめ: 何から手を付けるべきか
 
-現状は **worker 側の k8s 内観測は十分**、穴はほぼ 2 つ:
+**2026-04-23 時点で Phase 0 + Phase 1 完了**。元の 2 つの穴は埋まった:
 
-1. **通知経路が開通していない** (Alertmanager receiver なし / Rule 0 件 / ダッシュボード手動)
-   → 観測してるのに誰も気付かない状態
-2. **ホスト OS 層の可視化が分散している**
-   - gw / ext は素の node_exporter だけ
-   - CP は DaemonSet はあるが Pod ログ / journald が抜け
-   - RPi 固有メトリクスがどこにもない
+| 元の穴 | 解消状態 |
+|---|---|
+| 通知経路が開通していない | ✅ Discord receiver + 25 PrometheusRule + 13 ダッシュボード (code 化) + externalUrl で Source リンクまで機能 |
+| ホスト OS 層の可視化が分散 | ✅ systemd node_exporter を全 8 ノードに展開 (:9101)、温度 / クロック / 電圧 / スロットルまで可視化、RPi 専用アラートあり |
 
-この 2 つを埋めるのが Phase 0 (通知) と Phase 1 (ホスト層統一) の役割。
-**Pod 内部はほぼ取れている**ので、ここは急がない。
+残りのギャップ (Phase 2 候補、優先度順は `observability-plan.md`):
+
+- 🟨 **CP ノードの Pod ログ** が未収集 (Alloy が worker only、cascade 再発リスクで慎重に)
+- 🟨 **外部ノードの journald** が未収集 (monitoring_agent role が広がったので追加容易)
+- 🟨 **K8s Events** が Loki に流れていない (event-exporter で解消可能)
+- 🟨 **Envoy アクセスログ** が Loki に無い (L7 可視化、サンプリング前提)
+- 🟨 **Hubble flow log** が Loki に無い (L3/4 可視化、drop 判定のみから)
+- 🟨 **kubeEtcd endpoints** がハードコード (servers.yaml からの生成化は nice-to-have)
+
+詳細は `observability-plan.md` の Phase 2 セクション。
