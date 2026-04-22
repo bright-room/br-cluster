@@ -41,8 +41,8 @@ graph TB
 |---|---|---|---|---|
 | br-gateway1 | systemd `node_exporter` | — | — | — |
 | br-external1 | systemd `node_exporter` | — | — | — |
-| br-node1〜6 | DaemonSet `node_exporter` Pod | kubelet / cilium / etc | Pod の stdout/stderr | アプリ→OTLP |
-| br-node1〜3 (CP) | 上記 + **etcd** `:2381` | 上記 | ※ Alloy 不在（注記参照） | — |
+| br-node4〜6 (worker) | DaemonSet `node_exporter` Pod | kubelet / cilium / etc | Pod の stdout/stderr (Alloy tail) | アプリ→OTLP |
+| br-node1〜3 (CP) | DaemonSet `node_exporter` Pod + **etcd** `:2381` | kubelet / cilium / etc | ※ Alloy 不在（注記参照） | — |
 
 ---
 
@@ -169,7 +169,9 @@ graph TB
   loki --> grafana
   tempo --> grafana
 
-  user["ユーザー<br/>(CF Access 認証)"] --> grafana
+  zitadel["Zitadel<br/>(auth.b8m.app / OIDC)"]:::ui
+  user["ユーザー"] --> zitadel
+  zitadel --> grafana
 ```
 
 ---
@@ -233,18 +235,20 @@ graph LR
 
 | 項目 | 内容 |
 |---|---|
-| 目的 | 全 8 ノードを単一実装 (systemd + Ansible) に統合。k3s 障害時にも監視継続 |
+| 目的 | 全 8 ノードを単一実装 (systemd + Ansible) に統合し、ホスト OS メトリクス経路の保守対象を 1 つに集約 |
 | 変更範囲 | ホスト OS メトリクス層のみ。k8s ワークロード系 ServiceMonitor は**一切触らない** |
-| 作業 | 1. `monitoring_agent` role を `br-node*` にも適用<br/>2. `externalnodes-monitoring` EndpointSlice に `br-node1〜6` 追加 (できれば `servers.yaml` から生成)<br/>3. kube-prometheus-stack Helm values で `prometheus-node-exporter` を無効化 |
-| 得るもの | ・保守対象が 1 経路に集約<br/>・後続 Phase で hostPath マウント体操が不要<br/>・過去の observability-cascade 系インシデント再発耐性 |
+| 作業 | 1. `monitoring_agent` role を `br-node*` にも適用 (`setup_monitoring_agent.yaml` の対象を `gateway:external:master:worker` に拡張)<br/>2. `externalnodes-monitoring` の EndpointSlice に `br-node1〜6` を追加 (`servers.yaml` から生成するのが理想)<br/>3. ServiceMonitor の `relabelings` に **`job=node-exporter` / `instance=<node>:9100` を固定**する設定を追加 (既存 rules / ダッシュボード互換性の維持)<br/>4. 切替え順序: **systemd 側を先に全ノードで up → EndpointSlice 追加 → Prometheus 側で両系ターゲット見えることを確認 → kube-prometheus-stack Helm values で `prometheus-node-exporter` を `enabled: false` に** (:9100 は `hostNetwork` 競合するので逆順厳禁)<br/>5. DaemonSet 撤去後、`external-nodes` ServiceMonitor 名が全ノードを指すことになるので、内部統一のため名称を `node-exporter` 等に改名するかを判断 |
+| 得るもの | ・保守対象が 1 経路 (systemd + Ansible) に集約<br/>・後続 Phase で hostPath マウント体操が不要<br/>・外部ノード / k3s ノードでホスト OS 系メトリクスのラベルが完全統一 |
+| 注意点 | kube-prometheus-stack 同梱のデフォルト PrometheusRule は `job="node-exporter"` 前提で書かれているため、**作業 3 の relabel を欠かすと既存ルール / Node Exporter Full ダッシュボードが空になる**。Phase 1 の最重要作業はこの互換設定 |
 
 #### Phase 2: RPi 固有メトリクス収集 (textfile collector + vcgencmd)
 
 | 項目 | 内容 |
 |---|---|
-| 取得する値 | 温度 (`measure_temp`) / スロットリング状態 (`get_throttled`) / 実クロック (`measure_clock arm`) / コア電圧 (`measure_volts core`) |
-| 手段 | **既存の node_exporter の内蔵機能** (`--collector.textfile`) に乗せる。別エクスポータ (rpi_exporter 等) は導入しない |
-| 実装箇所 | `provisioner/roles/monitoring_agent/` 配下<br/>・`node_exporter.service.j2` に textfile フラグ追加<br/>・`/run/node_exporter/textfile` ディレクトリ (tmpfs, SD 摩耗回避)<br/>・`rpi-metrics.sh` (vcgencmd を叩いて `.prom` に書き出し)<br/>・`rpi-metrics.service` + `rpi-metrics.timer` (30秒間隔) |
+| 取得する値 | **温度** / **スロットリング状態** (`get_throttled`) / **実クロック** (`measure_clock arm`) / **コア電圧** (`measure_volts core`) |
+| 手段の切り分け | 温度は **node_exporter 内蔵の `hwmon` / `thermal_zone` collector** (`node_hwmon_temp_celsius` / `node_thermal_zone_temp`) を有効化するだけで取れる。textfile + `vcgencmd` が必要なのは **スロットリング / 実クロック / コア電圧** の 3 種 |
+| 手段 | **既存の node_exporter の内蔵機能** (`--collector.textfile` + `--collector.hwmon` / `--collector.thermal_zone`) に乗せる。別エクスポータ (rpi_exporter 等) は導入しない |
+| 実装箇所 | `provisioner/roles/monitoring_agent/` 配下<br/>・`node_exporter.service.j2` に textfile / hwmon / thermal_zone フラグ追加<br/>・`systemd` unit に `RuntimeDirectory=node_exporter/textfile` を指定 (tmpfs, SD 摩耗回避 / パーミッション整備)<br/>・`rpi-metrics.sh` (vcgencmd を叩いて `.prom.$$` に書いて `.prom` へ atomic rename)<br/>・`rpi-metrics.service` + `rpi-metrics.timer` (30秒間隔)<br/>・node_exporter と rpi-metrics でユーザが異なる場合は共通グループ or `umask 022` で read 可能化 |
 | リソース影響 | 常駐プロセスなし。CPU 平均 < 0.3%、メモリ 0 (timer 起動時のみ一時数MB) |
 | Phase 1 依存 | あり。Phase 1 完了後なら hostPath マウント設定が不要で最もシンプル |
 
@@ -266,7 +270,7 @@ Phase 2 でメトリクスが出るようになってから追加。
 
 Pi クラスタの規模感では直近必須ではないもの:
 
-- **外部ノード (br-gateway1, br-external1) の journald → Loki ログ収集**: `alloy` の systemd 版 or `promtail` 同等品を systemd で
+- **外部ノード (br-gateway1, br-external1) の journald → Loki ログ収集**: `alloy` の systemd 版 or `promtail` 同等品を systemd で。Phase 1 で `monitoring_agent` role を全ノードに広げるので、同じロール内に後付けで同梱すると Ansible の往復が減る
 - **control-plane の Pod ログ収集**: Alloy の `nodeSelector` を外すか、CP 専用の軽量 Alloy を配置
 - **メトリクス長期保存**: Thanos / Mimir。現状 14 日保持で運用上問題なし
 - **Blackbox exporter**: 外形監視。家庭内サービスなので優先度低
