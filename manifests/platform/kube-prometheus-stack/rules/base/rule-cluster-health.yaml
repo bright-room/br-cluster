@@ -1,0 +1,108 @@
+# Monitoring pipeline self-health and cluster-core liveness.
+# These rules answer: "is the monitoring stack itself working?" and
+# "is k3s still serving?"
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cluster-health
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: monitoring-pipeline
+      rules:
+        # Always firing sanity alert. If Discord stops receiving this,
+        # the alerting pipeline itself is broken.
+        - alert: Watchdog
+          expr: vector(1)
+          labels:
+            severity: none
+          annotations:
+            summary: Alerting pipeline is functional
+            description: |
+              This alert fires continuously to confirm the whole pipeline
+              (Prometheus → Alertmanager → Discord) is alive. If it stops
+              arriving, diagnose the alerting path itself.
+
+        - alert: TargetDown
+          expr: 100 * (count by (job, namespace) (up == 0) / count by (job, namespace) (up)) > 10
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $value | humanize }}% of {{ $labels.job }} targets in {{ $labels.namespace }} are down"
+            description: |
+              More than 10% of scrape targets for job {{ $labels.job }} have been
+              unreachable for 10 minutes.
+
+        - alert: PrometheusRuleFailures
+          expr: increase(prometheus_rule_evaluation_failures_total[5m]) > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Prometheus rule evaluation is failing
+            description: |
+              Prometheus instance {{ $labels.instance }} has failed to evaluate
+              {{ printf "%.0f" $value }} rules in the last 5 minutes.
+
+        - alert: PrometheusConfigReloadFailed
+          expr: max_over_time(prometheus_config_last_reload_successful[5m]) == 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: Prometheus failed to reload its config
+            description: Prometheus instance {{ $labels.instance }} could not reload its config.
+
+        - alert: AlertmanagerConfigReloadFailed
+          expr: max_over_time(alertmanager_config_last_reload_successful[5m]) == 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: Alertmanager failed to reload its config
+            description: Alertmanager {{ $labels.instance }} could not reload its config.
+
+        - alert: AlertmanagerFailedToSendAlerts
+          expr: |
+            (
+              rate(alertmanager_notifications_failed_total[5m])
+            /
+              rate(alertmanager_notifications_total[5m])
+            ) > 0.01
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: Alertmanager is failing to deliver notifications
+            description: |
+              {{ $value | humanizePercentage }} of notifications from Alertmanager
+              {{ $labels.instance }} to integration {{ $labels.integration }} failed.
+
+    - name: kubernetes-core
+      rules:
+        # k3s runs kube-apiserver inside the k3s binary; we monitor liveness via
+        # kubelet reachability because kubeApiServer scrape is disabled (see
+        # kube-prometheus-stack/app/components/k3s/values.yaml).
+        - alert: KubeletDown
+          expr: absent(up{job="kubelet"} == 1) or count(up{job="kubelet"} == 0) > 0
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: One or more kubelets are unreachable
+            description: |
+              Kubelet on {{ $labels.node }} has been unreachable for 15 minutes.
+              k3s API or node network is likely degraded.
+
+        - alert: EtcdDown
+          expr: up{job="kube-etcd"} == 0
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: etcd member is unreachable
+            description: |
+              etcd endpoint on {{ $labels.instance }} has been unreachable for
+              10 minutes. If 2 out of 3 are down the cluster loses quorum.
