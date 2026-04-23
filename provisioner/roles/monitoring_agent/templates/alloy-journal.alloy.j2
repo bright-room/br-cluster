@@ -44,6 +44,6 @@ loki.relabel "journal" {
 
 loki.write "default" {
   endpoint {
-    url = "{{ alloy_journal.loki_push_url }}"
+    url = "{{ alloy_journal_loki_push_url }}"
   }
 }
