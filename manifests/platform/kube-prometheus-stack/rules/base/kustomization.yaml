@@ -7,3 +7,4 @@ resources:
   - rule-storage.yaml
   - rule-cert.yaml
   - rule-rpi.yaml
+  - rule-monitoring-agent.yaml
