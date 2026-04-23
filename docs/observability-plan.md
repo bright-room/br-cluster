@@ -194,15 +194,34 @@ cluster-proxy (public) / internal-proxy (LAN) の access log を OTLP JSON 経�
 - **Envoy Gateway の envoy proxy pod** は `:19001` に自動で `/stats/prometheus` を開いている。PodMonitor `selector.matchLabels.app.kubernetes.io/managed-by=envoy-gateway + component=proxy` で両 Gateway を一網打尽。relabeling で `gateway_name` / `gateway_namespace` を付けると dashboard / alert が書きやすい
 - **低トラフィック環境でのレート系アラート**は divide-by-near-zero を避ける guard が必須。今回は `5xx ratio > 10% AND total rps > 0.5` の AND 条件で 1 件 5xx によるフラップを抑止
 
-## Phase 2-F: Hubble drop flow → Loki (🚧 PR #168 マージ済、parsing は follow-up)
+## Phase 2-F: Hubble drop flow → Loki (🚧 parsing 完了、dashboard/alert は NetworkPolicy 導入後)
 
 NetworkPolicy を書き始める前の**事前準備**として、drop verdict の flow を Loki に persist。policy 運用が本格化した瞬間から「誰が誰に何で denied か」が LogQL 一発で引ける状態を作る。
 
 | ID | 内容 | PR |
 |---|---|---|
 | P2-F (1) | hubble-flow-exporter Deployment (1 replica, worker) — hubble-relay gRPC を `--verdict=DROPPED --follow -o json` でストリーム、stdout → 既存 Alloy DS → Loki。cilium image を再利用、hardening 済 (readOnlyRootFS / runAsNonRoot / drop ALL) | [#168](https://github.com/bright-room/br-cluster/pull/168) |
-| P2-F (2) | loki.process で `verdict` / `drop_reason_desc` / source/destination namespace を structured metadata / 低カーディナリティ label に抽出 | TODO (24h 観測後) |
+| P2-F (2) | Alloy DS の `loki.process "pods"` に `stage.match { selector = "{namespace=\"hubble-flow-exporter\"}" }` を追加。`verdict` / `drop_reason_desc` / `src_namespace` / `dst_namespace` / `flow_node` を低カーディナリティ label に、`source_pod` / `dest_pod` を structured metadata に抽出 | TODO |
 | P2-F (3) | Grafana dashboard + PrometheusRule | **NetworkPolicy 導入後まで deferral** (今の drop はノイズしか無いので dashboard / alert を書いても空振り) |
+
+### P2-F (2) の Go 判定 (2026-04-23)
+
+PR #168 を 4h21m 稼働させた観察結果が全 Go:
+
+- exporter Pod: Ready=1/1, Restarts=0
+- Loki ingest: ~**2.6 行/分** (~0.04 rps)。他の log stream と比べて無視できる
+- drop reason 分布: `UNSUPPORTED_L3_PROTOCOL` 76% / `UNSUPPORTED_L2_PROTOCOL` 24% (plan 想定通り)
+- node coverage: worker 3 台 + **CP (br-node2) の flow も届いている** ← relay 集約の設計前提が実証された
+- Loki label: `namespace` / `pod` / `container` / `node` が付与されている
+
+### P2-F (2) の設計判断
+
+| 項目 | 選択 | 理由 |
+|---|---|---|
+| 抽出位置 | Alloy DS 共通 pipeline の末尾に `stage.match` で namespace 絞り | 既存 hot path への影響ゼロ (マッチしないログは nested stage を skip)。alloy-events のように別 release を立てるコスト不要 |
+| namespace の抽出 | `flow.source.labels` / `flow.destination.labels` 配列に対する regex `k8s:io\.kubernetes\.pod\.namespace=(?P<ns>[^",]+)` | Hubble JSON には `src/dst namespace` が first-class で無い。Cilium identity label 配列から拾う |
+| `flow_node` を label 追加 | 必要 | Alloy の `node` label は **Alloy Pod が載っているノード** (= hubble-flow-exporter pod のある br-node5 固定)。drop が発生したノードは `flow.node_name` なのでこちらを別 label で持つ |
+| `source_pod` / `dest_pod` | structured metadata | pod 名は高 cardinality、label 化すると series 爆発 |
 
 ### 設計判断
 
