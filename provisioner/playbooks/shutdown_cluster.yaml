@@ -1,0 +1,82 @@
+---
+# Ordered cluster shutdown.
+#
+# Order: worker -> master (control-plane) -> external -> gateway.
+#
+# gateway (br-gateway1) is the internet entry point for every other host.
+# If any earlier tier fails, we must NOT shut it down: losing the gateway
+# while other nodes are in an inconsistent state would leave the whole
+# cluster unreachable from outside and make recovery painful.
+#
+# any_errors_fatal on the first three plays aborts the playbook before the
+# gateway play runs, leaving br-gateway1 up for recovery access.
+
+- name: Preflight - ensure k3s is stopped
+  hosts: master:worker
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    # k3s-stop playbook を先に実行する前提。走ったままシャットダウンすると
+    # etcd の整合性が壊れたり Longhorn レプリカが不整合になるリスクがある
+    # ので、ここで明示的に止まる。
+    - name: Check k3s / k3s-agent service state
+      ansible.builtin.systemd:
+        name: "{{ 'k3s' if 'master' in group_names else 'k3s-agent' }}"
+      register: k3s_state
+      check_mode: false
+      changed_when: false
+      failed_when: false
+
+    - name: Abort if k3s is still active
+      ansible.builtin.fail:
+        msg: >-
+          k3s is still active on {{ inventory_hostname }}
+          (ActiveState={{ k3s_state.status.ActiveState | default('unknown') }}).
+          Run `cluster-forge provision run --env <env> k3s-stop` first.
+      when: k3s_state.status.ActiveState | default('inactive') == 'active'
+
+- name: Shutdown workers
+  hosts: worker
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Power off worker
+      community.general.shutdown:
+        msg: "Cluster shutdown initiated by ansible"
+        delay: 5
+
+- name: Shutdown control-plane
+  hosts: master
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  # Assumes k3s-stop was run first, so etcd is already stopped and parallel
+  # shutdown is safe.
+  tasks:
+    - name: Power off control-plane node
+      community.general.shutdown:
+        msg: "Cluster shutdown initiated by ansible"
+        delay: 5
+
+- name: Shutdown external services
+  hosts: external
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Power off external node
+      community.general.shutdown:
+        msg: "Cluster shutdown initiated by ansible"
+        delay: 5
+
+- name: Shutdown gateway
+  hosts: gateway
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Power off gateway
+      community.general.shutdown:
+        msg: "Cluster shutdown initiated by ansible"
+        delay: 5

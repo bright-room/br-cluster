@@ -12,6 +12,7 @@ PLAYBOOK_COMMANDS = {
     "k3s-start": "playbooks/k3s_start.yaml",
     "k3s-stop": "playbooks/k3s_stop.yaml",
     "k3s-reset": "playbooks/k3s_reset.yaml",
+    "shutdown-cluster": "playbooks/shutdown_cluster.yaml",
 }
 
 
