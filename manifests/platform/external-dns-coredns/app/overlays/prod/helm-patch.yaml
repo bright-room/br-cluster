@@ -4,3 +4,10 @@
     kind: ConfigMap
     name: external-dns-coredns-helm-values
     valuesKey: overlay-values.yaml
+- op: add
+  path: /spec/valuesFrom/-
+  value:
+    kind: ConfigMap
+    name: external-dns-coredns-monitoring-values
+    valuesKey: values.yaml
+    optional: true
