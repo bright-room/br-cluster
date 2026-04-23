@@ -1,7 +1,7 @@
 # 可観測性 拡充 実行プラン + 進捗
 
 `observability-map.md` で合意した 2 つの穴 (通知経路 / ホスト層統一) を埋めるための PR 単位の実行計画。
-**2026-04-23 時点で Phase 0 + Phase 1 完了**。以降は Phase 2 以降のバックログ。
+**2026-04-23 時点で Phase 0 + Phase 1 + P2-C 完了**。以降は Phase 2 の残り + Phase 3 バックログ。
 
 ---
 
@@ -37,7 +37,7 @@ flowchart LR
 
   P2A["P2-A event-exporter"]:::p2
   P2B["P2-B CP Alloy"]:::p2
-  P2C["P2-C external journald"]:::p2
+  P2C["P2-C all-node journald<br/>#147 #148 #149 #150 #151 #152"]:::done
   P2D["P2-D kubeEtcd 動的化"]:::p2
   P2E["P2-E Envoy access log"]:::p2
   P2F["P2-F Hubble flow log"]:::p2
@@ -86,6 +86,31 @@ flowchart LR
 
 ---
 
+## Phase 2-C: 全 8 ノード journald → Loki ✅ 完了
+
+元プランは「外部ノード (gateway / external) の journald → Loki」だったが、実装時にスコープを **全 8 ノード (k3s CP + worker + gateway + external) の systemd-journald 集約**に拡張した。ホスト systemd サービス (kubelet, containerd, sshd, kea-dhcp, nftables 等) が観測の空白地帯だったため。
+
+| ID | 内容 | PR |
+|---|---|---|
+| P2-C (1) | internal Envoy Gateway + external-dns (coredns provider) を新設 — LAN 限定 VIP `172.22.10.71`, `*.cluster-internal.bright-room.net` listener、br-gateway1 の etcd (SkyDNS schema) に A/CNAME を書く経路 | [#147](https://github.com/bright-room/br-cluster/pull/147) |
+| P2-C (2) | Loki HTTPRoute (`loki-push.cluster-internal.bright-room.net` → loki-gateway:80) | [#148](https://github.com/bright-room/br-cluster/pull/148) |
+| P2-C (3) | CoreDNS hosts プラグインに `fallthrough` 追加 — 静的 hosts で止まっていたクエリを etcd plugin に渡す | [#149](https://github.com/bright-room/br-cluster/pull/149) |
+| P2-C (4) | monitoring_agent role に Grafana Alloy 追加 (v1.15.1, systemd, 専用 user, ハードニング) + journal → Loki config | [#150](https://github.com/bright-room/br-cluster/pull/150) |
+| P2-C (5) | ⚠️ Loki values の `${S3_*}` を Flux postBuild が空置換してしまう bug を修正 (`$${...}` エスケープ) | [#151](https://github.com/bright-room/br-cluster/pull/151) |
+| P2-C (6) | Alloy push URL をグループ別に切替 — k3s ノードは localhost NodePort、非 k3s (gateway/external) はドメイン経由 | [#152](https://github.com/bright-room/br-cluster/pull/152) |
+
+### 🐛 P2-C 運用中に発見した罠
+
+| 何が起きたか | 原因 | 対処 |
+|---|---|---|
+| 既存の CoreDNS hosts プラグインに `fallthrough` 無く、etcd plugin が呼ばれず DNS 解決できない | PR #6 (2026-04-10) で internal-gateway を **WAN 側 DNAT** で使っていた名残。LAN 側の hosts block は fallthrough が無いまま残っていた | hosts block に fallthrough を 1 行追加 (#149) |
+| Flux postBuild が Loki 値の `${S3_ACCESS_KEY_ID}` を空文字列に置換し、Loki が S3 資格情報空で起動 → HelmRelease Failed → 依存する alloy/otel が cascade で未 ready | postBuild.substituteFrom を後付けしたが、values.yaml には Loki の expand-env 用プレースホルダがあった | `$${...}` にエスケープ (#151) |
+| **lease holder ノード自身からは LB IP (172.22.10.71) に接続できない** ("No route to host") | Cilium の socketLB は ClusterIP は redirect するが External/LB IP を redirect しない。lease holder の ARP responder は outbound 専用で自分宛に応答しない | k3s ノードは **localhost NodePort** (30800) 経由に切替 (#152)。非 k3s は lease holder になり得ないのでドメイン経由で OK |
+| Alloy の systemd unit で `Group=systemd-journal` にすると、alloy ユーザーの primary group "alloy" が supplementary にも入らず `/etc/alloy/config.alloy` (0750 root:alloy) を stat できず起動失敗 | systemd の setgid + initgroups の挙動 | `Group=alloy` + `SupplementaryGroups=systemd-journal` (#150 内で修正) |
+| **全 CP への Alloy install を同時実行したら br-node3 が NotReady、SSH 落ち、物理再起動が必要に** | Pi 4GB CP で zip DL + extract + binary copy + systemd daemon-reload + restart が同時集中 → 一時的リソース圧迫で kernel が応答不能に | 手動で物理再起動。follow-up で playbook に `serial: 1` を入れて CP は 1 台ずつ適用するようにしたい |
+
+---
+
 ## 2026-04-23 時点で実現していること
 
 - 🔔 **アラート → Discord 通知**が実際に届く (Watchdog / 他 rules / 手動テスト全て確認済)
@@ -95,6 +120,8 @@ flowchart LR
 - 📡 **ServiceMonitor / PodMonitor 30+** が全て `up=1` (alloy / cilium / hubble / longhorn / loki / tempo / otel / grafana / cnpg / cert-manager / external-dns / metrics-server / envoy-gateway / kubelet / etcd / kube-state-metrics / host-nodes…)
 - 🌡️ 全 8 ノードの **CPU 温度 / ARM クロック / コア電圧 / スロットル状態** が Prometheus に入り、アラート閾値で検知可能
 - 🛡️ 2026-04-13 cascade の原因と対処が `docs/incidents/` に永続化され、以降の設計判断 (worker pin / nodeDownPodDeletionPolicy / Alloy file tailing / GOMEMLIMIT / swap+reserve) の根拠が追える
+- 📓 **全 8 ノードの systemd-journald ログ**が Loki に集約。kubelet / containerd / sshd / kea-dhcp / nftables / garage / chrony 等のホストサービスが `{job="systemd-journal", host="<name>", unit="<svc>"}` で検索可能
+- 🛣️ **内部サービス公開基盤**として internal Envoy Gateway (`*.cluster-internal.bright-room.net`) + external-dns-coredns が稼働、将来の内部向け LAN サービス (event-exporter metrics、追加の API 等) は HTTPRoute 1 枚で公開可能
 
 ---
 
@@ -116,13 +143,6 @@ flowchart LR
   - Phase 1: `memory: 64Mi req / 192Mi limit` + CP 限定で 1〜2 週間観察
   - Phase 2: 問題なければ本番化
 - **リスク**: 高 (cascade 再発懸念 — CP は Pi 4B 4GB でメモリ余裕が薄い)
-
-### P2-C: 外部ノード (gateway / external) の journald → Loki (優先度: 中)
-
-- **目的**: nftables / kea-dhcp / sshd / garage 等 **systemd サービスのログ**を Loki へ
-- **構成**: `grafana/alloy` 単体バイナリを systemd で `loki.source.journal`
-- **実装箇所**: `monitoring_agent` role に alloy-journal タスクを同梱 (P1-A で既にインフラは整っている)
-- **リスク**: 低
 
 ### P2-D: kubeEtcd endpoints 動的化 (優先度: 低)
 
@@ -169,17 +189,27 @@ flowchart LR
 | P1 | port 競合 | :9100 = DS, :9101 = systemd で明示共存、問題なし |
 | P1 | vcgencmd ハング | **root + systemd + 60s 間隔 + timeout 3s** で 8 ノード 24h 運用して安定 |
 | P2-B | CP Alloy OOM | 影モード運用ルールを明文化 |
+| P2-C | CP Pi 同時大量プロビジョニングで SSH 断 | **新規 systemd install は `serial: 1`** を徹底 (follow-up で playbook に組み込み予定) |
+| P2-C | Cilium L2 lease holder hairpin | k3s ノードは NodePort 経由、非 k3s はドメイン経由に経路分離。socketLB 拡張は follow-up で検討 |
 | P2-E/F | Loki ingestion 飽和 | サンプリング前提 |
 
 ---
 
 ## 次回着手時の推奨順序
 
-1. **P2-C (external journald → Loki)** が最も簡単 (P1-A で広げた `monitoring_agent` role を拡張するだけ、リスク低)
-2. **P2-A (event-exporter)** — 導入容易 + 運用価値高い
-3. **P2-E (Envoy access log)** — L7 可視化の効果が大きい
-4. **P2-B (CP Alloy)** は 2 週間影モード運用が必要なので、余裕がある時に
-5. **P2-F / P2-D** は需要が出てから
+1. **P2-A (event-exporter)** — 導入容易 + 運用価値高い。P2-C で用意した internal Envoy Gateway + Loki push 経路を活用できる
+2. **P2-E (Envoy access log)** — L7 可視化の効果が大きい
+3. **P2-B (CP Alloy)** は 2 週間影モード運用が必要なので、余裕がある時に。P2-C で CP 大量同時プロビの危険が実証済なので `serial: 1` + 事前シングル検証必須
+4. **P2-F / P2-D** は需要が出てから
+
+### P2-C 由来の follow-up (別 PR 候補)
+
+- **Alloy 死活監視 PrometheusRule**: 8 ノードの alloy.service が down / loki push failure rate が閾値超え時にアラート
+- **Alloy 自体のメトリクス収集**: `127.0.0.1:12345` で公開中、node_exporter textfile 経由 or `host-monitoring` ServiceMonitor 拡張で Prometheus に入れる
+- **Provisioner playbook に `serial: 1`**: CP 同時適用による SSH 断対策 (P2-C で br-node3 が死んだ教訓)
+- **Cilium socketLB で LB IP hairpin を解決**: `bpf.hostRouting: true` or `loadBalancer.acceleration` 調整で lease holder 自身から LB IP 到達可能にする。成功すれば P2-C (6) の per-group URL 分岐を削除できる
+- **internal Envoy Gateway の ServiceMonitor**: 既存 cluster-gateway と同様のメトリクス収集
+- **external-dns-coredns の ServiceMonitor / monitoring overlay**: cloudflare instance のを mirror
 
 ---
 
@@ -193,4 +223,9 @@ flowchart LR
   - `manifests/platform/kube-prometheus-stack/host-monitoring/` (旧 externalnodes-monitoring から rename)
   - `manifests/platform/grafana/dashboards/` + `scripts/fetch-grafana-dashboards.sh`
   - `provisioner/roles/monitoring_agent/` (node_exporter + rpi-metrics timer)
+- **P2-C で追加された主な manifest / role**:
+  - `manifests/platform/envoy-gateway/config/base/internal-*.yaml` (内部 Gateway)
+  - `manifests/platform/external-dns-coredns/` (内部向け DNS プロビジョナ)
+  - `manifests/platform/loki/app/base/httproute-internal.yaml` (Loki push 経路)
+  - `provisioner/roles/monitoring_agent/tasks/alloy_journal.yaml` + `templates/alloy*.j2`
 - **過去インシデント**: `docs/incidents/2026-04-13-observability-cascade.md`
