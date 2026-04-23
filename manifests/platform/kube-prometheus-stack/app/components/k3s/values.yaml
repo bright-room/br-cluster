@@ -18,12 +18,10 @@ kubeScheduler:
 # K3s embedded etcd exposes metrics on 2381/http when
 # `etcd-expose-metrics: true` is set in the k3s server config
 # (see provisioner/roles/k3s/templates/config.yaml.master.j2).
+# `endpoints` are generated per env by `cluster-forge generate-manifests`
+# into the overlay's `etcd-endpoints.yaml` (merged in after this file).
 kubeEtcd:
   enabled: true
-  endpoints:
-    - 172.22.10.10
-    - 172.22.10.11
-    - 172.22.10.12
   service:
     enabled: true
     port: 2381

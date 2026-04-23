@@ -38,7 +38,7 @@ flowchart LR
   P2A["P2-A K8s events<br/>#157 #158 #159"]:::done
   P2B["P2-B CP Alloy<br/>#170 (shadow WIP)"]:::p2
   P2C["P2-C all-node journald<br/>#147 #148 #149 #150 #151 #152"]:::done
-  P2D["P2-D kubeEtcd 動的化"]:::p2
+  P2D["P2-D kubeEtcd 動的化"]:::done
   P2E["P2-E Envoy access log<br/>#161 #162 #164 #165 #166"]:::done
   P2F["P2-F Hubble drop flow<br/>#168 (parsing WIP)"]:::p2
 
@@ -167,11 +167,13 @@ controller / kubelet / scheduler が emit する K8s Events (Pod OOMKilled / Fai
 | P2-B (1) | 独立 HelmRelease `alloy-cp` を追加、br-node2 のみ影モード稼働 | [#170](https://github.com/bright-room/br-cluster/pull/170) |
 | P2-B (2) | 3 CP 全台展開 (nodeAffinity 解除) | TODO (1〜2 週間観察後) |
 
-### P2-D: kubeEtcd endpoints 動的化 (優先度: 低)
+## Phase 2-D: kubeEtcd endpoints 動的化 ✅ 完了
 
-- **目的**: 現在 `kube-prometheus-stack/app/components/k3s/values.yaml` に CP IP を 3 つハードコード。CP 追加/入替時に手動編集が必要
-- **案**: `servers.yaml` → kustomize plugin or CI スクリプトで生成
-- **リスク**: 低
+`kube-prometheus-stack/app/components/k3s/values.yaml` にハードコードされていた CP 3 IP を撤去し、`servers.yaml` (`k8s_role = primary|secondary`) + 1Password IP から `cluster-forge generate-manifests --env prod` が overlay の `etcd-endpoints.yaml` を生成する構造に変更。CP 追加/入替時は servers.yaml を編集して `make prod/generate-manifests` を回すだけで済む。
+
+| ID | 内容 | PR |
+|---|---|---|
+| P2-D (1) | `cluster_forge.manifest_generator` を新設 (primary + secondary ノードを抽出して kubeEtcd.endpoints を生成)、`generate-manifests --env` CLI + `make prod/generate-manifests` target を追加。overlay 側で configMapGenerator + helm-patch を 2 本 valuesFrom に分岐 | TODO |
 
 ## Phase 2-E: Envoy Gateway アクセスログ + L7 監視 ✅ 完了
 
@@ -258,7 +260,6 @@ NetworkPolicy を書き始める前の**事前準備**として、drop verdict �
 
 1. **P2-B phase 2 (3 CP 全台展開)** — br-node2 影モード (#170) が 1〜2 週間安定したら nodeAffinity を外す。他クラスタ変更と重ねない
 2. **P2-F の残り (parsing + label 抽出)** — exporter は稼働中 (#168)。24h 観測後に loki.process で `verdict` / `drop_reason_desc` / src/dst namespace を structured metadata 化。dashboard / alert は NetworkPolicy 導入まで保留
-3. **P2-D (kubeEtcd 動的化)** — 需要ベース (CP 入替時)
 
 ### 観測系 follow-up (別 PR 候補)
 
@@ -270,6 +271,17 @@ NetworkPolicy を書き始める前の**事前準備**として、drop verdict �
 - **internal Envoy Gateway の ServiceMonitor**: 既存 cluster-gateway と同様のメトリクス収集
 - **external-dns-coredns の ServiceMonitor / monitoring overlay**: cloudflare instance のを mirror
 - **hubble-flow-exporter の死活 PrometheusRule**: `kube_deployment_status_replicas_available{deployment="hubble-flow-exporter"}` ベース。alloy-events (#159) と同パターン。先に drop の baseline rate が見えてからでも可
+
+### トポロジー情報の単一 source of truth 化 (P2-D follow-up)
+
+P2-D で kubeEtcd endpoints は `cluster-forge generate-manifests` 経由で servers.yaml + 1Password に寄せたが、他の manifest には依然として IP / ホスト情報がハードコードされた場所がある。per-consumer に YAML fragment 生成を増やすと「新しい consumer を足すたびに cluster-forge の Python 側に生成関数を追加」コストが嵩むため、**個数固定のスカラー値は `cluster-settings.yaml` + Flux postBuild `${VAR}` に寄せる**路線で follow-up する。
+
+想定する移行順:
+
+1. **kubeEtcd endpoints を postBuild 化** — P2-D で per-consumer 生成にした `etcd-endpoints.yaml` を、`cluster-settings.yaml` の `BR_NODE{1,2,3}_IP` + `components/k3s/values.yaml` 内 `${BR_NODE1_IP}` に置換。CP 台数変更時は cluster-settings.yaml と values.yaml のリストを両方手で触ることになるが、変更頻度が低いので許容
+2. **`cluster-settings.yaml` を `cluster-forge generate-manifests` 生成に寄せる** — servers.yaml + 1Password から `BR_*_IP` / `CLOUDFLARED_TUNNEL_ID` 等を自動生成。既存の固定値 (`CLUSTER_DOMAIN` / `TRUSTED_INTERNAL_POD_CIDR` 等) をどこに書くかは要設計 (servers.yaml か専用の `cluster-config.yaml` か)
+3. **`host-monitoring/base/endpoints.yaml` の 8 host IP を整理** — リスト値なので postBuild では表現しきれない。cluster-forge の per-consumer 生成 (P2-D と同じパターン) か、`cluster_hosts.yaml` と共通化する kustomize plugin を検討
+4. **`provisioner/inventories/base/group_vars/all/network.yaml` の `KUBE_VIP_ADDRESS` と `cluster-settings.yaml` の重複解消** — source of truth を片方に寄せ、もう片方は生成
 
 ---
 

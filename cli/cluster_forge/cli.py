@@ -10,6 +10,7 @@ import click
 
 from cluster_forge import config_generator as config_gen
 from cluster_forge import inventory_generator as inv_gen
+from cluster_forge import manifest_generator as manifest_gen
 from cluster_forge import packer as packer_mod
 from cluster_forge import provisioner as provisioner_mod
 from cluster_forge.bootstrap import (
@@ -170,6 +171,19 @@ def generate_inventory_cmd(env: str) -> None:
     provider = OnePasswordCliProvider(env)
     click.echo(f"Generating inventory for {env}...")
     files = inv_gen.write_inventory(inventory, env, provider, PROVISIONER_DIR)
+    for f in files:
+        click.echo(f"  -> {f.relative_to(REPO_ROOT)}")
+    click.echo("Done.")
+
+
+@main.command("generate-manifests")
+@ENV_OPTION
+def generate_manifests_cmd(env: str) -> None:
+    """Generate env-specific manifest fragments from servers.yaml + 1Password."""
+    inventory = load_inventory()
+    provider = OnePasswordCliProvider(env)
+    click.echo(f"Generating manifests for {env}...")
+    files = manifest_gen.write_manifests(inventory, env, provider, REPO_ROOT)
     for f in files:
         click.echo(f"  -> {f.relative_to(REPO_ROOT)}")
     click.echo("Done.")
