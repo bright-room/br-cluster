@@ -40,7 +40,7 @@ flowchart LR
   P2C["P2-C all-node journald<br/>#147 #148 #149 #150 #151 #152"]:::done
   P2D["P2-D kubeEtcd 動的化"]:::p2
   P2E["P2-E Envoy access log<br/>#161 #162 #164 #165 #166"]:::done
-  P2F["P2-F Hubble flow log"]:::p2
+  P2F["P2-F Hubble drop flow<br/>#168 (parsing WIP)"]:::p2
 
   P0A --> P1AC
   P0B --> P0C
@@ -185,11 +185,34 @@ cluster-proxy (public) / internal-proxy (LAN) の access log を OTLP JSON 経�
 - **Envoy Gateway の envoy proxy pod** は `:19001` に自動で `/stats/prometheus` を開いている。PodMonitor `selector.matchLabels.app.kubernetes.io/managed-by=envoy-gateway + component=proxy` で両 Gateway を一網打尽。relabeling で `gateway_name` / `gateway_namespace` を付けると dashboard / alert が書きやすい
 - **低トラフィック環境でのレート系アラート**は divide-by-near-zero を避ける guard が必須。今回は `5xx ratio > 10% AND total rps > 0.5` の AND 条件で 1 件 5xx によるフラップを抑止
 
-### P2-F: Hubble flow log → Loki (優先度: 低)
+## Phase 2-F: Hubble drop flow → Loki (🚧 PR #168 マージ済、parsing は follow-up)
 
-- **目的**: Pod 間通信の可否を時系列で調査可能に
-- **サンプリング**: 初手は **drop 判定のみ** (deny された flow のみ)
-- **リスク**: 中 (flow は秒間数百件のオーダー)
+NetworkPolicy を書き始める前の**事前準備**として、drop verdict の flow を Loki に persist。policy 運用が本格化した瞬間から「誰が誰に何で denied か」が LogQL 一発で引ける状態を作る。
+
+| ID | 内容 | PR |
+|---|---|---|
+| P2-F (1) | hubble-flow-exporter Deployment (1 replica, worker) — hubble-relay gRPC を `--verdict=DROPPED --follow -o json` でストリーム、stdout → 既存 Alloy DS → Loki。cilium image を再利用、hardening 済 (readOnlyRootFS / runAsNonRoot / drop ALL) | [#168](https://github.com/bright-room/br-cluster/pull/168) |
+| P2-F (2) | loki.process で `verdict` / `drop_reason_desc` / source/destination namespace を structured metadata / 低カーディナリティ label に抽出 | TODO (24h 観測後) |
+| P2-F (3) | Grafana dashboard + PrometheusRule | **NetworkPolicy 導入後まで deferral** (今の drop はノイズしか無いので dashboard / alert を書いても空振り) |
+
+### 設計判断
+
+| 項目 | 選択 | 理由 |
+|---|---|---|
+| flow 取得方式 | hubble-relay gRPC を 1 Deployment から叩く | relay が全ノードの flow を集約するので CP Alloy (P2-B) 未対応でも**全ノードカバー** |
+| Loki 転送 | stdout → kubelet pod log → 既存 Alloy DS | 新規パイプライン無し。DS の worker nodeSelector と整合 |
+| コンテナ image | `quay.io/cilium/cilium:v1.19.2` | 全 k3s ノードに既にキャッシュ済で追加 pull 無し、hubble CLI version も cilium と同期 |
+| フィルタ位置 | CLI 側で `--verdict=DROPPED` | ingest 前に絞って Loki 負荷最小化 |
+| TLS | plain gRPC | hubble-relay は `disable-server-tls: true` 設定済 |
+
+### 現状の drop 実態 (platform オンリー段階)
+
+ほぼ以下のノイズだけ:
+
+- `UNSUPPORTED_L3_PROTOCOL` (drop_reason 139): ICMPv6 Router Solicitation — pod が veth 上の IPv6 neighbor discovery を投げて multicast 先で落ちる
+- `UNSUPPORTED_L2_PROTOCOL` (drop_reason 166): Ethernet/ARP 系の L2 フレーム
+
+想定通り。**NetworkPolicy を書き始めた瞬間から `policy-denied` が主成分になる**というのがこの PR の前提。
 
 ---
 
@@ -219,14 +242,15 @@ cluster-proxy (public) / internal-proxy (LAN) の access log を OTLP JSON 経�
 | P2-B | CP Alloy OOM | 影モード運用ルールを明文化 |
 | P2-C | CP Pi 同時大量プロビジョニングで SSH 断 | **新規 systemd install は `serial: 1`** を徹底 (follow-up で playbook に組み込み予定) |
 | P2-C | Cilium L2 lease holder hairpin | k3s ノードは NodePort 経由、非 k3s はドメイン経由に経路分離。socketLB 拡張は follow-up で検討 |
-| P2-E/F | Loki ingestion 飽和 | サンプリング前提 |
+| P2-E | Loki ingestion 飽和 | サンプリング前提 (量計測 0.05 rps で不要と判明) |
+| P2-F | drop flow 量爆発 | `--verdict=DROPPED` を CLI 側で適用、ingest 前に絞る。NetworkPolicy 導入後は `--allowlist` で namespace 絞り検討 |
 
 ---
 
 ## 次回着手時の推奨順序
 
-1. **P2-B (CP Alloy)** — CP (br-node1〜3) の Pod ログが未収集の最後の穴。2 週間影モード運用が必要。P2-C で CP 大量同時プロビの危険が実証済なので `serial: 1` + 事前シングル検証必須
-2. **P2-F (Hubble flow drop)** — deny された flow のみ Loki に。NetworkPolicy 誤設定切り分け
+1. **P2-F の残り (parsing + label 抽出)** — exporter は稼働中 (#168)。24h 観測後に loki.process で `verdict` / `drop_reason_desc` / src/dst namespace を structured metadata 化。dashboard / alert は NetworkPolicy 導入まで保留
+2. **P2-B (CP Alloy)** — CP (br-node1〜3) の Pod ログが未収集の最後の穴。2 週間影モード運用が必要。P2-C で CP 大量同時プロビの危険が実証済なので `serial: 1` + 事前シングル検証必須
 3. **P2-D (kubeEtcd 動的化)** — 需要ベース (CP 入替時)
 
 ### 観測系 follow-up (別 PR 候補)
@@ -235,11 +259,10 @@ cluster-proxy (public) / internal-proxy (LAN) の access log を OTLP JSON 経�
 - **~~Alloy journal の死活 PrometheusRule~~** ✅ #156
 - **~~Alloy events の死活 PrometheusRule~~** ✅ #159
 - **~~Provisioner playbook に `serial: 1`~~** ✅ #154 (setup_monitoring_agent のみ、他 playbook は未対応)
-- **Cilium socketLB を LB IP にも効かせる (bpf.hostRouting / loadBalancer.acceleration)**: 成功すれば P2-C #152 の per-group URL 分岐を削除できる
-- **internal Gateway / external-dns-coredns の ServiceMonitor** 追加
 - **Cilium socketLB で LB IP hairpin を解決**: `bpf.hostRouting: true` or `loadBalancer.acceleration` 調整で lease holder 自身から LB IP 到達可能にする。成功すれば P2-C (6) の per-group URL 分岐を削除できる
 - **internal Envoy Gateway の ServiceMonitor**: 既存 cluster-gateway と同様のメトリクス収集
 - **external-dns-coredns の ServiceMonitor / monitoring overlay**: cloudflare instance のを mirror
+- **hubble-flow-exporter の死活 PrometheusRule**: `kube_deployment_status_replicas_available{deployment="hubble-flow-exporter"}` ベース。alloy-events (#159) と同パターン。先に drop の baseline rate が見えてからでも可
 
 ---
 
@@ -267,4 +290,6 @@ cluster-proxy (public) / internal-proxy (LAN) の access log を OTLP JSON 経�
   - `manifests/platform/envoy-gateway/monitoring/base/pod-monitor.yaml` (envoy proxy :19001/stats/prometheus)
   - `manifests/platform/kube-prometheus-stack/rules/base/rule-envoy-gateway.yaml` (EnvoyHigh5xxRate / EnvoyProxyNoTraffic)
   - `manifests/platform/grafana/dashboards/custom/json/envoy-access-log.json`
+- **P2-F で追加された主な manifest**:
+  - `manifests/platform/hubble-flow-exporter/` (hubble-relay → stdout → Alloy DS → Loki, `--verdict=DROPPED` CLI filter)
 - **過去インシデント**: `docs/incidents/2026-04-13-observability-cascade.md`
