@@ -15,7 +15,9 @@ ExecStart={{ install_dir }}/node_exporter \
   --web.listen-address=:{{ node_exporter.port }} \
   --collector.hwmon \
   --collector.thermal_zone \
-  --collector.textfile.directory={{ node_exporter.textfile_dir }}
+  --collector.textfile.directory={{ node_exporter.textfile_dir }} \
+  --collector.systemd \
+  --collector.systemd.unit-include='^(alloy|node_exporter|rpi-metrics)\.(service|timer)$'
 
 Restart=always
 RestartSec=5
