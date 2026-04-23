@@ -30,8 +30,11 @@ loki:
     s3:
       endpoint: https://object-storage.cluster-internal.bright-room.net:3900
       region: ap-northeast-1
-      accessKeyId: ${S3_ACCESS_KEY_ID}
-      secretAccessKey: ${S3_SECRET_ACCESS_KEY}
+      # $$ でエスケープして Flux postBuild substitution を回避。
+      # Loki プロセス自身が -config.expand-env=true で env から展開する
+      # ランタイム用プレースホルダなので Flux に触らせない。
+      accessKeyId: $${S3_ACCESS_KEY_ID}
+      secretAccessKey: $${S3_SECRET_ACCESS_KEY}
       s3ForcePathStyle: true
       insecure: false
       http_config:
