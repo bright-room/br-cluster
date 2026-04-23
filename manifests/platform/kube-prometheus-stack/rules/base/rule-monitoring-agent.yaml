@@ -82,3 +82,22 @@ spec:
               Pod 再起動理由 / FailedScheduling / OOMKilled 等の調査情報が
               失われている。
               `kubectl -n alloy-events get pod; kubectl -n alloy-events logs deploy/alloy-events --tail=50`。
+
+        # hubble-flow-exporter Deployment は hubble-relay の DROPPED verdict flow を
+        # stdout に流す 1 replica。stdout は worker DaemonSet Alloy 経由で Loki に
+        # 入る。ここが落ちると drop flow ログが silent に途絶え、NetworkPolicy 導入後の
+        # policy-denied 調査ができなくなる。alloy-events と同じく Deployment 本体は
+        # serviceMonitor を持たないので kube-state-metrics で死活を取る。
+        - alert: HubbleFlowExporterDown
+          expr: |
+            kube_deployment_status_replicas_available{namespace="hubble-flow-exporter", deployment="hubble-flow-exporter"} == 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: hubble-flow-exporter deployment has 0 ready replicas
+            description: |
+              hubble-flow-exporter Deployment (hubble-relay DROPPED flow → Loki シッパー)
+              が 10 分以上 ready replica 0。drop verdict の flow が Loki に入らず、
+              NetworkPolicy 導入後の policy-denied 調査が不可能になる。
+              `kubectl -n hubble-flow-exporter get pod; kubectl -n hubble-flow-exporter logs deploy/hubble-flow-exporter --tail=50`。
