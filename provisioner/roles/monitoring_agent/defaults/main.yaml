@@ -11,9 +11,12 @@ node_exporter:
 # group_vars/all/main.yaml.
 alloy_journal_enabled: false
 alloy_journal:
-  # Internal Envoy Gateway HTTPRoute created in manifests/platform/loki/.
-  # Only reachable from LAN (Cilium LB IP 172.22.10.71).
-  loki_push_url: "http://loki-push.cluster-internal.bright-room.net/loki/api/v1/push"
+  # loki-gateway Service の NodePort を localhost 経由で叩く。internal Envoy
+  # Gateway (172.22.10.71) の LB IP を使うと Cilium L2 announcer の lease
+  # holder ノード自身からの hairpin が失敗する (socketLB が LB IP を redirect
+  # しないため "No route to host") ので、localhost NodePort → eBPF kube-proxy
+  # replacement 経由で backend pod に直接転送する経路を使う。
+  loki_push_url: "http://127.0.0.1:30800/loki/api/v1/push"
   # Alloy HTTP server bound to loopback (metrics / debug UI). Not scraped
   # externally — node_exporter textfile is the metrics surface on these hosts.
   http_listen_addr: "127.0.0.1:12345"
