@@ -40,7 +40,7 @@ flowchart LR
   P2C["P2-C all-node journald<br/>#147 #148 #149 #150 #151 #152"]:::done
   P2D["P2-D kubeEtcd 動的化"]:::done
   P2E["P2-E Envoy access log<br/>#161 #162 #164 #165 #166"]:::done
-  P2F["P2-F Hubble drop flow<br/>#168 (parsing WIP)"]:::p2
+  P2F["P2-F Hubble drop flow<br/>#168 #173 (parsing done)"]:::done
 
   P0A --> P1AC
   P0B --> P0C
@@ -194,14 +194,14 @@ cluster-proxy (public) / internal-proxy (LAN) の access log を OTLP JSON 経�
 - **Envoy Gateway の envoy proxy pod** は `:19001` に自動で `/stats/prometheus` を開いている。PodMonitor `selector.matchLabels.app.kubernetes.io/managed-by=envoy-gateway + component=proxy` で両 Gateway を一網打尽。relabeling で `gateway_name` / `gateway_namespace` を付けると dashboard / alert が書きやすい
 - **低トラフィック環境でのレート系アラート**は divide-by-near-zero を避ける guard が必須。今回は `5xx ratio > 10% AND total rps > 0.5` の AND 条件で 1 件 5xx によるフラップを抑止
 
-## Phase 2-F: Hubble drop flow → Loki (🚧 parsing 完了、dashboard/alert は NetworkPolicy 導入後)
+## Phase 2-F: Hubble drop flow → Loki (✅ parsing 完了、dashboard/alert は NetworkPolicy 導入後)
 
 NetworkPolicy を書き始める前の**事前準備**として、drop verdict の flow を Loki に persist。policy 運用が本格化した瞬間から「誰が誰に何で denied か」が LogQL 一発で引ける状態を作る。
 
 | ID | 内容 | PR |
 |---|---|---|
 | P2-F (1) | hubble-flow-exporter Deployment (1 replica, worker) — hubble-relay gRPC を `--verdict=DROPPED --follow -o json` でストリーム、stdout → 既存 Alloy DS → Loki。cilium image を再利用、hardening 済 (readOnlyRootFS / runAsNonRoot / drop ALL) | [#168](https://github.com/bright-room/br-cluster/pull/168) |
-| P2-F (2) | Alloy DS の `loki.process "pods"` に `stage.match { selector = "{namespace=\"hubble-flow-exporter\"}" }` を追加。`verdict` / `drop_reason_desc` / `src_namespace` / `dst_namespace` / `flow_node` を低カーディナリティ label に、`source_pod` / `dest_pod` を structured metadata に抽出 | TODO |
+| P2-F (2) | Alloy DS の `loki.process "pods"` に `stage.match { selector = "{namespace=\"hubble-flow-exporter\"}" }` を追加。`verdict` / `drop_reason_desc` / `src_namespace` / `dst_namespace` / `flow_node` を低カーディナリティ label に、`source_pod` / `dest_pod` を structured metadata に抽出 | [#173](https://github.com/bright-room/br-cluster/pull/173) |
 | P2-F (3) | Grafana dashboard + PrometheusRule | **NetworkPolicy 導入後まで deferral** (今の drop はノイズしか無いので dashboard / alert を書いても空振り) |
 
 ### P2-F (2) の Go 判定 (2026-04-23)
@@ -278,7 +278,7 @@ PR #168 を 4h21m 稼働させた観察結果が全 Go:
 ## 次回着手時の推奨順序
 
 1. **P2-B phase 2 (3 CP 全台展開)** — br-node2 影モード (#170) が 1〜2 週間安定したら nodeAffinity を外す。他クラスタ変更と重ねない
-2. **P2-F の残り (parsing + label 抽出)** — exporter は稼働中 (#168)。24h 観測後に loki.process で `verdict` / `drop_reason_desc` / src/dst namespace を structured metadata 化。dashboard / alert は NetworkPolicy 導入まで保留
+2. **P2-F phase 3 (dashboard + PrometheusRule)** — 現状はノイズ主体で dashboard が空振りになるので、**NetworkPolicy を書き始めた後**に着手。`policy-denied` verdict が主成分になったタイミングで src/dst namespace 別の denied rate パネル + 急増 alert を入れる
 
 ### 観測系 follow-up (別 PR 候補)
 
