@@ -18,8 +18,12 @@ alloy_journal_enabled: false
 # holder になり得ないのでドメイン経由が安全。
 alloy_journal_loki_push_url: "http://loki-push.cluster-internal.bright-room.net/loki/api/v1/push"
 alloy_journal:
-  # Alloy HTTP server bound to loopback (metrics / debug UI). Not scraped
-  # externally — node_exporter textfile is the metrics surface on these hosts.
-  http_listen_addr: "127.0.0.1:12345"
+  # Alloy HTTP server (内部 metrics / debug UI) を LAN 経由で scrape できるよう
+  # 0.0.0.0:12345 に bind。エンドポイントは
+  # manifests/platform/kube-prometheus-stack/host-monitoring/alloy-* で
+  # EndpointSlice 化し、Prometheus から job=alloy-host として収集する。
+  # gateway ノードは nftables の in_tcp_accept に 12345 を追加済
+  # (inventories/base/host_vars/br-gateway1.yaml)。
+  http_listen_addr: "0.0.0.0:12345"
   config_dir: /etc/alloy
   data_dir: /var/lib/alloy
