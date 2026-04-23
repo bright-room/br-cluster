@@ -1,0 +1,51 @@
+---
+- name: Install peer health check script
+  template:
+    src: check-peers-healthy.sh.j2
+    dest: /usr/local/bin/k3s-leader-restart-check-peers.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install self leader-status check script
+  template:
+    src: check-should-restart.sh.j2
+    dest: /usr/local/bin/k3s-leader-restart-check-self.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install leader-restart entry point
+  template:
+    src: k3s-leader-restart.j2
+    dest: /usr/local/bin/k3s-leader-restart
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install systemd service unit
+  template:
+    src: k3s-leader-restart.service.j2
+    dest: /etc/systemd/system/k3s-leader-restart.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload systemd
+
+- name: Install systemd timer unit
+  template:
+    src: k3s-leader-restart.timer.j2
+    dest: /etc/systemd/system/k3s-leader-restart.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload systemd
+
+- name: Flush handlers so timer reloads before enable
+  meta: flush_handlers
+
+- name: Enable and start leader-restart timer
+  systemd:
+    name: k3s-leader-restart.timer
+    enabled: "{{ k3s_leader_restart.enabled }}"
+    state: "{{ 'started' if k3s_leader_restart.enabled else 'stopped' }}"

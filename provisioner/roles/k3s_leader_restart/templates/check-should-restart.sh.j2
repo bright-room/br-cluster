@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Managed by Ansible (role: k3s_leader_restart). Do not edit manually.
+#
+# Exit 0 (proceed to restart) if this node either:
+#   - holds any of: etcd leader / kube-controller-manager leader /
+#     kube-scheduler leader, OR
+#   - has not been restarted in force_restart_uptime_days days (safety net)
+# Otherwise exit 1 (skip this cycle).
+set -euo pipefail
+
+FORCE_RESTART_UPTIME_DAYS={{ k3s_leader_restart.force_restart_uptime_days }}
+KUBECONFIG={{ k3s.config_dir }}/k3s.yaml
+export KUBECONFIG
+
+SELF=$(hostname)
+
+uptime_days=$(awk '{print int($1/86400)}' /proc/uptime)
+if (( uptime_days > FORCE_RESTART_UPTIME_DAYS )); then
+  echo "uptime ${uptime_days}d > ${FORCE_RESTART_UPTIME_DAYS}d: force restart"
+  exit 0
+fi
+
+etcd_leader=$(curl -sf --max-time 5 http://127.0.0.1:2381/metrics \
+  | awk '/^etcd_server_is_leader / {print $2; exit}')
+
+cm_leader=$(kubectl -n kube-system get lease kube-controller-manager \
+  -o jsonpath='{.spec.holderIdentity}' 2>/dev/null | cut -d_ -f1 || true)
+
+sched_leader=$(kubectl -n kube-system get lease kube-scheduler \
+  -o jsonpath='{.spec.holderIdentity}' 2>/dev/null | cut -d_ -f1 || true)
+
+echo "self=${SELF} etcd_leader=${etcd_leader:-?} cm=${cm_leader:-?} sched=${sched_leader:-?}"
+
+if [[ "${etcd_leader:-0}" == "1" \
+   || "${cm_leader:-}" == "${SELF}" \
+   || "${sched_leader:-}" == "${SELF}" ]]; then
+  echo "holding leader role(s): restart"
+  exit 0
+fi
+
+echo "not a leader: skip"
+exit 1

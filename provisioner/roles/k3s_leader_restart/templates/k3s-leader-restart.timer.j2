@@ -1,0 +1,16 @@
+{% set idx = groups['master'].index(inventory_hostname) %}
+{% set hour = k3s_leader_restart.base_hour + idx %}
+# Managed by Ansible (role: k3s_leader_restart). Do not edit manually.
+#
+# Each master fires on its own hour (base_hour + index in groups['master'])
+# so restarts never overlap. This node: {{ inventory_hostname }} (index {{ idx }}).
+[Unit]
+Description=Daily leader-restart check for k3s
+
+[Timer]
+OnCalendar=*-*-* {{ '%02d' % hour }}:00:00
+RandomizedDelaySec={{ k3s_leader_restart.randomized_delay_sec }}
+Persistent=false
+
+[Install]
+WantedBy=timers.target
