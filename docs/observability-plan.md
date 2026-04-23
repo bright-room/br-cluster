@@ -38,7 +38,7 @@ flowchart LR
   P2A["P2-A K8s events<br/>#157 #158 #159"]:::done
   P2B["P2-B CP Alloy<br/>#170 (shadow WIP)"]:::p2
   P2C["P2-C all-node journald<br/>#147 #148 #149 #150 #151 #152"]:::done
-  P2D["P2-D kubeEtcd 動的化"]:::p2
+  P2D["P2-D kubeEtcd 動的化"]:::done
   P2E["P2-E Envoy access log<br/>#161 #162 #164 #165 #166"]:::done
   P2F["P2-F Hubble drop flow<br/>#168 (parsing WIP)"]:::p2
 
@@ -167,11 +167,13 @@ controller / kubelet / scheduler が emit する K8s Events (Pod OOMKilled / Fai
 | P2-B (1) | 独立 HelmRelease `alloy-cp` を追加、br-node2 のみ影モード稼働 | [#170](https://github.com/bright-room/br-cluster/pull/170) |
 | P2-B (2) | 3 CP 全台展開 (nodeAffinity 解除) | TODO (1〜2 週間観察後) |
 
-### P2-D: kubeEtcd endpoints 動的化 (優先度: 低)
+## Phase 2-D: kubeEtcd endpoints 動的化 ✅ 完了
 
-- **目的**: 現在 `kube-prometheus-stack/app/components/k3s/values.yaml` に CP IP を 3 つハードコード。CP 追加/入替時に手動編集が必要
-- **案**: `servers.yaml` → kustomize plugin or CI スクリプトで生成
-- **リスク**: 低
+`kube-prometheus-stack/app/components/k3s/values.yaml` にハードコードされていた CP 3 IP を撤去し、`servers.yaml` (`k8s_role = primary|secondary`) + 1Password IP から `cluster-forge generate-manifests --env prod` が overlay の `etcd-endpoints.yaml` を生成する構造に変更。CP 追加/入替時は servers.yaml を編集して `make prod/generate-manifests` を回すだけで済む。
+
+| ID | 内容 | PR |
+|---|---|---|
+| P2-D (1) | `cluster_forge.manifest_generator` を新設 (primary + secondary ノードを抽出して kubeEtcd.endpoints を生成)、`generate-manifests --env` CLI + `make prod/generate-manifests` target を追加。overlay 側で configMapGenerator + helm-patch を 2 本 valuesFrom に分岐 | TODO |
 
 ## Phase 2-E: Envoy Gateway アクセスログ + L7 監視 ✅ 完了
 
@@ -258,7 +260,6 @@ NetworkPolicy を書き始める前の**事前準備**として、drop verdict �
 
 1. **P2-B phase 2 (3 CP 全台展開)** — br-node2 影モード (#170) が 1〜2 週間安定したら nodeAffinity を外す。他クラスタ変更と重ねない
 2. **P2-F の残り (parsing + label 抽出)** — exporter は稼働中 (#168)。24h 観測後に loki.process で `verdict` / `drop_reason_desc` / src/dst namespace を structured metadata 化。dashboard / alert は NetworkPolicy 導入まで保留
-3. **P2-D (kubeEtcd 動的化)** — 需要ベース (CP 入替時)
 
 ### 観測系 follow-up (別 PR 候補)
 

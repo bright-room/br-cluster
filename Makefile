@@ -63,6 +63,12 @@ dev/generate-inventory:
 prod/generate-inventory:
 	uv run cluster-forge generate-inventory --env prod
 
+dev/generate-manifests:
+	uv run cluster-forge generate-manifests --env dev
+
+prod/generate-manifests:
+	uv run cluster-forge generate-manifests --env prod
+
 # === Provisioning ===
 # Usage: make dev/provision/setup-node, make prod/provision/k3s-start, etc.
 
