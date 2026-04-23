@@ -9,7 +9,7 @@ spec:
       namespace: envoy-gateway-system
       sectionName: http
   hostnames:
-    - loki-push.cluster-internal.bright-room.net
+    - loki-push.${CLUSTER_INTERNAL_DOMAIN}
   rules:
     - backendRefs:
         - name: loki-gateway
