@@ -20,8 +20,10 @@ now=$(date +%s)
 for name in "${!PEERS[@]}"; do
   ip="${PEERS[$name]}"
 
-  if ! curl -sfk --max-time 5 "https://${ip}:6443/livez" >/dev/null; then
-    echo "FAIL: ${name} (${ip}) apiserver unhealthy" >&2
+  # /livez requires auth on recent k3s, so only verify the apiserver port
+  # is reachable. Substantive health is covered by etcd /health below.
+  if ! timeout 5 bash -c "</dev/tcp/${ip}/6443" 2>/dev/null; then
+    echo "FAIL: ${name} (${ip}) apiserver port 6443 unreachable" >&2
     exit 1
   fi
 
