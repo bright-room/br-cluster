@@ -1,0 +1,27 @@
+# Alloy chart の default RBAC が Events を含むかは app version 依存なので、
+# 確実を期して events get/list/watch を追加で明示する (重複しても害なし)。
+# chart が作る ServiceAccount は alloy-events.alloy-events。
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: alloy-events-watcher
+rules:
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["events.k8s.io"]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: alloy-events-watcher
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: alloy-events-watcher
+subjects:
+  - kind: ServiceAccount
+    name: alloy-events
+    namespace: alloy-events
