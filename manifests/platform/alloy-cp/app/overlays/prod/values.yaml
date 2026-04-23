@@ -1,0 +1,34 @@
+# alloy-cp helm values (prod overlay)
+#
+# Shadow-mode phase 1: target br-node2 only (2nd CP, not primary).
+# Avoid br-node1 (primary CP / etcd cluster-init) and br-node3 (had
+# NotReady incident during P2-C mass provisioning).
+#
+# After 1-2 weeks of stable operation, expand to all 3 CP nodes by
+# replacing nodeAffinity with the control-plane role selector.
+
+controller:
+  nodeSelector:
+    node-role.kubernetes.io/control-plane: "true"
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                  - br-node2
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+alloy:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 300m
+      memory: 192Mi
