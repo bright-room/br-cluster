@@ -65,6 +65,62 @@ alloy:
         // CRI log line format: <time> <stream> <tag> <content>
         // Drop the wrapper, keep the app payload.
         stage.cri { }
+
+        // --- hubble-flow-exporter parsing (P2-F phase 2) ------------------
+        // Extract Hubble drop-flow fields so LogQL can filter/aggregate by
+        // verdict / drop_reason_desc / src_namespace / dst_namespace / flow_node
+        // without parsing JSON at query time. Only runs for the exporter's
+        // namespace; every other namespace's logs pass through unchanged.
+        stage.match {
+          selector = "{namespace=\"hubble-flow-exporter\"}"
+
+          stage.json {
+            expressions = {
+              verdict          = "flow.verdict",
+              drop_reason_desc = "flow.drop_reason_desc",
+              flow_node        = "flow.node_name",
+              source_labels    = "flow.source.labels",
+              dest_labels      = "flow.destination.labels",
+              source_pod       = "flow.source.pod_name",
+              dest_pod         = "flow.destination.pod_name",
+            }
+          }
+
+          // Cilium identity label arrays include the Kubernetes namespace as
+          // a k8s:io.kubernetes.pod.namespace=<ns> entry. Pull it out via regex
+          // on the stringified array (Hubble doesn't expose src/dst ns as a
+          // first-class field).
+          stage.regex {
+            source     = "source_labels"
+            expression = "k8s:io\\.kubernetes\\.pod\\.namespace=(?P<src_namespace>[^\",]+)"
+          }
+          stage.regex {
+            source     = "dest_labels"
+            expression = "k8s:io\\.kubernetes\\.pod\\.namespace=(?P<dst_namespace>[^\",]+)"
+          }
+
+          // Low-cardinality fields → labels. drop_reason_desc ≤ ~30,
+          // verdict ≤ ~10, namespaces ≤ ~25, flow_node ≤ 8.
+          stage.labels {
+            values = {
+              verdict          = "",
+              drop_reason_desc = "",
+              src_namespace    = "",
+              dst_namespace    = "",
+              flow_node        = "",
+            }
+          }
+
+          // High-cardinality fields → structured metadata (indexed per line,
+          // not per stream). Drops where source/dest is a reserved identity
+          // leave these empty which is harmless.
+          stage.structured_metadata {
+            values = {
+              source_pod = "",
+              dest_pod   = "",
+            }
+          }
+        }
       }
 
       loki.source.file "pods" {
