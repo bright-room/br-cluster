@@ -1,7 +1,7 @@
 # 可観測性 拡充 実行プラン + 進捗
 
 `observability-map.md` で合意した 2 つの穴 (通知経路 / ホスト層統一) を埋めるための PR 単位の実行計画。
-**2026-04-23 時点で Phase 0 + Phase 1 + P2-C 完了**。以降は Phase 2 の残り + Phase 3 バックログ。
+**2026-04-23 時点で Phase 0 + Phase 1 + P2-A + P2-C 完了**。以降は Phase 2 の残り + Phase 3 バックログ。
 
 ---
 
@@ -35,7 +35,7 @@ flowchart LR
   P1F["🐛 AM configSecret<br/>#144"]:::done
   P1G["🐛 externalUrl<br/>#145"]:::done
 
-  P2A["P2-A event-exporter"]:::p2
+  P2A["P2-A K8s events<br/>#157 #158 #159"]:::done
   P2B["P2-B CP Alloy"]:::p2
   P2C["P2-C all-node journald<br/>#147 #148 #149 #150 #151 #152"]:::done
   P2D["P2-D kubeEtcd 動的化"]:::p2
@@ -111,6 +111,26 @@ flowchart LR
 
 ---
 
+## Phase 2-A: K8s Events → Loki ✅ 完了
+
+controller / kubelet / scheduler が emit する K8s Events (Pod OOMKilled / FailedScheduling / BackOff / FailedMount / ImagePullError 等) を Loki に永続化。etcd の 1h TTL を超えた事後調査が可能になった。
+
+既存の \`grafana/alloy\` chart を流用し、専用 release (\`alloy-events\`) として 1 replica Deployment で稼働。Pod log tailing の DaemonSet とは独立。
+
+| ID | 内容 | PR |
+|---|---|---|
+| P2-A (1) | alloy-events HelmRelease (Deployment, worker 限定, loki.source.kubernetes_events → loki.write) + ClusterRole (events get/list/watch) を明示 | [#157](https://github.com/bright-room/br-cluster/pull/157) |
+| P2-A (2) | Grafana dashboard "Kubernetes Events" (Observability フォルダ) — hand-written、\`dashboards/custom/\` ディレクトリ新設 (base/ は fetch script 管理、custom/ は手書き) | [#158](https://github.com/bright-room/br-cluster/pull/158) |
+| P2-A (3) | AlloyEventsDown PrometheusRule (kube_deployment_status_replicas_available ベース、10m) を monitoring-agent-health に追加 | [#159](https://github.com/bright-room/br-cluster/pull/159) |
+
+### 派生した設計知見
+
+- **Alloy chart 1 つで複数 release を併存させる**パターンが確立。今後「Alloy の別用途 (Span metric collection 等)」を追加する時も同じ構造で独立デプロイ可能
+- **手書き Grafana dashboard の置き場所**が確立 (\`dashboards/custom/\`)。今後 br-cluster 固有 metric 向けの dashboard は全てここ
+- \`loki.source.kubernetes_events\` の JSON label 抽出 + \`stage.labels\` で \`reason\` / \`type\` / \`namespace\` / \`involved_kind\` を low cardinality labels として index 化、\`involvedObject.name\` は structured metadata に留める設計が機能した
+
+---
+
 ## 2026-04-23 時点で実現していること
 
 - 🔔 **アラート → Discord 通知**が実際に届く (Watchdog / 他 rules / 手動テスト全て確認済)
@@ -122,19 +142,14 @@ flowchart LR
 - 🛡️ 2026-04-13 cascade の原因と対処が `docs/incidents/` に永続化され、以降の設計判断 (worker pin / nodeDownPodDeletionPolicy / Alloy file tailing / GOMEMLIMIT / swap+reserve) の根拠が追える
 - 📓 **全 8 ノードの systemd-journald ログ**が Loki に集約。kubelet / containerd / sshd / kea-dhcp / nftables / garage / chrony 等のホストサービスが `{job="systemd-journal", host="<name>", unit="<svc>"}` で検索可能
 - 🛣️ **内部サービス公開基盤**として internal Envoy Gateway (`*.cluster-internal.bright-room.net`) + external-dns-coredns が稼働、将来の内部向け LAN サービス (event-exporter metrics、追加の API 等) は HTTPRoute 1 枚で公開可能
+- 🧾 **K8s Events** (Pod OOMKilled / FailedScheduling / BackOff / ImagePullError 等) が Loki に集約、専用 dashboard (Observability フォルダの Kubernetes Events) で時系列 / reason / namespace フィルタ可能
+- 📟 **monitoring-agent 系 (Alloy journal / Alloy events / node_exporter / rpi-metrics) の死活監視**が自己完結、silent failure しても Discord に飛んでくる
 
 ---
 
 ## Phase 2: 観測穴埋め (次回以降の候補)
 
 **Phase 2 はどれも単独で価値がある**。1 つずつ判断して着手すればよい。
-
-### P2-A: `kubernetes-event-exporter` 導入 (優先度: 中)
-
-- **目的**: K8s Events (Pod 再起動 / ノード OOM / Pull エラー等) を Loki に流し、時系列でクエリ可能にする。
-- **狙い**: 現状の Pod ログ収集 (Alloy) では拾えない「何があってその Pod が落ちたか」を可視化
-- **構成**: `kubernetes-event-exporter` Deployment → Loki gateway に HTTP push
-- **リスク**: 低 (read-only watcher)
 
 ### P2-B: CP ノードに Alloy DaemonSet 展開 (優先度: 中, 慎重)
 
@@ -197,16 +212,18 @@ flowchart LR
 
 ## 次回着手時の推奨順序
 
-1. **P2-A (event-exporter)** — 導入容易 + 運用価値高い。P2-C で用意した internal Envoy Gateway + Loki push 経路を活用できる
-2. **P2-E (Envoy access log)** — L7 可視化の効果が大きい
-3. **P2-B (CP Alloy)** は 2 週間影モード運用が必要なので、余裕がある時に。P2-C で CP 大量同時プロビの危険が実証済なので `serial: 1` + 事前シングル検証必須
-4. **P2-F / P2-D** は需要が出てから
+1. **P2-E (Envoy access log)** — L7 可視化の効果が大きい。公開トラフィックの 5xx / routing 問題切り分けに効く
+2. **P2-B (CP Alloy)** は 2 週間影モード運用が必要なので、余裕がある時に。P2-C で CP 大量同時プロビの危険が実証済なので `serial: 1` + 事前シングル検証必須
+3. **P2-F / P2-D** は需要が出てから
 
-### P2-C 由来の follow-up (別 PR 候補)
+### 観測系 follow-up (別 PR 候補)
 
-- **Alloy 死活監視 PrometheusRule**: 8 ノードの alloy.service が down / loki push failure rate が閾値超え時にアラート
-- **Alloy 自体のメトリクス収集**: `127.0.0.1:12345` で公開中、node_exporter textfile 経由 or `host-monitoring` ServiceMonitor 拡張で Prometheus に入れる
-- **Provisioner playbook に `serial: 1`**: CP 同時適用による SSH 断対策 (P2-C で br-node3 が死んだ教訓)
+- **Alloy 自体のメトリクス収集**: Alloy journal も events も現状 `serviceMonitor: false`。push failure rate / batch drop 等を集めると silent failure 検知が強化される。`127.0.0.1:12345` を公開するか textfile 経由で
+- **~~Alloy journal の死活 PrometheusRule~~** ✅ #156
+- **~~Alloy events の死活 PrometheusRule~~** ✅ #159
+- **~~Provisioner playbook に `serial: 1`~~** ✅ #154 (setup_monitoring_agent のみ、他 playbook は未対応)
+- **Cilium socketLB を LB IP にも効かせる (bpf.hostRouting / loadBalancer.acceleration)**: 成功すれば P2-C #152 の per-group URL 分岐を削除できる
+- **internal Gateway / external-dns-coredns の ServiceMonitor** 追加
 - **Cilium socketLB で LB IP hairpin を解決**: `bpf.hostRouting: true` or `loadBalancer.acceleration` 調整で lease holder 自身から LB IP 到達可能にする。成功すれば P2-C (6) の per-group URL 分岐を削除できる
 - **internal Envoy Gateway の ServiceMonitor**: 既存 cluster-gateway と同様のメトリクス収集
 - **external-dns-coredns の ServiceMonitor / monitoring overlay**: cloudflare instance のを mirror
@@ -228,4 +245,8 @@ flowchart LR
   - `manifests/platform/external-dns-coredns/` (内部向け DNS プロビジョナ)
   - `manifests/platform/loki/app/base/httproute-internal.yaml` (Loki push 経路)
   - `provisioner/roles/monitoring_agent/tasks/alloy_journal.yaml` + `templates/alloy*.j2`
+- **P2-A で追加された主な manifest**:
+  - `manifests/platform/alloy-events/` (K8s Events → Loki 専用 Alloy Deployment)
+  - `manifests/platform/grafana/dashboards/custom/` (手書き dashboard 置き場、第一号 kubernetes-events.json)
+  - `manifests/platform/kube-prometheus-stack/rules/base/rule-monitoring-agent.yaml` (monitoring-agent 自己監視)
 - **過去インシデント**: `docs/incidents/2026-04-13-observability-cascade.md`
