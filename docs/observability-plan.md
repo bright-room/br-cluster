@@ -1,7 +1,7 @@
 # 可観測性 拡充 実行プラン + 進捗
 
 `observability-map.md` で合意した 2 つの穴 (通知経路 / ホスト層統一) を埋めるための PR 単位の実行計画。
-**2026-04-23 時点で Phase 0 + Phase 1 + P2-A + P2-C + P2-E 完了**。以降は Phase 2 の残り + Phase 3 バックログ。
+**2026-04-23 時点で Phase 0 + Phase 1 + P2-A + P2-C + P2-E 完了、P2-B phase 1 / P2-F phase 1 が影モード稼働中**。以降は Phase 2 の残り + Phase 3 バックログ。
 
 ---
 
@@ -36,7 +36,7 @@ flowchart LR
   P1G["🐛 externalUrl<br/>#145"]:::done
 
   P2A["P2-A K8s events<br/>#157 #158 #159"]:::done
-  P2B["P2-B CP Alloy"]:::p2
+  P2B["P2-B CP Alloy<br/>#170 (shadow WIP)"]:::p2
   P2C["P2-C all-node journald<br/>#147 #148 #149 #150 #151 #152"]:::done
   P2D["P2-D kubeEtcd 動的化"]:::p2
   P2E["P2-E Envoy access log<br/>#161 #162 #164 #165 #166"]:::done
@@ -152,13 +152,20 @@ controller / kubelet / scheduler が emit する K8s Events (Pod OOMKilled / Fai
 
 **Phase 2 はどれも単独で価値がある**。1 つずつ判断して着手すればよい。
 
-### P2-B: CP ノードに Alloy DaemonSet 展開 (優先度: 中, 慎重)
+### P2-B: CP ノードに Alloy DaemonSet 展開 (🚧 phase 1 稼働中 — PR #170 マージ済)
 
 - **目的**: 現状 Alloy が worker のみ (`nodeSelector: node_type=worker`) のため CP (br-node1〜3) の Pod ログが拾えていない
-- **手順**: **影モード必須**
-  - Phase 1: `memory: 64Mi req / 192Mi limit` + CP 限定で 1〜2 週間観察
-  - Phase 2: 問題なければ本番化
+- **設計**: 独立 HelmRelease `alloy-cp` (別 namespace / resource 枠) を追加。worker Alloy DS には一切手を入れず、削除で完全 rollback 可能
+- **phase 1 (稼働中)**: br-node2 1 台限定、`64Mi req / 192Mi limit`、`nodeAffinity` で hostname 固定。OTLP receiver は持たず pod log file tailing のみ (app は CP に乗らない)
+  - br-node1 (primary CP / etcd cluster-init) と br-node3 (P2-C で NotReady 実績) を避けて br-node2 選定
+  - 1〜2 週間の OOM / CP etcd 安定性 / Loki ログ到達を観察
+- **phase 2 (未着手)**: 問題なければ `nodeAffinity` を外して 3 CP 全台に展開。apply は他クラスタ変更と重ねず静かなタイミングで (cascade 教訓)
 - **リスク**: 高 (cascade 再発懸念 — CP は Pi 4B 4GB でメモリ余裕が薄い)
+
+| ID | 内容 | PR |
+|---|---|---|
+| P2-B (1) | 独立 HelmRelease `alloy-cp` を追加、br-node2 のみ影モード稼働 | [#170](https://github.com/bright-room/br-cluster/pull/170) |
+| P2-B (2) | 3 CP 全台展開 (nodeAffinity 解除) | TODO (1〜2 週間観察後) |
 
 ### P2-D: kubeEtcd endpoints 動的化 (優先度: 低)
 
@@ -249,8 +256,8 @@ NetworkPolicy を書き始める前の**事前準備**として、drop verdict �
 
 ## 次回着手時の推奨順序
 
-1. **P2-F の残り (parsing + label 抽出)** — exporter は稼働中 (#168)。24h 観測後に loki.process で `verdict` / `drop_reason_desc` / src/dst namespace を structured metadata 化。dashboard / alert は NetworkPolicy 導入まで保留
-2. **P2-B (CP Alloy)** — CP (br-node1〜3) の Pod ログが未収集の最後の穴。2 週間影モード運用が必要。P2-C で CP 大量同時プロビの危険が実証済なので `serial: 1` + 事前シングル検証必須
+1. **P2-B phase 2 (3 CP 全台展開)** — br-node2 影モード (#170) が 1〜2 週間安定したら nodeAffinity を外す。他クラスタ変更と重ねない
+2. **P2-F の残り (parsing + label 抽出)** — exporter は稼働中 (#168)。24h 観測後に loki.process で `verdict` / `drop_reason_desc` / src/dst namespace を structured metadata 化。dashboard / alert は NetworkPolicy 導入まで保留
 3. **P2-D (kubeEtcd 動的化)** — 需要ベース (CP 入替時)
 
 ### 観測系 follow-up (別 PR 候補)
@@ -292,4 +299,6 @@ NetworkPolicy を書き始める前の**事前準備**として、drop verdict �
   - `manifests/platform/grafana/dashboards/custom/json/envoy-access-log.json`
 - **P2-F で追加された主な manifest**:
   - `manifests/platform/hubble-flow-exporter/` (hubble-relay → stdout → Alloy DS → Loki, `--verdict=DROPPED` CLI filter)
+- **P2-B (phase 1) で追加された主な manifest**:
+  - `manifests/platform/alloy-cp/` (独立 HelmRelease、CP 限定影モード、br-node2 only)
 - **過去インシデント**: `docs/incidents/2026-04-13-observability-cascade.md`
