@@ -21,3 +21,10 @@ gpu_memory_mb: 16
 storage_mode: none
 os_partition_size_mib: 65536  # 64 GiB
 mount_opts: "defaults,noatime,discard,nofail"
+
+##################################
+# Monitoring agent
+##################################
+# Ship systemd-journald to Loki via the internal Envoy Gateway (P2-C).
+# Applies to every host in the br_cluster group (k3s + gateway + external).
+alloy_journal_enabled: true

@@ -9,3 +9,4 @@ versions:
   coredns: "1.14.2"
   certbot: "5.4.0"
   node_exporter: "1.11.0"
+  alloy: "1.15.1"

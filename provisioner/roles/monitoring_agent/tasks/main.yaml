@@ -6,3 +6,8 @@
 - name: Install rpi-metrics timer (textfile collector source)
   include_tasks: rpi_metrics.yaml
   tags: [rpi_metrics]
+
+- name: Install Alloy (systemd-journald → Loki)
+  include_tasks: alloy_journal.yaml
+  when: alloy_journal_enabled | bool
+  tags: [alloy_journal]

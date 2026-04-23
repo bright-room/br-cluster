@@ -96,6 +96,14 @@ gateway:
   replicas: 1
   nginxConfig:
     resolver: coredns.kube-system.svc.cluster.local.
+  # NodePort で host の Alloy から push できるようにする。
+  # LB IP 経由だと Cilium L2 announcer の lease holder ノード自身からの
+  # hairpin が成立せず "No route to host" になるため (socketLB が LB IP
+  # を redirect しない)。localhost:NodePort なら eBPF kube-proxy
+  # replacement が local backend pod に直接転送するので ARP 不要。
+  service:
+    type: NodePort
+    nodePort: 30800
 
 chunksCache:
   enabled: false

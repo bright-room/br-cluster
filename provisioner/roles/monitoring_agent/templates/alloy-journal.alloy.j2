@@ -1,0 +1,49 @@
+// Grafana Alloy config — systemd-journald shipper to Loki (P2-C).
+// Managed by monitoring_agent role; edits will be overwritten.
+
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+// --- systemd-journald source -----------------------------------------------
+
+loki.source.journal "host" {
+  // Catch up on boot within this window; older entries are skipped on first
+  // start so a long-idle host doesn't flood Loki.
+  max_age       = "1h"
+  relabel_rules = loki.relabel.journal.rules
+  forward_to    = [loki.write.default.receiver]
+  labels        = {
+    job  = "systemd-journal",
+    host = "{{ inventory_hostname }}",
+  }
+}
+
+// Promote a small, stable set of journal fields to labels. Labels with unbounded
+// cardinality (_PID, _SYSTEMD_INVOCATION_ID, MESSAGE_ID, …) are intentionally
+// left as structured metadata — they remain queryable via LogQL but don't blow
+// up Loki's index.
+loki.relabel "journal" {
+  forward_to = []
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+  rule {
+    source_labels = ["__journal_priority_keyword"]
+    target_label  = "priority"
+  }
+  rule {
+    source_labels = ["__journal__transport"]
+    target_label  = "transport"
+  }
+}
+
+// --- Sink -------------------------------------------------------------------
+
+loki.write "default" {
+  endpoint {
+    url = "{{ alloy_journal.loki_push_url }}"
+  }
+}
