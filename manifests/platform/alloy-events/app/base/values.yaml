@@ -1,0 +1,108 @@
+# alloy helm values — dedicated instance for shipping K8s Events to Loki (P2-A)
+#
+# 既存の alloy DaemonSet (Pod log tailing) とは別インスタンスを立てる:
+#   - controller: deployment (単一レプリカ、DS ではない) — K8s Events は
+#     cluster-wide なので 1 つ出すだけで十分、むしろ重複送信したくない
+#   - RBAC: events を全 namespace で list/watch する必要あり
+#   - sink: loki-gateway ClusterIP 直叩き (pod 内なので internal Gateway
+#     経由する必要なし、NodePort も不要)
+#
+# 参考: docs/observability-plan.md §P2-A
+
+alloy:
+  configMap:
+    create: true
+    content: |
+      logging {
+        level  = "info"
+        format = "logfmt"
+      }
+
+      // --- K8s Events source --------------------------------------------------
+      // kube-apiserver を watch し、Event object を log line (JSON) として emit。
+      // 全 namespace を対象 (namespaces 引数を省略するとデフォルトで全部)。
+
+      loki.source.kubernetes_events "default" {
+        job_name   = "kubernetes-events"
+        log_format = "json"
+        forward_to = [loki.process.events.receiver]
+      }
+
+      // --- Event → 構造化ラベル付与 ------------------------------------------
+      // JSON body から namespace / kind / reason / type を抜き出してラベル化。
+      // involvedObject は Event が指す対象リソース (Pod, Node, PVC, etc.)。
+      // kind / namespace / reason / type は低カーディナリティなのでラベル化
+      // しても index が爆発しない。
+
+      loki.process "events" {
+        forward_to = [loki.write.default.receiver]
+
+        stage.json {
+          expressions = {
+            type             = "type",
+            reason           = "reason",
+            involved_kind    = "involvedObject.kind",
+            involved_name    = "involvedObject.name",
+            involved_ns      = "involvedObject.namespace",
+          }
+        }
+
+        // involved_name は Pod 名などで高カーディナリティなのでラベルにしない。
+        // LogQL で parse して検索できる形のまま残す。
+        stage.labels {
+          values = {
+            type          = "",
+            reason        = "",
+            involved_kind = "",
+            namespace     = "involved_ns",
+          }
+        }
+
+        stage.static_labels {
+          values = {
+            job = "kubernetes-events",
+          }
+        }
+      }
+
+      // --- Sink ---------------------------------------------------------------
+      // pod 内なので ClusterIP 直で OK。internal Gateway 経由も NodePort も不要。
+
+      loki.write "default" {
+        endpoint {
+          url = "http://loki-gateway.loki.svc.cluster.local/loki/api/v1/push"
+        }
+      }
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 192Mi
+
+# 単一レプリカの Deployment。K8s Events は cluster-wide なので DS は不要かつ
+# 重複送信になるので避ける。leader election は無いが 1 replica なら問題なし。
+controller:
+  type: deployment
+  replicas: 1
+  # worker 限定 (P2-B 方針と整合、CP 負荷を追加しない)
+  nodeSelector:
+    node_type: worker
+
+# K8s Events を list/watch するため RBAC が必要。chart の default ClusterRole
+# は core/Events API を含んでいるので rbac.create: true で十分 (contents:
+# get/list/watch on events.k8s.io + core/v1/events)。
+rbac:
+  create: true
+
+serviceAccount:
+  create: true
+
+# Deployment なので DS 特有の host mount は全部無効。
+service:
+  enabled: false
+
+serviceMonitor:
+  enabled: false
