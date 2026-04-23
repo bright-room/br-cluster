@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: host-alloy
+spec:
+  endpoints:
+    - port: metrics
+      interval: 30s
+      relabelings:
+        # ノード名を instance label に寄せる (host-nodes と同じ方針)。
+        - sourceLabels: [__meta_kubernetes_endpointslice_endpoint_node_name]
+          targetLabel: instance
+        # in-cluster DaemonSet/Deployment の alloy と区別するため
+        # job=alloy-host に命名。dashboard / alert で job 軸で切り替え可能。
+        - targetLabel: job
+          replacement: alloy-host
+  selector:
+    matchLabels:
+      app: host-alloy

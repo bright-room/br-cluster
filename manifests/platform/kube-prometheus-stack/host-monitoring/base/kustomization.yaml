@@ -4,3 +4,6 @@ resources:
   - endpoints.yaml
   - service.yaml
   - service-monitor.yaml
+  - alloy-endpoints.yaml
+  - alloy-service.yaml
+  - alloy-service-monitor.yaml
