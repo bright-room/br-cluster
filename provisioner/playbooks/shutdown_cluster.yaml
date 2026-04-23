@@ -1,0 +1,58 @@
+---
+# Ordered cluster shutdown.
+#
+# Order: worker -> master (control-plane) -> external -> gateway.
+#
+# gateway (br-gateway1) is the internet entry point for every other host.
+# If any earlier tier fails, we must NOT shut it down: losing the gateway
+# while other nodes are in an inconsistent state would leave the whole
+# cluster unreachable from outside and make recovery painful.
+#
+# any_errors_fatal on the first three plays aborts the playbook before the
+# gateway play runs, leaving br-gateway1 up for recovery access.
+
+- name: Shutdown workers
+  hosts: worker
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Power off worker
+      community.general.shutdown:
+        msg: "Cluster shutdown initiated by ansible"
+        delay: 5
+
+- name: Shutdown control-plane
+  hosts: master
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  # Shut masters one at a time so etcd quorum stays healthy long enough
+  # for a clean leader step-down on each node.
+  serial: 1
+  tasks:
+    - name: Power off control-plane node
+      community.general.shutdown:
+        msg: "Cluster shutdown initiated by ansible"
+        delay: 5
+
+- name: Shutdown external services
+  hosts: external
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Power off external node
+      community.general.shutdown:
+        msg: "Cluster shutdown initiated by ansible"
+        delay: 5
+
+- name: Shutdown gateway
+  hosts: gateway
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Power off gateway
+      community.general.shutdown:
+        msg: "Cluster shutdown initiated by ansible"
+        delay: 5
