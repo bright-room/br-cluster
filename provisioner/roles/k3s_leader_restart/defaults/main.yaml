@@ -1,0 +1,15 @@
+---
+k3s_leader_restart:
+  enabled: true
+  # Base hour (UTC+0900 on node local time). Each master gets base_hour + its
+  # index in groups['master'] so restarts never overlap.
+  base_hour: 3
+  # Randomization window applied to each timer firing.
+  randomized_delay_sec: 900
+  # Abort if any peer's etcd process started less than this many seconds ago.
+  # Prevents cascade restarts (a peer restart moves leadership, then the new
+  # leader's timer would fire and restart again).
+  min_peer_uptime_sec: 14400
+  # Safety net: if this node hasn't been restarted in this many days, restart
+  # regardless of leader status so no node accumulates skew indefinitely.
+  force_restart_uptime_days: 30
