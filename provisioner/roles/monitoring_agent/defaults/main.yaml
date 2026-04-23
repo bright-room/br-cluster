@@ -10,13 +10,14 @@ node_exporter:
 # the role can still be applied in isolation; enabled for br_cluster via
 # group_vars/all/main.yaml.
 alloy_journal_enabled: false
+# Loki push 先 URL (デフォルトはクラスタ外ノード向け = internal Gateway ドメイン)。
+# k3s ノードは group_vars/clusters.yaml で localhost NodePort に上書きする。
+# 分ける理由: k3s ノードだと LB IP (172.22.10.71) への自ノード hairpin が
+# Cilium L2 lease holder で失敗するため NodePort + eBPF kube-proxy で回避。
+# 逆に gateway / external は k8s 外なので NodePort が使えず、かつ lease
+# holder になり得ないのでドメイン経由が安全。
+alloy_journal_loki_push_url: "http://loki-push.cluster-internal.bright-room.net/loki/api/v1/push"
 alloy_journal:
-  # loki-gateway Service の NodePort を localhost 経由で叩く。internal Envoy
-  # Gateway (172.22.10.71) の LB IP を使うと Cilium L2 announcer の lease
-  # holder ノード自身からの hairpin が失敗する (socketLB が LB IP を redirect
-  # しないため "No route to host") ので、localhost NodePort → eBPF kube-proxy
-  # replacement 経由で backend pod に直接転送する経路を使う。
-  loki_push_url: "http://127.0.0.1:30800/loki/api/v1/push"
   # Alloy HTTP server bound to loopback (metrics / debug UI). Not scraped
   # externally — node_exporter textfile is the metrics surface on these hosts.
   http_listen_addr: "127.0.0.1:12345"
