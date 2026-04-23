@@ -165,12 +165,15 @@ controller / kubelet / scheduler が emit する K8s Events (Pod OOMKilled / Fai
 - **案**: `servers.yaml` → kustomize plugin or CI スクリプトで生成
 - **リスク**: 低
 
-### P2-E: Envoy Gateway アクセスログ → Loki (優先度: 中)
+### P2-E: Envoy Gateway アクセスログ → Loki (優先度: 中 / 進行中)
 
 - **目的**: HTTP 5xx / L7 ルーティング問題の切り分け。Hubble flow は L3/4 のみ
-- **構成**: `EnvoyProxy.telemetry.accessLog` で OTLP export → Alloy → Loki
-- **サンプリング**: 初手は **5xx のみ** or **全件の 10%** で様子見
-- **リスク**: 中 (高頻度リクエスト環境だと Loki ingestion を圧迫)
+- **構成 (実装済)**: `EnvoyProxy.telemetry.accessLog` で **OTLP JSON** export → opentelemetry-collector (既存 logs pipeline) → Loki OTLP 受信。cluster-proxy / internal-proxy の両方で `service.name=envoy-access-log`、JSON フィールド (method / path / response_code / duration / authority / upstream_cluster / trace_id ...) は Loki の structured metadata として `sum by (response_code) (rate(...))` で直接集計可能
+- **進捗**:
+  - cluster-proxy を OTLP JSON 化 [#161](https://github.com/bright-room/br-cluster/pull/161)
+  - internal-proxy に同等設定をミラー [#162](https://github.com/bright-room/br-cluster/pull/162)
+  - 量計測: cluster-proxy **0.04 rps**, internal-proxy **0.009 rps**, 5xx はゼロ。想定 ~2 MB/day で **サンプリング不要** と判断。2 桁 rps に達したら再評価
+- **残タスク**: Grafana dashboard (`dashboards/custom/envoy-access-log.json`) / PrometheusRule (`EnvoyHigh5xxRate`)
 
 ### P2-F: Hubble flow log → Loki (優先度: 低)
 
