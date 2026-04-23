@@ -4,3 +4,4 @@ namespace: grafana
 
 resources:
   - ../../base
+  - ../../custom
