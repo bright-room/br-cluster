@@ -5,3 +5,17 @@ node_exporter:
   # coexist on the same node — see docs/observability-plan.md P1-A.
   port: 9101
   textfile_dir: /run/node_exporter/textfile
+
+# Grafana Alloy shipping systemd-journald → Loki (P2-C). Off by default so
+# the role can still be applied in isolation; enabled for br_cluster via
+# group_vars/all/main.yaml.
+alloy_journal_enabled: false
+alloy_journal:
+  # Internal Envoy Gateway HTTPRoute created in manifests/platform/loki/.
+  # Only reachable from LAN (Cilium LB IP 172.22.10.71).
+  loki_push_url: "http://loki-push.cluster-internal.bright-room.net/loki/api/v1/push"
+  # Alloy HTTP server bound to loopback (metrics / debug UI). Not scraped
+  # externally — node_exporter textfile is the metrics surface on these hosts.
+  http_listen_addr: "127.0.0.1:12345"
+  config_dir: /etc/alloy
+  data_dir: /var/lib/alloy
