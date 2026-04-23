@@ -272,6 +272,17 @@ NetworkPolicy を書き始める前の**事前準備**として、drop verdict �
 - **external-dns-coredns の ServiceMonitor / monitoring overlay**: cloudflare instance のを mirror
 - **hubble-flow-exporter の死活 PrometheusRule**: `kube_deployment_status_replicas_available{deployment="hubble-flow-exporter"}` ベース。alloy-events (#159) と同パターン。先に drop の baseline rate が見えてからでも可
 
+### トポロジー情報の単一 source of truth 化 (P2-D follow-up)
+
+P2-D で kubeEtcd endpoints は `cluster-forge generate-manifests` 経由で servers.yaml + 1Password に寄せたが、他の manifest には依然として IP / ホスト情報がハードコードされた場所がある。per-consumer に YAML fragment 生成を増やすと「新しい consumer を足すたびに cluster-forge の Python 側に生成関数を追加」コストが嵩むため、**個数固定のスカラー値は `cluster-settings.yaml` + Flux postBuild `${VAR}` に寄せる**路線で follow-up する。
+
+想定する移行順:
+
+1. **kubeEtcd endpoints を postBuild 化** — P2-D で per-consumer 生成にした `etcd-endpoints.yaml` を、`cluster-settings.yaml` の `BR_NODE{1,2,3}_IP` + `components/k3s/values.yaml` 内 `${BR_NODE1_IP}` に置換。CP 台数変更時は cluster-settings.yaml と values.yaml のリストを両方手で触ることになるが、変更頻度が低いので許容
+2. **`cluster-settings.yaml` を `cluster-forge generate-manifests` 生成に寄せる** — servers.yaml + 1Password から `BR_*_IP` / `CLOUDFLARED_TUNNEL_ID` 等を自動生成。既存の固定値 (`CLUSTER_DOMAIN` / `TRUSTED_INTERNAL_POD_CIDR` 等) をどこに書くかは要設計 (servers.yaml か専用の `cluster-config.yaml` か)
+3. **`host-monitoring/base/endpoints.yaml` の 8 host IP を整理** — リスト値なので postBuild では表現しきれない。cluster-forge の per-consumer 生成 (P2-D と同じパターン) か、`cluster_hosts.yaml` と共通化する kustomize plugin を検討
+4. **`provisioner/inventories/base/group_vars/all/network.yaml` の `KUBE_VIP_ADDRESS` と `cluster-settings.yaml` の重複解消** — source of truth を片方に寄せ、もう片方は生成
+
 ---
 
 ## 関連ファイル
