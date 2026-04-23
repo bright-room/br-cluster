@@ -14,3 +14,20 @@ spec:
   path: ./manifests/platform/alloy-events/app/overlays/prod
   prune: true
   timeout: 5m
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: alloy-events-monitoring
+  namespace: flux-system
+spec:
+  interval: 30m
+  targetNamespace: alloy-events
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  dependsOn:
+    - name: alloy-events-app
+    - name: kube-prometheus-stack-app
+  path: ./manifests/platform/alloy-events/monitoring/overlays/prod
+  prune: true
