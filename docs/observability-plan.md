@@ -287,7 +287,6 @@ PR #168 を 4h21m 稼働させた観察結果が全 Go:
 - **~~Alloy events の死活 PrometheusRule~~** ✅ #159
 - **~~Provisioner playbook に `serial: 1`~~** ✅ #154 (setup_monitoring_agent のみ、他 playbook は未対応)
 - **Cilium socketLB で LB IP hairpin を解決**: `bpf.hostRouting: true` or `loadBalancer.acceleration` 調整で lease holder 自身から LB IP 到達可能にする。成功すれば P2-C (6) の per-group URL 分岐を削除できる
-- **internal Envoy Gateway の ServiceMonitor**: 既存 cluster-gateway と同様のメトリクス収集
 - **external-dns-coredns の ServiceMonitor / monitoring overlay**: cloudflare instance のを mirror
 - **hubble-flow-exporter の死活 PrometheusRule**: `kube_deployment_status_replicas_available{deployment="hubble-flow-exporter"}` ベース。alloy-events (#159) と同パターン。先に drop の baseline rate が見えてからでも可
 
