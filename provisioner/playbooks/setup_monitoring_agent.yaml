@@ -9,6 +9,15 @@
   hosts: br_cluster
   gather_facts: true
   become: true
+  # Canary rollout: 1 ホスト先行 → その後 3 台並列。Pi 4GB CP に新規
+  # systemd サービス (バイナリ DL + extract + daemon-reload + restart) を
+  # 同時展開するとリソースピークで SSH 断 + NotReady が起きる (2026-04-13
+  # vcgencmd / 2026-04-23 Alloy install の 2 回実証済)。
+  # [1, 3] で 8 ホストなら 1 → 3 → 3 → 1 の 4 バッチ、CP 3 台が完全同時に
+  # なることはない。canary がコケたら以降はユーザー判断で止める前提。
+  serial:
+    - 1
+    - 3
 
   roles:
     - name: Monitoring agent (node_exporter)
