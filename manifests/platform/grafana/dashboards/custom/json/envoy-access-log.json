@@ -360,7 +360,7 @@
         {
           "datasource": {"type": "loki", "uid": "loki"},
           "editorMode": "code",
-          "expr": "{service_name=\"envoy-access-log\"} | envoy_proxy_name=~\"$proxy\" | authority=~\"$authority\" | response_code=~\"5..\"",
+          "expr": "{service_name=\"envoy-access-log\"} | envoy_proxy_name=~\"$proxy\" | authority=~\"$authority\" | response_code=~\"5..\" | line_format \"{{.method}} {{.response_code}} ({{.response_code_details}}) {{.authority}}{{.path}} {{.duration}}ms flags={{.response_flags}} up={{.upstream_cluster}}->{{.upstream_host}} req_id={{.request_id}}\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -387,7 +387,7 @@
         {
           "datasource": {"type": "loki", "uid": "loki"},
           "editorMode": "code",
-          "expr": "{service_name=\"envoy-access-log\"} | envoy_proxy_name=~\"$proxy\" | authority=~\"$authority\"",
+          "expr": "{service_name=\"envoy-access-log\"} | envoy_proxy_name=~\"$proxy\" | authority=~\"$authority\" | line_format \"{{.method}} {{.response_code}} {{.authority}}{{.path}} {{.duration}}ms up={{.upstream_cluster}}\"",
           "queryType": "range",
           "refId": "A"
         }
