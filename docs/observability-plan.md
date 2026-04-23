@@ -282,13 +282,13 @@ PR #168 を 4h21m 稼働させた観察結果が全 Go:
 
 ### 観測系 follow-up (別 PR 候補)
 
-- **Alloy 自体のメトリクス収集**: Alloy journal も events も現状 `serviceMonitor: false`。push failure rate / batch drop 等を集めると silent failure 検知が強化される。`127.0.0.1:12345` を公開するか textfile 経由で
+- **~~Alloy 自体のメトリクス収集~~** ✅ #178 (alloy-events / alloy-cp に serviceMonitor 有効化), #179 (systemd Alloy を 0.0.0.0:12345 bind + host-alloy SM、全 8 ノード `up=1` 確認済)
 - **~~Alloy journal の死活 PrometheusRule~~** ✅ #156
 - **~~Alloy events の死活 PrometheusRule~~** ✅ #159
 - **~~Provisioner playbook に `serial: 1`~~** ✅ #154 (setup_monitoring_agent のみ、他 playbook は未対応)
 - **Cilium socketLB で LB IP hairpin を解決**: `bpf.hostRouting: true` or `loadBalancer.acceleration` 調整で lease holder 自身から LB IP 到達可能にする。成功すれば P2-C (6) の per-group URL 分岐を削除できる
-- **external-dns-coredns の ServiceMonitor / monitoring overlay**: cloudflare instance のを mirror
-- **hubble-flow-exporter の死活 PrometheusRule**: `kube_deployment_status_replicas_available{deployment="hubble-flow-exporter"}` ベース。alloy-events (#159) と同パターン。先に drop の baseline rate が見えてからでも可
+- **~~external-dns-coredns の ServiceMonitor / monitoring overlay~~** ✅ #177 (cloudflare instance と同パターンで Flux Kustomization 分離)
+- **~~hubble-flow-exporter の死活 PrometheusRule~~** ✅ #175 (alloy-events と同パターン、`kube_deployment_status_replicas_available` ベース)
 
 ### トポロジー情報の単一 source of truth 化 (P2-D follow-up)
 
