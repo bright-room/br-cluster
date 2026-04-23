@@ -62,3 +62,23 @@ spec:
               スロットル / 電圧 textfile が更新停止しており、RPi rules
               (NodeTempHigh / NodeThrottled 等) が silent に発火しなくなる。
               `ssh {{ $labels.instance }} 'systemctl status rpi-metrics.timer rpi-metrics.service'`。
+
+        # alloy-events Deployment は K8s Events を Loki に流す専用 1 replica。
+        # ここが落ちると Pod OOMKilled / FailedScheduling 等の cluster-wide
+        # イベントが Loki に入らず silent に失われる (etcd に 1h しか残らない)。
+        # kube-state-metrics の deployment_status_replicas_available を使う。
+        # Deployment 本体の up{} scrape は serviceMonitor=false で無いため。
+        - alert: AlloyEventsDown
+          expr: |
+            kube_deployment_status_replicas_available{namespace="alloy-events", deployment="alloy-events"} == 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: alloy-events deployment has 0 ready replicas
+            description: |
+              alloy-events Deployment (K8s Events → Loki シッパー) が 10 分以上
+              ready replica 0。このクラスタの K8s Events が Loki に流れておらず、
+              Pod 再起動理由 / FailedScheduling / OOMKilled 等の調査情報が
+              失われている。
+              `kubectl -n alloy-events get pod; kubectl -n alloy-events logs deploy/alloy-events --tail=50`。
