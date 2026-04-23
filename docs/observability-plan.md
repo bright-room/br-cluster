@@ -1,7 +1,7 @@
 # 可観測性 拡充 実行プラン + 進捗
 
 `observability-map.md` で合意した 2 つの穴 (通知経路 / ホスト層統一) を埋めるための PR 単位の実行計画。
-**2026-04-23 時点で Phase 0 + Phase 1 + P2-A + P2-C 完了**。以降は Phase 2 の残り + Phase 3 バックログ。
+**2026-04-23 時点で Phase 0 + Phase 1 + P2-A + P2-C + P2-E 完了**。以降は Phase 2 の残り + Phase 3 バックログ。
 
 ---
 
@@ -39,7 +39,7 @@ flowchart LR
   P2B["P2-B CP Alloy"]:::p2
   P2C["P2-C all-node journald<br/>#147 #148 #149 #150 #151 #152"]:::done
   P2D["P2-D kubeEtcd 動的化"]:::p2
-  P2E["P2-E Envoy access log"]:::p2
+  P2E["P2-E Envoy access log<br/>#161 #162 #164 #165 #166"]:::done
   P2F["P2-F Hubble flow log"]:::p2
 
   P0A --> P1AC
@@ -144,6 +144,7 @@ controller / kubelet / scheduler が emit する K8s Events (Pod OOMKilled / Fai
 - 🛣️ **内部サービス公開基盤**として internal Envoy Gateway (`*.cluster-internal.bright-room.net`) + external-dns-coredns が稼働、将来の内部向け LAN サービス (event-exporter metrics、追加の API 等) は HTTPRoute 1 枚で公開可能
 - 🧾 **K8s Events** (Pod OOMKilled / FailedScheduling / BackOff / ImagePullError 等) が Loki に集約、専用 dashboard (Observability フォルダの Kubernetes Events) で時系列 / reason / namespace フィルタ可能
 - 📟 **monitoring-agent 系 (Alloy journal / Alloy events / node_exporter / rpi-metrics) の死活監視**が自己完結、silent failure しても Discord に飛んでくる
+- 🛰️ **Envoy Gateway L7 観測**: cluster-proxy / internal-proxy の access log が OTLP JSON で Loki に集約 (`{service_name="envoy-access-log"}`, structured metadata で `response_code` / `authority` / `path` / `duration` 直接集計)、proxy の `/stats/prometheus` を `envoy-proxy` PodMonitor で scrape、`EnvoyHigh5xxRate` / `EnvoyProxyNoTraffic` アラート稼働、Observability フォルダの "Envoy Access Log" dashboard で 5xx / レイテンシ / top authority・path を即時可視化
 
 ---
 
@@ -165,15 +166,24 @@ controller / kubelet / scheduler が emit する K8s Events (Pod OOMKilled / Fai
 - **案**: `servers.yaml` → kustomize plugin or CI スクリプトで生成
 - **リスク**: 低
 
-### P2-E: Envoy Gateway アクセスログ → Loki (優先度: 中 / 進行中)
+## Phase 2-E: Envoy Gateway アクセスログ + L7 監視 ✅ 完了
 
-- **目的**: HTTP 5xx / L7 ルーティング問題の切り分け。Hubble flow は L3/4 のみ
-- **構成 (実装済)**: `EnvoyProxy.telemetry.accessLog` で **OTLP JSON** export → opentelemetry-collector (既存 logs pipeline) → Loki OTLP 受信。cluster-proxy / internal-proxy の両方で `service.name=envoy-access-log`、JSON フィールド (method / path / response_code / duration / authority / upstream_cluster / trace_id ...) は Loki の structured metadata として `sum by (response_code) (rate(...))` で直接集計可能
-- **進捗**:
-  - cluster-proxy を OTLP JSON 化 [#161](https://github.com/bright-room/br-cluster/pull/161)
-  - internal-proxy に同等設定をミラー [#162](https://github.com/bright-room/br-cluster/pull/162)
-  - 量計測: cluster-proxy **0.04 rps**, internal-proxy **0.009 rps**, 5xx はゼロ。想定 ~2 MB/day で **サンプリング不要** と判断。2 桁 rps に達したら再評価
-- **残タスク**: Grafana dashboard (`dashboards/custom/envoy-access-log.json`) / PrometheusRule (`EnvoyHigh5xxRate`)
+cluster-proxy (public) / internal-proxy (LAN) の access log を OTLP JSON 経路で Loki に集約、さらに Envoy proxy 自身の `/stats/prometheus` を PodMonitor でスクレイプして **5xx 比率ベースのアラート**を稼働させた。
+
+| ID | 内容 | PR |
+|---|---|---|
+| P2-E (1) | cluster-proxy の access log を Text → OTLP JSON に切替、`service.name=envoy-access-log` 付与 | [#161](https://github.com/bright-room/br-cluster/pull/161) |
+| P2-E (2) | internal-proxy に同等設定をミラー、経路統一 | [#162](https://github.com/bright-room/br-cluster/pull/162) |
+| P2-E (3) | 量計測 (cluster-proxy 0.04 rps / internal 0.009 rps, 5xx ゼロ, ~2 MB/day) → **サンプリング不要** 判断、plan に記録 | [#163](https://github.com/bright-room/br-cluster/pull/163) |
+| P2-E (4) | Grafana "Envoy Access Log" dashboard (8 panel: QPS / 5xx / duration quantiles / top authority / top path-by-5xx / top upstream-by-5xx / logs) | [#164](https://github.com/bright-room/br-cluster/pull/164) |
+| P2-E (5) | ⚠️ OTLP JSON log は Loki body が空になる罠を logs panel の `line_format` で再構成 | [#165](https://github.com/bright-room/br-cluster/pull/165) |
+| P2-E (6) | Envoy proxy の `:19001/stats/prometheus` を `envoy-proxy` PodMonitor でスクレイプ、`EnvoyHigh5xxRate` (10% かつ 0.5 rps 10m) + `EnvoyProxyNoTraffic` (scrape 欠損 10m) の PrometheusRule 追加 | [#166](https://github.com/bright-room/br-cluster/pull/166) |
+
+### 派生した設計知見
+
+- **OTLP JSON → Loki は body 空 + structured metadata** のマッピングになる (OTLP semantic convention 通り)。集計クエリ (`sum by (response_code) (rate(...))`, `| unwrap duration`) は parser 不要で素直になる反面、Grafana logs panel は body 描画なので `| line_format` での再構成が必須。次回 OTLP JSON log を Loki に通す時は、dashboard を書く前に `curl /loki/api/v1/query_range ... | limit=1` で body を確認するのが手戻り最小
+- **Envoy Gateway の envoy proxy pod** は `:19001` に自動で `/stats/prometheus` を開いている。PodMonitor `selector.matchLabels.app.kubernetes.io/managed-by=envoy-gateway + component=proxy` で両 Gateway を一網打尽。relabeling で `gateway_name` / `gateway_namespace` を付けると dashboard / alert が書きやすい
+- **低トラフィック環境でのレート系アラート**は divide-by-near-zero を避ける guard が必須。今回は `5xx ratio > 10% AND total rps > 0.5` の AND 条件で 1 件 5xx によるフラップを抑止
 
 ### P2-F: Hubble flow log → Loki (優先度: 低)
 
@@ -215,9 +225,9 @@ controller / kubelet / scheduler が emit する K8s Events (Pod OOMKilled / Fai
 
 ## 次回着手時の推奨順序
 
-1. **P2-E (Envoy access log)** — L7 可視化の効果が大きい。公開トラフィックの 5xx / routing 問題切り分けに効く
-2. **P2-B (CP Alloy)** は 2 週間影モード運用が必要なので、余裕がある時に。P2-C で CP 大量同時プロビの危険が実証済なので `serial: 1` + 事前シングル検証必須
-3. **P2-F / P2-D** は需要が出てから
+1. **P2-B (CP Alloy)** — CP (br-node1〜3) の Pod ログが未収集の最後の穴。2 週間影モード運用が必要。P2-C で CP 大量同時プロビの危険が実証済なので `serial: 1` + 事前シングル検証必須
+2. **P2-F (Hubble flow drop)** — deny された flow のみ Loki に。NetworkPolicy 誤設定切り分け
+3. **P2-D (kubeEtcd 動的化)** — 需要ベース (CP 入替時)
 
 ### 観測系 follow-up (別 PR 候補)
 
@@ -252,4 +262,9 @@ controller / kubelet / scheduler が emit する K8s Events (Pod OOMKilled / Fai
   - `manifests/platform/alloy-events/` (K8s Events → Loki 専用 Alloy Deployment)
   - `manifests/platform/grafana/dashboards/custom/` (手書き dashboard 置き場、第一号 kubernetes-events.json)
   - `manifests/platform/kube-prometheus-stack/rules/base/rule-monitoring-agent.yaml` (monitoring-agent 自己監視)
+- **P2-E で追加された主な manifest**:
+  - `manifests/platform/envoy-gateway/config/base/envoy-proxy.yaml` + `internal-envoy-proxy.yaml` の `telemetry.accessLog` (OTLP JSON)
+  - `manifests/platform/envoy-gateway/monitoring/base/pod-monitor.yaml` (envoy proxy :19001/stats/prometheus)
+  - `manifests/platform/kube-prometheus-stack/rules/base/rule-envoy-gateway.yaml` (EnvoyHigh5xxRate / EnvoyProxyNoTraffic)
+  - `manifests/platform/grafana/dashboards/custom/json/envoy-access-log.json`
 - **過去インシデント**: `docs/incidents/2026-04-13-observability-cascade.md`
