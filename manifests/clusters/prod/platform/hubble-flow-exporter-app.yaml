@@ -1,0 +1,17 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: hubble-flow-exporter-app
+  namespace: flux-system
+spec:
+  interval: 30m
+  targetNamespace: hubble-flow-exporter
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  dependsOn:
+    - name: cilium-app
+    - name: alloy-app
+  path: ./manifests/platform/hubble-flow-exporter/app/overlays/prod
+  prune: true
+  timeout: 5m
