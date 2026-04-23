@@ -27,9 +27,8 @@
   gather_facts: false
   become: true
   any_errors_fatal: true
-  # Shut masters one at a time so etcd quorum stays healthy long enough
-  # for a clean leader step-down on each node.
-  serial: 1
+  # Assumes k3s-stop was run first, so etcd is already stopped and parallel
+  # shutdown is safe.
   tasks:
     - name: Power off control-plane node
       community.general.shutdown:
