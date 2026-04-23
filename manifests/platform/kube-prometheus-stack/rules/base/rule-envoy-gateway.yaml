@@ -1,0 +1,55 @@
+# Envoy Gateway proxy に対する HTTP レベルのアラート。
+# PodMonitor `envoy-proxy` (envoy-gateway/monitoring) が :19001/stats/prometheus
+# をスクレイプしている前提。
+#
+# メトリクス仕様:
+#   envoy_cluster_upstream_rq_xx{envoy_response_code_class, envoy_cluster_name, gateway_name}
+#     counter。HTTPRoute 由来の upstream cluster は `httproute/<ns>/<name>/rule/<idx>` の命名。
+#     internal 用途 (accesslog_otel_*, xds_cluster, tracing) は `envoy_cluster_name=~"httproute/.*"` で除外。
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: envoy-gateway
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: envoy-gateway
+      rules:
+        - alert: EnvoyHigh5xxRate
+          expr: |
+            (
+              sum by (gateway_name, envoy_cluster_name) (
+                rate(envoy_cluster_upstream_rq_xx{envoy_response_code_class="5", envoy_cluster_name=~"httproute/.*"}[5m])
+              )
+              /
+              sum by (gateway_name, envoy_cluster_name) (
+                rate(envoy_cluster_upstream_rq_xx{envoy_cluster_name=~"httproute/.*"}[5m])
+              )
+            ) > 0.1
+            and
+            sum by (gateway_name, envoy_cluster_name) (
+              rate(envoy_cluster_upstream_rq_xx{envoy_cluster_name=~"httproute/.*"}[5m])
+            ) > 0.5
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: Envoy 5xx ratio > 10% on {{ $labels.envoy_cluster_name }}
+            description: |
+              Gateway {{ $labels.gateway_name }} の upstream cluster
+              {{ $labels.envoy_cluster_name }} で 5xx の比率が 10% を 10 分以上
+              超えています (最低 0.5 rps のトラフィック下で判定)。
+              ダッシュボード: Observability / Envoy Access Log。
+
+        - alert: EnvoyProxyNoTraffic
+          expr: |
+            absent(envoy_server_live) == 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: Envoy proxy metrics are missing
+            description: |
+              envoy-proxy PodMonitor からメトリクスが 10 分以上取れていません。
+              Gateway pod / PodMonitor / Prometheus scrape の経路を確認してください。

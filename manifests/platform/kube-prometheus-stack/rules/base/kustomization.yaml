@@ -8,3 +8,4 @@ resources:
   - rule-cert.yaml
   - rule-rpi.yaml
   - rule-monitoring-agent.yaml
+  - rule-envoy-gateway.yaml
