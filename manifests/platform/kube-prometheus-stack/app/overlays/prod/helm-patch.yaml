@@ -4,9 +4,3 @@
     kind: ConfigMap
     name: kube-prometheus-stack-helm-values
     valuesKey: overlay-values.yaml
-- op: add
-  path: /spec/valuesFrom/-
-  value:
-    kind: ConfigMap
-    name: kube-prometheus-stack-helm-values
-    valuesKey: etcd-endpoints.yaml

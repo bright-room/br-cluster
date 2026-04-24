@@ -1,9 +1,0 @@
-# Managed by `cluster-forge generate-manifests --env prod` — do not edit by hand.
-# Source of truth: servers.yaml (k8s_role = primary|secondary) + 1Password IPs.
-# K3s embedded etcd exposes metrics on :2381 via `etcd-expose-metrics: true`
-# (provisioner/roles/k3s/templates/config.yaml.master.j2).
-kubeEtcd:
-  endpoints:
-  - 172.22.10.10
-  - 172.22.10.11
-  - 172.22.10.12
