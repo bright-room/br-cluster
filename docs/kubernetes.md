@@ -11,10 +11,23 @@
 | ディストリビューション  | k3s `v1.35.3+k3s1` ([`versions.yaml`](../provisioner/inventories/base/group_vars/all/versions.yaml)) |
 | Control Plane           | 3 台 (`br-node1` primary / `br-node2` / `br-node3`)、組込み etcd クォーラム |
 | Worker                  | 3 台 (`br-node4-6`) |
-| API VIP                 | `172.22.10.60` を kube-vip DaemonSet が ARP announce |
+| API VIP                 | `172.22.10.60` を kube-vip DaemonSet が ARP announce (node1-3 上) |
 | Pod CIDR                | `10.42.0.0/16` (Cilium IPAM cluster-pool) |
 | Service CIDR            | `10.43.0.0/16` (k3s デフォルト) |
 | CoreDNS ClusterIP       | `10.43.0.10` |
+
+### ノード別 k3s 役割
+
+物理ホストの一覧は [`docs/hardware.md`](hardware.md#ノード一覧)。ここでは k3s レイヤの役割のみ示す。
+
+| ホスト         | k3s role  | 起動方法                          | etcd メンバー | 主な責務 |
+|----------------|-----------|-----------------------------------|---------------|----------|
+| `br-node1`     | primary   | `k3s server` (クラスタ起動モード) | ✅            | ブートストラップ元 (Cilium / CoreDNS / kube-vip / Flux を適用) |
+| `br-node2`     | secondary | `k3s server` (既存クラスタトークン) | ✅          | control-plane HA |
+| `br-node3`     | secondary | `k3s server` (既存クラスタトークン) | ✅          | control-plane HA |
+| `br-node4-6`   | worker    | `k3s agent`                        | —             | ワークロード Pod、Longhorn レプリカ |
+
+API VIP `172.22.10.60` は kube-vip DaemonSet が node1-3 上で ARP announce する。Worker ノードのデータ領域マウント (`/var/lib/longhorn`) は物理レイヤの責務なので [`docs/hardware.md#ディスクレイアウト`](hardware.md#ディスクレイアウト) を参照。
 
 ## k3s で無効化している組込みコンポーネント
 

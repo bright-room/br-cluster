@@ -38,25 +38,9 @@ IP 設計、ファイアウォール、DNS、VIP、外部公開の経路をま�
 | `172.22.10.70` | cluster-gateway   | Cilium LB-IPAM (annotation 固定) + L2 announce | `*.b8m.app` 終端 |
 | `172.22.10.71` | internal-gateway  | 同上                          | LAN 内サービス向け |
 
-### LB IP の払い出し方式 (重要)
+### LB IP の払い出し方式
 
-`*.b8m.app` 用 (`172.22.10.70`) と LAN 内向け (`172.22.10.71`) は LB-IPAM プール `172.22.10.64/26` の中から、**自動割当ではなくサービスの annotation で明示固定** している。
-
-```yaml
-# manifests/platform/envoy-gateway/config/base/envoy-proxy.yaml
-envoyService:
-  annotations:
-    io.cilium/lb-ipam-ips: ${CLUSTER_GATEWAY_IP}   # 172.22.10.70
-```
-
-ARP announce は 2 系統が同時に有効:
-
-| IP            | ARP 広告主体             |
-|---------------|--------------------------|
-| `172.22.10.60` (k8s-api) | kube-vip DaemonSet (`vip_arp: true`) |
-| `172.22.10.70/.71` (Service LB) | Cilium L2 Announcement Policy + kube-vip Service LB (`svc_enable: true`) |
-
-新しい LB IP を増やすときは、(a) `cluster-settings.yaml` に変数追加 (b) Service 側で `io.cilium/lb-ipam-ips` annotation を設定、の 2 ステップ。プール `172.22.10.64/26` の範囲内であること。
+`172.22.10.70` (cluster-gateway) / `172.22.10.71` (internal-gateway) は Cilium LB-IPAM プール `172.22.10.64/26` から annotation で明示固定。annotation 例 / ARP 二重化 (Cilium L2 + kube-vip svc_enable) / 追加手順は [`docs/platform/networking.md#lb-ip-払い出し`](platform/networking.md#lb-ip-払い出し)。
 
 ## DHCP / DNS / NTP (gateway1)
 
