@@ -1,162 +1,195 @@
 # アーキテクチャ概要
 
-Raspberry Pi 上に構築する自宅 Kubernetes (k3s) クラスタ **br-cluster** の全体設計と、設計判断の背景をまとめる。
+br-cluster の **システム全体像と設計判断の "なぜ" を集約**する。各レイヤの実装詳細は別ドキュメントを参照。
+
+| レイヤ | 詳細 |
+|-------|------|
+| 物理 | [`docs/hardware.md`](hardware.md) |
+| L2/L3 / VIP / DNS / nftables | [`docs/network.md`](network.md) |
+| Packer / Ansible / cluster-forge | [`docs/provisioning.md`](provisioning.md) |
+| k3s / cluster-settings / Flux ブート順 | [`docs/kubernetes.md`](kubernetes.md) |
+| プラットフォームコンポーネント (8 グループ) | [`docs/platform/`](platform/) |
 
 ## 全体構成
 
 ```mermaid
-graph LR
-  user["ユーザー<br/>(Browser)"]
+flowchart LR
+  user((Browser))
 
-  subgraph cloudflare["Cloudflare (Edge)"]
-    access["Cloudflare Access<br/>GitHub org bright-room<br/>+ WARP device posture"]
-    tunnel["Cloudflare Tunnel<br/>br-cluster"]
+  subgraph cloudflare["Cloudflare Edge"]
+    cfaccess["CF Access<br/>GitHub Org + WARP"]
+    cftunnel["CF Tunnel"]
+    cfdns["Cloudflare DNS<br/>b8m.app zone"]
   end
 
-  user -->|"HTTPS *.b8m.app<br/>(WARP enrolled)"| access
-  access -->|authn + posture ok<br/>+ Cf-Access-Jwt-Assertion| tunnel
+  subgraph lan["自宅 LAN 172.22.10.0/24"]
+    subgraph external["クラスタ外ノード"]
+      gw["br-gateway1<br/>DHCP DNS NTP nftables"]
+      ext["br-external1<br/>Garage S3 for loki and tempo"]
+    end
 
-  subgraph lan["自宅 LAN"]
-    subgraph k3s["k3s cluster (br-node1-6)"]
-      cfd["cloudflared-br-cluster<br/>(QUIC)"]
-
-      subgraph eg["envoy-gateway-system"]
-        egw["Gateway: cluster-gateway<br/>172.22.10.70:443<br/>SNI *.b8m.app"]
-      end
-
-      subgraph idp["zitadel"]
-        zit["Zitadel<br/>(OIDC IdP)<br/>auth.b8m.app"]
-      end
-
-      subgraph apps["ワークロード"]
-        grafana[Grafana]
-        prom[Prometheus]
-        am[Alertmanager]
-        hubble[Hubble UI]
-        longhorn[Longhorn UI]
-      end
+    subgraph k3s["k3s クラスタ br-node1-6"]
+      cfd["cloudflared Pod"]
+      egw["Envoy Gateway<br/>cluster-gateway 172.22.10.70"]
+      iegw["Envoy Gateway<br/>internal-gateway 172.22.10.71"]
+      apps["Workloads<br/>Grafana Loki Tempo<br/>Zitadel Longhorn etc"]
+      flux["Flux Operator + Flux CD"]
     end
   end
 
-  tunnel -->|QUIC origin| cfd
-  cfd -->|HTTPS<br/>SNI: cluster-gateway.b8m.app| egw
-  egw -->|HTTPRoute: Host 振分| grafana & prom & am & hubble & longhorn & zit
-  apps -.->|OIDC authorize/token/userinfo| zit
+  ghrepo[("GitHub<br/>bright-room/br-cluster")]
+  ghzit[("GitHub<br/>br-cluster-zitadel-terraform")]
+  cfrepo[("GitHub<br/>br-cloudflare-terraform")]
 
-  style cloudflare fill:#f38020,color:#fff
-  style lan fill:#e3f2fd,color:#000
-  style k3s fill:#326ce5,color:#fff
+  user -->|HTTPS| cfaccess
+  cfaccess --> cftunnel -->|QUIC| cfd -->|HTTPS| egw -->|HTTPRoute| apps
+  apps -->|S3| ext
+
+  ghrepo --> flux --> apps
+  ghzit -. tofu-controller .-> apps
+  cfrepo -. terraform .-> cfaccess
+  cfrepo -. terraform .-> cftunnel
+  cfrepo -. terraform .-> cfdns
+
+  apps -. external-dns .-> cfdns
 ```
 
-## 外部公開の流れ
+## 外部公開フロー
 
-1. **ブラウザ → Cloudflare Edge**: ユーザーが `https://<service>.b8m.app/` にアクセス
-2. **Cloudflare Access**: 未認証ならGitHub SSO にリダイレクト、GitHub Org `bright-room` のメンバーのみ許可。成功すると `Cf-Access-Jwt-Assertion` ヘッダを付けて origin に転送
-3. **Cloudflare Tunnel (br-cluster)**: Edge からクラスタ内の `cloudflared` Pod に QUIC で配送(外向き接続 = 家庭ルーターのポート開放不要)
-4. **cloudflared Pod → cluster-gateway**: `https://172.22.10.70:443` に転送。SNI には `cluster-gateway.b8m.app` を明示的に指定(Envoy Gateway の strict SNI match 対応)
-5. **Envoy (cluster-gateway)**: `*.b8m.app` 証明書で TLS 終端、`HTTPRoute` を元に Host ヘッダで各サービスへ振り分け
-6. **各ワークロード**: CF Access JWT ヘッダを信頼する設定で、そのままログイン済み状態で表示(Grafana の場合 `auth.jwt` で検証)
+`https://<svc>.b8m.app` を叩いたときの経路:
 
-## Gateway
+1. **ブラウザ → Cloudflare Edge**
+2. **Cloudflare Access** で認証: GitHub Org `bright-room` + WARP device posture。成功すると `Cf-Access-Jwt-Assertion` ヘッダ付与
+3. **Cloudflare Tunnel** が QUIC でクラスタ内 `cloudflared` Pod に配送 (家庭ルーターは outbound のみ)
+4. cloudflared → `https://172.22.10.70:443` (cluster-gateway VIP)、SNI に `cluster-gateway.b8m.app` を明示
+5. **Envoy Gateway** が `*.b8m.app` 証明書で TLS 終端、HTTPRoute の Host で振り分け
+6. 各ワークロードは Envoy `SecurityPolicy` の OIDC filter または自前 OIDC で Zitadel ログイン
 
-- **GatewayClass / EnvoyProxy**: `cluster-gateway` / `cluster-proxy` の1組のみ
-- **LoadBalancer IP**: `172.22.10.70` を Cilium LB-IPAM + L2 Announcement Policy で自動 announce
-- **TLS**: `*.b8m.app` 証明書を cert-manager + Let's Encrypt DNS01 challenge (Cloudflare API) で自動発行・更新
-- **HTTPRoute**: 各サービス namespace に `<name>-b8m` HTTPRoute を配置
+ポート開放不要・DDoS 対策・Geo ブロック等は Cloudflare 側に集約。詳細は [`docs/network.md`](network.md) と [`docs/platform/networking.md`](platform/networking.md)。
 
-## DNS
+## 認証 (2 層構成)
 
-- Zone **`b8m.app`** を Cloudflare で管理 (TF: `br-cloudflare-terraform` repo)
-- `*.b8m.app` 配下のレコードは **external-dns-cloudflare** が `Gateway` / `HTTPRoute` アノテーションから自動発行
-  - Gateway の `external-dns.alpha.kubernetes.io/target` で Tunnel CNAME (`<tunnel-id>.cfargotunnel.com`) を指定
-  - HTTPRoute の `cloudflare-proxied: "true"` で CF proxy 有効化
-- external-dns v0.21.0 の gateway-api source は target annotation を **Gateway からのみ** 読む (HTTPRoute には書かない)
+| 層 | 実装 | 範囲 | 失敗時の挙動 |
+|----|------|------|-------------|
+| ネットワーク層 | **Cloudflare Access** (GitHub Org + WARP posture) | `*.b8m.app` 全体 | エッジで弾かれる、クラスタには到達しない |
+| アプリ層       | **Zitadel OIDC** (`auth.b8m.app`) を 2 系統で消費: Envoy `SecurityPolicy` (OIDC filter) / アプリ自前 (`auth.generic_oauth` 等) | アプリ単位の user / role | アプリが 401 を返す |
 
-## 認証
+- enrollment 専用アプリだけ WARP require を外して chicken-and-egg を回避
+- アプリ別パターン:
 
-2 層構成:
+| アプリ | アプリ層認証 |
+|--------|------|
+| Alertmanager / Hubble UI / Longhorn UI / Prometheus | Envoy `SecurityPolicy` OIDC filter |
+| Grafana | アプリ自身の `auth.generic_oauth` (Envoy SecurityPolicy は **付けない** = 二重 OIDC 回避) |
+| Zitadel console (`auth.b8m.app`) | Zitadel 自身が IdP、CF Access が前段 |
 
-1. **ネットワーク層 (Cloudflare Access)**: `*.b8m.app` に到達する前にエッジで弾く
-   - `include`: GitHub Organization `bright-room` メンバー
-   - `require`: WARP device posture (接続済みの `bright-room` team 端末のみ)
-   - enrollment 専用アプリだけ WARP require を外して chicken-and-egg を回避
-2. **アプリ層 (Zitadel OIDC)**: クラスタ内 Zitadel (`auth.b8m.app`) を OIDC provider として、各アプリが identity を取得
-   - ユーザー/プロジェクト/アプリ登録は `br-cluster-zitadel-terraform` で IaC 管理
-   - tofu-controller がクラスタ内で plan/apply、state は k8s Secret (cluster 破棄と同期)
-   - メール (verification / password reset) は Resend SMTP 経由
+詳細は [`docs/platform/identity.md`](platform/identity.md) と [`docs/platform/networking.md`](platform/networking.md#envoy-gateway)。
 
-### アプリごとの統合パターン
+## 管理境界 (どこを誰が管理するか)
 
-| アプリ | パターン | 備考 |
-|---|---|---|
-| Alertmanager / Hubble UI / Longhorn UI / Prometheus | Envoy Gateway `SecurityPolicy` + OIDC filter | gateway 側で強制、アプリ側はユーザー情報を受け取らない |
-| Grafana | Grafana 自身の `auth.generic_oauth` | SecurityPolicy を **付けない** (二重 OIDC 回避)、Grafana の Org ロールにマッピング可 |
-| Zitadel console (`auth.b8m.app`) | Zitadel 自身がログイン UI | CF Access (WARP + GitHub) が前段 |
+br-cluster 1 つで全部を管理せず、**責務単位で 4 リポ + 物理運用** に分けている。
 
-### SecurityPolicy の OIDC provider 参照
+```mermaid
+flowchart TB
+  subgraph repo1["bright-room/br-cluster (このリポ)"]
+    a1["k3s 内のリソース<br/>Flux GitOps"]
+    a2["物理 / OS<br/>Packer + Ansible + cluster-forge"]
+  end
+  subgraph repo2["bright-room/br-cloudflare-terraform"]
+    b1["Cloudflare Tunnel"]
+    b2["CF Access App / Policy"]
+    b3["Cloudflare DNS / Zone"]
+  end
+  subgraph repo3["bright-room/br-cluster-zitadel-terraform"]
+    c1["Zitadel テナント / アプリ / ロール"]
+  end
+  subgraph nonk3s["非 k3s インフラ cluster-internal.bright-room.net"]
+    d1["dns / ntp / gateway / external /<br/>node / object-storage"]
+  end
 
-in-cluster の OIDC issuer (`auth.b8m.app`) を `provider.issuer` だけで指定すると、Envoy の DNS 解決が STRICT_DNS クラスタに頼ることになる。Envoy 内蔵の DNS resolver を `EnvoyProxy.spec.bootstrap` で **c-ares → getaddrinfo に差し替え済み**なので素直に動くが、IdP を k8s Service として明示的に指す方が failure mode が局所化される。
-
-```yaml
-spec:
-  oidc:
-    provider:
-      issuer: https://auth.b8m.app
-      backendRefs:
-        - { kind: Service, name: zitadel, namespace: zitadel, port: 8080 }
+  a1 -. external-dns .-> b3
+  a1 -. tofu-controller .-> c1
+  a1 -. cloudflared .-> b1
+  a1 -. SecurityPolicy issuer .-> c1
 ```
 
-別 namespace を参照するので `zitadel` ns 側に `ReferenceGrant` が必要 (`manifests/platform/zitadel/app/base/referencegrant.yaml`)。
+| 領域 | 場所 | このリポからの操作 |
+|------|------|-------------------|
+| k3s 内のリソース | `manifests/` (Flux で適用) | 直接編集 |
+| 物理 / OS / k3s 起動 | `imager/` `provisioner/` `cli/` | 直接編集 |
+| Cloudflare (Tunnel / Access / DNS Zone 設定) | `bright-room/br-cloudflare-terraform` | **触らない** (terraform repo で管理) |
+| Zitadel リソース (user / app / role) | `bright-room/br-cluster-zitadel-terraform` | クラスタ内の tofu-controller が apply |
+| 非 k3s インフラ (`*.cluster-internal.bright-room.net`) | 別 (br-external1 上の手動セット等) | **br-cluster のスコープ外** |
 
-## 管理の境界 (scope)
-
-- **k3s 内のリソース**: 本リポ (`br-cluster`) で管理、Flux GitOps で適用
-- **Cloudflare 側**: `br-cloudflare-terraform` リポで管理 (Tunnel / Access App / DNS / Zone 設定)
-- **物理/OS レイヤ**: Packer (`imager/`) + Ansible (`provisioner/`) + CLI (`cli/cluster_forge/`) で管理
-- **非 k3s インフラ (`*.cluster-internal.bright-room.net`: dns/ntp/gateway/external/node/object-storage)**: br-cluster のスコープ外。変更しない
-
-## 設計判断
+## 主要な設計判断
 
 ### なぜ Cloudflare Tunnel か
 
-- 家庭ルーターのポート開放/動的DNS が不要。外向き接続のみでクラスタが公開される
+- 家庭ルーターのポート開放 / 動的 DNS が不要 (outbound 接続のみで成立)
 - DDoS / bot 耐性を Cloudflare エッジが肩代わり
-- WAF / Access / Geo ブロック等が CF 側で一括設定可能
+- WAF / Access / Geo ブロック等を 1 箇所で集中管理
 
 ### なぜ `*.b8m.app` か
 
-- 当初 `*.cluster-platform.bright-room.net` を使っていたが、Cloudflare Universal SSL の **2nd-level wildcard が Free プラン非対応** にぶつかった
+- 当初 `*.cluster-platform.bright-room.net` を使っていたが、Cloudflare Universal SSL の **2nd-level wildcard が Free プラン非対応**にぶつかった
 - 1st-level wildcard (`*.b8m.app`) に統合することで、ACM 有料プラン不要で TLS 終端可能
-- ドメインも短く覚えやすい
+- 短く覚えやすい
 
-### なぜ CF Access JWT 直検証から Zitadel OIDC に戻ったか
+### なぜ CF Access JWT 直検証 → Zitadel OIDC に戻したか
 
 - 旧構成: CF Access が発行する JWT を各アプリが JWKS で検証、auto-sign-up で Admin 付与
-- ユーザー/ロールの管理が CF Access 依存で「アプリ単位で権限を絞る」ができなかった
-- Zitadel をクラスタ内で立てて OIDC provider に変更。アプリは Zitadel の user/role を受け取り、CF Access は **ネットワーク境界** の役割に限定
+- ユーザー / ロールの管理が CF Access 依存で「アプリ単位で権限を絞る」ができなかった
+- Zitadel をクラスタ内で立てて OIDC provider に変更。アプリは Zitadel の user / role を受け取り、CF Access は **ネットワーク境界の役割に限定**
 - Keycloak を避けたのは JVM の重さ (Pi 上で non-trivial) と DB 運用コスト。Zitadel は Go + CNPG (既存) で動く
 
-### Gateway 分離の設計
+### Gateway 統合 (1 本構成)
 
-過去に `public-gateway` / `internal-gateway` / `cluster-gateway` の3本に分けていたが、Access で in/out を分けられるため `cluster-gateway` 1本に統一。GatewayClass / EnvoyProxy / Gateway / HTTPRoute の本数が大幅に減った。
+過去に `public-gateway` / `internal-gateway` / `cluster-gateway` の 3 本に分けていたが、Access で in/out を分けられるため **`cluster-gateway` 1 本に統一** (LAN 内向け配信用に `internal-gateway` のみ別途残す)。GatewayClass / EnvoyProxy / Gateway / HTTPRoute の本数が大幅に減った。
+
+### なぜ Cilium か (CNI 選定)
+
+- eBPF で **CNI + kube-proxy 代替 + LB-IPAM + L2 Announcement + Hubble** を一本化
+- Pi の限られたリソースで複数 OSS を並走させない
+- 詳細 → [`docs/platform/networking.md`](platform/networking.md)
+
+### なぜ k3s 同梱の servicelb / traefik / Helm Controller を全部 disable か
+
+- LB は Cilium LB-IPAM、Ingress は Envoy Gateway、Helm は Flux に責務移譲
+- 同じレイヤーに 2 つの実装が並走するのを避ける (k3s のデフォルトを残すと debug 困難)
+- 詳細 → [`docs/kubernetes.md`](kubernetes.md)
+
+### なぜ Longhorn のオフクラスタバックアップを撤去したか
+
+- 学習環境のため PVC 内容は再現可能 (Git からの再構築前提)
+- 2026-04-13 commit `41f3782` で Garage stack ごと削除
+- スナップショット機能は残してある。将来必要なら復活可
+- 詳細 → [`docs/platform/storage.md`](platform/storage.md)
+
+### なぜ Loki / Tempo を `br-external1` Garage に置くか
+
+- Pi の Longhorn 容量を圧迫しない
+- クラスタ全体障害でもデータが残る場所が必要
+- 詳細 → [`docs/platform/observability.md`](platform/observability.md)
 
 ## 新しい OIDC 保護アプリを追加する手順
 
 既存 app (Alertmanager / Hubble / Longhorn / Prometheus) をテンプレートに使う想定。
 
-1. **br-cluster**: HTTPRoute を追加してホスト名を決める (`<name>.b8m.app`)
-2. **br-cluster-zitadel-terraform**: `zitadel_application_oidc.platform` の for_each map にエントリ追加 → tofu-controller apply で `tf-zitadel-output` に `<name>_client_id` / `<name>_client_secret` が書き出される
-3. **br-cluster**: アプリの namespace に
-   - `ExternalSecret` (store: `kubernetes-backend`, tf-zitadel-output の 2 キーを `client-id` / `client-secret` に rename コピー)
-   - `SecurityPolicy` (`issuer: https://auth.b8m.app`, `backendRefs` で `zitadel` Service 指定, `redirectURL: https://<name>.b8m.app/oauth2/callback`)
-4. **br-cluster**: `manifests/platform/zitadel/app/base/referencegrant.yaml` の `from` リストに対象 namespace を追加 (初回だけ)
-5. **br-cloudflare-terraform**: `access_applications` map に `<name> = "<name>.b8m.app"` を追加 → CF Access (GitHub org + WARP) がホスト名に効く
+| Step | リポ | 作業 |
+|------|------|------|
+| 1 | `br-cluster` | `manifests/platform/<app>/config/.../httproute.yaml` を追加してホスト名 `<name>.b8m.app` を決める |
+| 2 | `br-cluster-zitadel-terraform` | `zitadel_application_oidc.platform` の `for_each` map にエントリ追加 → tofu-controller apply で `tf-zitadel-output` Secret に `<name>_client_id` / `<name>_client_secret` が書き出される |
+| 3 | `br-cluster` | アプリ namespace に **`ExternalSecret`** (store: `kubernetes-backend`、`tf-zitadel-output` の 2 キーを `client-id` / `client-secret` に rename) と **`SecurityPolicy`** (`issuer: https://auth.b8m.app`、`backendRefs` で `zitadel` Service 指定、`redirectURL: https://<name>.b8m.app/oauth2/callback`) を追加 |
+| 4 | `br-cluster` | [`manifests/platform/zitadel/app/base/referencegrant.yaml`](../manifests/platform/zitadel/app/base/referencegrant.yaml) の `from` リストに対象 namespace を追加 (初回のみ) |
+| 5 | `br-cloudflare-terraform` | `access_applications` map に `<name> = "<name>.b8m.app"` を追加 → CF Access (GitHub Org + WARP) が新ホストに効く |
 
-Grafana のように**アプリが自前の OIDC を持っている場合**は 3 の `SecurityPolicy` を付けず、アプリ側の generic OAuth 設定で client 情報を流し込む (実例: `manifests/platform/grafana/app/base/values.yaml`)。
+Grafana のように **アプリ自前の OIDC** を持つ場合は Step 3 の `SecurityPolicy` を **付けず**、アプリ側の generic OAuth 設定で client 情報を流し込む (実例: [`manifests/platform/grafana/app/base/values.yaml`](../manifests/platform/grafana/app/base/values.yaml))。
 
-## 関連ドキュメント
+詳細 → [`docs/platform/identity.md`](platform/identity.md)。
 
-- `docs/observability.md` — メトリクス/ログ/トレースの収集アーキテクチャ
-- `docs/incidents/` — 過去のインシデント記録
-- `README.md` — セットアップ/運用コマンド
-- `CLAUDE.md` — プロジェクトの規約・ツール利用方針
+## 関連
+
+- [`docs/kubernetes.md`](kubernetes.md) — 全 platform コンポーネント一覧 (グループ別リンク)
+- [`docs/platform/`](platform/) — 各グループの詳細
+- [`docs/incidents/`](incidents/) — 過去のインシデント記録
+- [`README.md`](../README.md) — リポ概要 / セットアップ
