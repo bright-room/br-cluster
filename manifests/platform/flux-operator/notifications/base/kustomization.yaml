@@ -5,3 +5,4 @@ resources:
   - discord-webhook-externalsecret.yaml
   - discord-provider.yaml
   - discord-alert.yaml
+  - discord-sources-alert.yaml
