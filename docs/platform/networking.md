@@ -232,6 +232,15 @@ Gateway API v1 の実装。**外部公開用 `cluster-gateway`** と **LAN 内�
 | `cluster-gateway`| `172.22.10.70` | HTTPS:443 `*.b8m.app` | cert-manager (`letsencrypt-issuer`、`*.b8m.app`) | 外部公開、Cloudflare Tunnel origin |
 | `internal-gateway`| `172.22.10.71` | HTTP:80 `*.cluster-internal.bright-room.net` | なし (LAN クローズド) | 非 k3s ノードからの Loki push 等 |
 
+### `internal-gateway` の使い分け
+
+LAN 内クローズドな経路で、Cloudflare Tunnel を経由しない。クライアントによって in-cluster サービスへの到達手段を分けている:
+
+| クライアント | 経路 | 理由 |
+|--------------|------|------|
+| 非 k3s ノード (gateway1 / external1) の Alloy | `internal-gateway` (`172.22.10.71`) → HTTPRoute → Loki 等 | クラスタ外からは Service ClusterIP を引けないので Gateway 経由が必要 |
+| k3s ノード自身 (DaemonSet Alloy など) | `localhost:30800` (NodePort) → Loki | Cilium eBPF kube-proxy replacement が自ノードで NodePort を backend に変換するため、自ノードが L2 lease holder でなくても通る。Gateway を 1 ホップ減らせる |
+
 ### LB IP 固定
 
 Service の annotation `io.cilium/lb-ipam-ips: ${CLUSTER_GATEWAY_IP}` で Cilium LB-IPAM プールから IP を pin する ([`envoy-proxy.yaml`](../../manifests/platform/envoy-gateway/config/base/envoy-proxy.yaml))。
@@ -366,10 +375,42 @@ ingress:
 
 ---
 
+## 外部公開フロー (`https://<svc>.b8m.app`)
+
+ブラウザから Pod までの一気通貫フロー。本グループの cloudflared / Envoy Gateway / external-dns-cloudflare / cert-manager (別グループ) が連携する。
+
+```mermaid
+sequenceDiagram
+  participant U as Browser
+  participant CFE as Cloudflare Edge
+  participant CFA as Cloudflare Access
+  participant CFT as Cloudflare Tunnel
+  participant CFD as cloudflared Pod
+  participant EG as Envoy Gateway<br/>(172.22.10.70)
+  participant APP as App Pod
+  U->>CFE: HTTPS *.b8m.app
+  CFE->>CFA: GitHub Org + WARP posture チェック
+  CFA->>CFT: OK (Cf-Access-Jwt-Assertion 付与)
+  CFT->>CFD: QUIC (家から outbound のみ)
+  CFD->>EG: HTTPS, SNI=cluster-gateway.b8m.app
+  EG->>APP: HTTPRoute (Host で振り分け)
+  APP-->>U: Response (OIDC は SecurityPolicy / 自前のいずれか)
+```
+
+ポイント:
+
+- **家庭ルーターのポート開放は不要**。outbound QUIC のみで全部成立 ([cloudflared](#cloudflared) 節)
+- TLS 終端は Envoy で実施 (`*.b8m.app` を cert-manager + Let's Encrypt DNS01 で自動発行 → [`platform/certificate.md`](certificate.md))
+- 認証は 2 層: Cloudflare Access (ネットワーク層) + Zitadel OIDC (アプリ層、Envoy SecurityPolicy で実装)
+- DNS レコード (`<svc>.b8m.app` → Cloudflare Tunnel CNAME) は [external-dns-cloudflare](#external-dns-cloudflare) が HTTPRoute から自動生成
+- 設計判断 (なぜ Cloudflare Tunnel か等) は [`docs/architecture.md`](../architecture.md)
+
+---
+
 ## 関連
 
 - [`docs/kubernetes.md`](../kubernetes.md) — クラスタ全体概要・k3s 設定
-- [`docs/network.md`](../network.md) — L2/L3、VIP 一覧、nftables、外部公開フロー
+- [`docs/network.md`](../network.md) — L2/L3、VIP 一覧、nftables
 - [`docs/architecture.md`](../architecture.md) — 認証 2 層、Gateway 統合の設計判断
 - [`docs/platform/certificate.md`](certificate.md) — `*.b8m.app` 証明書の発行
 - [`docs/platform/identity.md`](identity.md) — Zitadel OIDC (Envoy SecurityPolicy が参照)
