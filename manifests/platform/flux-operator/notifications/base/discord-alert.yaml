@@ -1,0 +1,20 @@
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Alert
+metadata:
+  name: discord
+  namespace: flux-system
+spec:
+  providerRef:
+    name: discord
+  eventSeverity: info
+  eventSources:
+    - kind: Kustomization
+      name: '*'
+    - kind: HelmRelease
+      name: '*'
+  inclusionList:
+    - '.*Applying revision.*'
+    - '.*Reconciliation finished.*'
+    - '.*Reconciliation failed.*'
+    - '.*Helm (install|upgrade) (succeeded|failed).*'
+    - '.*Health check failed.*'
