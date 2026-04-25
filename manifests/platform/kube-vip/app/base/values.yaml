@@ -4,7 +4,8 @@ config:
 
 env:
   cp_enable: "true"
-  svc_enable: "false"
+  svc_enable: "true"
+  svc_election: "true"
   vip_arp: "true"
   vip_leaderelection: "true"
   vip_leaseduration: "15"
