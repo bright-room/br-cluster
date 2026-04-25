@@ -21,53 +21,7 @@ br-cluster の物理ハードウェアと、各ノードが担う役割をまと
 
 クラスタは自宅 LAN とは別の **専用サブネット (172.22.10.0/24)** を持ち、`br-gateway1` がその境界ルーターを兼ねる。日常使いの端末 (MacBook / Windows PC / スマホ) は自宅ルーター配下の通常 LAN に居て、クラスタへは `br-gateway1` 経由で到達する。
 
-```mermaid
-graph LR
-  internet((Internet))
-
-  subgraph home["自宅 LAN"]
-    router["自宅ルーター<br/>(Wi-Fi AP)"]
-    mac[MacBook]
-    win[Windows PC]
-    phone[スマホ]
-  end
-
-  subgraph cluster["クラスタ LAN (172.22.10.0/24)"]
-    switch["L2 スイッチ"]
-    gw[br-gateway1]
-    ext[br-external1]
-    n1[br-node1]
-    n2[br-node2]
-    n3[br-node3]
-    n4[br-node4]
-    n5[br-node5]
-    n6[br-node6]
-  end
-
-  internet --- router
-  router -. Wi-Fi .- mac
-  router --- win
-  router -. Wi-Fi .- phone
-
-  router -. Wi-Fi (wlan0) .- gw
-  gw -- eth0 --- switch
-  switch --- ext
-  switch --- n1
-  switch --- n2
-  switch --- n3
-  switch --- n4
-  switch --- n5
-  switch --- n6
-
-  classDef cp fill:#326ce5,color:#fff
-  classDef wk fill:#5b8def,color:#fff
-  classDef gwc fill:#f38020,color:#fff
-  classDef extc fill:#7c4dff,color:#fff
-  class n1,n2,n3 cp
-  class n4,n5,n6 wk
-  class gw gwc
-  class ext extc
-```
+![ネットワークトポロジ](assets/hardware-topology.drawio.svg)
 
 `br-gateway1` だけが 2 系統 (LAN: `eth0` / WAN: `wlan0`) を持ち、残りのノードは `eth0` のみでクラスタ LAN に参加する。
 
@@ -122,7 +76,7 @@ RTL9210 は UAS (USB Attached SCSI) で random hang する既知問題があり�
 | DHCP 配布  | `172.22.10.100-200` |
 | DNS        | 内部ゾーン `cluster-internal.bright-room.net` を権威、他は `8.8.8.8` / `8.8.4.4` にフォワード |
 | NTP        | 上流 `ntp.nict.jp` |
-| 主要 NAT   | DNAT: WAN `:6443` → k8s API VIP `172.22.10.60:6443` / Masquerade: LAN → WAN |
+| 主要 NAT   | API VIP 向け DNAT + LAN → WAN Masquerade (ルール詳細は [`network.md#nat`](network.md#nat)、宛先 API VIP の意味は [`kubernetes.md#トポロジ`](kubernetes.md#トポロジ)) |
 | Ansible role | [`provisioner/roles/gateway`](../provisioner/roles/gateway) + `ipr-cnrs.nftables` |
 | 詳細       | [`docs/network.md`](network.md) |
 
@@ -137,16 +91,14 @@ RTL9210 は UAS (USB Attached SCSI) で random hang する既知問題があり�
 | 用途         | クラスタ外 Loki / Tempo のオブジェクトストア (Longhorn のバックアップ送り先ではない) |
 | Ansible role | [`provisioner/roles/external`](../provisioner/roles/external) |
 
-### br-node1-6 (k3s)
+### br-node1-6 (k3s ノード)
 
-| ホスト         | k3s role          | 起動方法 | etcd メンバー | 主な責務 |
-|----------------|-------------------|----------|---------------|----------|
-| `br-node1`     | primary           | `k3s server` (クラスタ起動モード) | ✅ | ブートストラップ元 (Cilium / CoreDNS / kube-vip / Flux を適用) |
-| `br-node2`     | secondary         | `k3s server` (既存クラスタトークン) | ✅ | control-plane HA |
-| `br-node3`     | secondary         | `k3s server` (既存クラスタトークン) | ✅ | control-plane HA |
-| `br-node4-6`   | worker            | `k3s agent` | — | ワークロード Pod、Longhorn レプリカ |
+物理ホストとしては全 6 台が同一構成 (Pi + RTL9210 + SSD)。違いはディスクレイアウト ([`### ディスクレイアウト`](#ディスクレイアウト)) のみ:
 
-control-plane VIP `172.22.10.60` は kube-vip DaemonSet が node1-3 上で ARP announce する。worker ノードはデータ用 ext4 を `/var/lib/longhorn` にマウントする。
+- `br-node1-3`: `storage_mode: none` (OS パーティションのみ、etcd は `/var/lib/rancher/k3s` 配下で OS と同居)
+- `br-node4-6`: `storage_mode: ext4` で `/var/lib/longhorn` を ext4 マウント
+
+k3s レイヤの役割 (control-plane / worker / etcd メンバー / 起動方法) は [`docs/kubernetes.md#ノード別-k3s-役割`](kubernetes.md#ノード別-k3s-役割) を参照。
 
 ## 関連
 

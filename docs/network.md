@@ -38,25 +38,9 @@ IP 設計、ファイアウォール、DNS、VIP、外部公開の経路をま�
 | `172.22.10.70` | cluster-gateway   | Cilium LB-IPAM (annotation 固定) + L2 announce | `*.b8m.app` 終端 |
 | `172.22.10.71` | internal-gateway  | 同上                          | LAN 内サービス向け |
 
-### LB IP の払い出し方式 (重要)
+### LB IP の払い出し方式
 
-`*.b8m.app` 用 (`172.22.10.70`) と LAN 内向け (`172.22.10.71`) は LB-IPAM プール `172.22.10.64/26` の中から、**自動割当ではなくサービスの annotation で明示固定** している。
-
-```yaml
-# manifests/platform/envoy-gateway/config/base/envoy-proxy.yaml
-envoyService:
-  annotations:
-    io.cilium/lb-ipam-ips: ${CLUSTER_GATEWAY_IP}   # 172.22.10.70
-```
-
-ARP announce は 2 系統が同時に有効:
-
-| IP            | ARP 広告主体             |
-|---------------|--------------------------|
-| `172.22.10.60` (k8s-api) | kube-vip DaemonSet (`vip_arp: true`) |
-| `172.22.10.70/.71` (Service LB) | Cilium L2 Announcement Policy + kube-vip Service LB (`svc_enable: true`) |
-
-新しい LB IP を増やすときは、(a) `cluster-settings.yaml` に変数追加 (b) Service 側で `io.cilium/lb-ipam-ips` annotation を設定、の 2 ステップ。プール `172.22.10.64/26` の範囲内であること。
+`172.22.10.70` (cluster-gateway) / `172.22.10.71` (internal-gateway) は Cilium LB-IPAM プール `172.22.10.64/26` から annotation で明示固定。annotation 例 / ARP 二重化 (Cilium L2 + kube-vip svc_enable) / 追加手順は [`docs/platform/networking.md#lb-ip-払い出し`](platform/networking.md#lb-ip-払い出し)。
 
 ## DHCP / DNS / NTP (gateway1)
 
@@ -126,41 +110,15 @@ wan_exposed_domains:
 | `prerouting`  | DNAT: WAN `tcp/6443` → `172.22.10.60:6443` (k8s API) |
 | `postrouting` | LAN → WAN masquerade、WAN → LAN hairpin masquerade (DNAT 戻り経路) |
 
-## 外部公開フロー (`https://<svc>.b8m.app`)
+## 外部公開フロー
 
-```mermaid
-sequenceDiagram
-  participant U as Browser
-  participant CFE as Cloudflare Edge
-  participant CFA as Cloudflare Access
-  participant CFT as Cloudflare Tunnel
-  participant CFD as cloudflared Pod
-  participant EG as Envoy Gateway<br/>(172.22.10.70)
-  participant APP as App Pod
-  U->>CFE: HTTPS *.b8m.app
-  CFE->>CFA: GitHub Org + WARP posture チェック
-  CFA->>CFT: OK (Cf-Access-Jwt-Assertion 付与)
-  CFT->>CFD: QUIC (家から outbound のみ)
-  CFD->>EG: HTTPS, SNI=cluster-gateway.b8m.app
-  EG->>APP: HTTPRoute (Host で振り分け)
-  APP-->>U: Response (OIDC は SecurityPolicy / 自前のいずれか)
-```
+`https://<svc>.b8m.app` のリクエストが Cloudflare Edge → Cloudflare Tunnel → cloudflared Pod → Envoy Gateway → App Pod に流れる一気通貫フローは、k8s レイヤの責務として [`docs/platform/networking.md#外部公開フロー-httpssvcb8mapp`](platform/networking.md#外部公開フロー-httpssvcb8mapp) に集約。
 
-ポイント:
-- **家庭ルーターのポート開放は不要**。outbound QUIC のみで全部成立
-- TLS 終端は Envoy で実施 (`*.b8m.app` を cert-manager + Let's Encrypt DNS01 で自動発行)
-- 認証は 2 層: Cloudflare Access (ネットワーク層) + Zitadel OIDC (アプリ層)
-- 詳細な認証フローは [`docs/architecture.md`](architecture.md)
+物理側で関与するのは「家庭ルーターは inbound 不要 (outbound QUIC のみ)」という点だけで、ポート開放・DNAT は無い (k8s API VIP `:6443` の DNAT のみ → [`#nat`](#nat))。
 
 ## クラスタ内限定の経路 (internal-gateway)
 
-| 項目 | 内容 |
-|------|------|
-| IP | `172.22.10.71` (LB-IPAM annotation で固定) |
-| 用途 | 非 k3s ノード (gateway1 / external1) の Alloy から Loki 等への push |
-| アクセス | LAN 内からのみ (Cloudflare Tunnel を経由しない) |
-
-k3s ノード自身からは **`localhost:30800` (NodePort)** 経由で Loki に push する。Cilium eBPF kube-proxy replacement が自ノードで NodePort を backend に変換するため、自ノードが L2 lease holder でなくても動く。
+`172.22.10.71` の `internal-gateway` (LAN クローズド、TLS なし、Cloudflare Tunnel を経由しない) が k3s 外のノード (gateway1 / external1) からのアクセス入口。クライアント別の使い分け (`internal-gateway` 経由 vs ノード自身の `localhost:30800` NodePort) は [`docs/platform/networking.md#internal-gateway-の使い分け`](platform/networking.md#internal-gateway-の使い分け)。
 
 ## 関連
 

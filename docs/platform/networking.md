@@ -71,12 +71,42 @@ flowchart TB
 | 判断 | 採用 | 不採用 / 旧構成 | 理由 |
 |---|---|---|---|
 | CNI | Cilium (eBPF) | flannel (k3s デフォルト) | NetworkPolicy / kube-proxy replacement / LB-IPAM を 1 本で完結。`disable-network-policy` も合わせて Cilium に集約 |
-| LB IP 割当 | Cilium LB-IPAM annotation 固定 | k3s servicelb / `spec.externalIPs` 手書き | プール管理 + 宣言的 IP 指定。詳細 → [`docs/network.md`](../network.md#lb-ip-の払い出し方式-重要) |
+| LB IP 割当 | Cilium LB-IPAM annotation 固定 | k3s servicelb / `spec.externalIPs` 手書き | プール管理 + 宣言的 IP 指定。詳細 → [`#lb-ip-払い出し`](#lb-ip-払い出し) |
 | ARP 広告 | Cilium L2 Announcement + kube-vip svc_enable の二重 | どちらか単独 | 2026-04-25 の grafana.b8m.app 502 で kube-vip svc_enable=false により VIP 未付与だった経緯から両方有効化 (`a71e010`) |
 | Ingress | Envoy Gateway (Gateway API v1) | Traefik (k3s デフォルト) / Ingress (旧 API) | Gateway API + SecurityPolicy で OIDC をエッジ実装、HTTPRoute で namespace 越境を許可 |
 | Gateway 本数 | 1 本に統合 (`cluster-gateway`) + LAN 用 1 本 (`internal-gateway`) | `public-gateway` / `internal-gateway` / `cluster-gateway` の 3 本構成 | Cloudflare Access で in/out が分かれるので外向き 1 本で済む |
 | 外部公開 | Cloudflare Tunnel + Access | DDNS + ポート開放 | 家庭ルーターに inbound を開けない。outbound QUIC のみ |
 | 外部 DNS 自動化 | external-dns v0.21.0 (Gateway API v1 native) | v0.20.x | v0.20.x は HTTPRoute v1 の annotation を読み落として A レコードが書かれていた事故あり |
+
+---
+
+## LB IP 払い出し
+
+外部公開用 (`172.22.10.70` cluster-gateway) と LAN 内向け (`172.22.10.71` internal-gateway) は LB-IPAM プール `172.22.10.64/26` の中から、**自動割当ではなくサービスの annotation で明示固定** している。プール定義は [`CiliumLoadBalancerIPPool default-pool`](../../manifests/platform/cilium/config/base/) (Cilium 節参照)。
+
+```yaml
+# manifests/platform/envoy-gateway/config/base/envoy-proxy.yaml
+envoyService:
+  annotations:
+    io.cilium/lb-ipam-ips: ${CLUSTER_GATEWAY_IP}   # 172.22.10.70
+```
+
+### ARP 広告 (二重で有効)
+
+| IP                              | ARP 広告主体 |
+|---------------------------------|--------------|
+| `172.22.10.60` (k8s-api)        | kube-vip DaemonSet (`vip_arp: true`) |
+| `172.22.10.70 / .71` (Service LB)| Cilium L2 Announcement Policy + kube-vip Service LB (`svc_enable: true`) |
+
+`svc_enable: false` にすると LB IP がどこからも ARP されなくなり外部公開系が全滅する (2026-04-25 `grafana.b8m.app` 502 の経緯)。両方有効化を維持する ([kube-vip 節](#kube-vip) も参照)。
+
+### LB IP を増やすとき
+
+1. [`manifests/clusters/prod/config/cluster-settings.yaml`](../../manifests/clusters/prod/config/cluster-settings.yaml) に変数追加
+2. Service 側で `io.cilium/lb-ipam-ips` annotation を設定
+3. プール `172.22.10.64/26` の範囲内であることを確認
+
+サブネット全体の IP 設計は [`docs/network.md#ホスト-ip--vip`](../network.md#ホスト-ip--vip) を参照。
 
 ---
 
@@ -201,6 +231,15 @@ Gateway API v1 の実装。**外部公開用 `cluster-gateway`** と **LAN 内�
 |------------------|----------------|--------------------|------------------------------|------|
 | `cluster-gateway`| `172.22.10.70` | HTTPS:443 `*.b8m.app` | cert-manager (`letsencrypt-issuer`、`*.b8m.app`) | 外部公開、Cloudflare Tunnel origin |
 | `internal-gateway`| `172.22.10.71` | HTTP:80 `*.cluster-internal.bright-room.net` | なし (LAN クローズド) | 非 k3s ノードからの Loki push 等 |
+
+### `internal-gateway` の使い分け
+
+LAN 内クローズドな経路で、Cloudflare Tunnel を経由しない。クライアントによって in-cluster サービスへの到達手段を分けている:
+
+| クライアント | 経路 | 理由 |
+|--------------|------|------|
+| 非 k3s ノード (gateway1 / external1) の Alloy | `internal-gateway` (`172.22.10.71`) → HTTPRoute → Loki 等 | クラスタ外からは Service ClusterIP を引けないので Gateway 経由が必要 |
+| k3s ノード自身 (DaemonSet Alloy など) | `localhost:30800` (NodePort) → Loki | Cilium eBPF kube-proxy replacement が自ノードで NodePort を backend に変換するため、自ノードが L2 lease holder でなくても通る。Gateway を 1 ホップ減らせる |
 
 ### LB IP 固定
 
@@ -336,10 +375,42 @@ ingress:
 
 ---
 
+## 外部公開フロー (`https://<svc>.b8m.app`)
+
+ブラウザから Pod までの一気通貫フロー。本グループの cloudflared / Envoy Gateway / external-dns-cloudflare / cert-manager (別グループ) が連携する。
+
+```mermaid
+sequenceDiagram
+  participant U as Browser
+  participant CFE as Cloudflare Edge
+  participant CFA as Cloudflare Access
+  participant CFT as Cloudflare Tunnel
+  participant CFD as cloudflared Pod
+  participant EG as Envoy Gateway<br/>(172.22.10.70)
+  participant APP as App Pod
+  U->>CFE: HTTPS *.b8m.app
+  CFE->>CFA: GitHub Org + WARP posture チェック
+  CFA->>CFT: OK (Cf-Access-Jwt-Assertion 付与)
+  CFT->>CFD: QUIC (家から outbound のみ)
+  CFD->>EG: HTTPS, SNI=cluster-gateway.b8m.app
+  EG->>APP: HTTPRoute (Host で振り分け)
+  APP-->>U: Response (OIDC は SecurityPolicy / 自前のいずれか)
+```
+
+ポイント:
+
+- **家庭ルーターのポート開放は不要**。outbound QUIC のみで全部成立 ([cloudflared](#cloudflared) 節)
+- TLS 終端は Envoy で実施 (`*.b8m.app` を cert-manager + Let's Encrypt DNS01 で自動発行 → [`platform/certificate.md`](certificate.md))
+- 認証は 2 層: Cloudflare Access (ネットワーク層) + Zitadel OIDC (アプリ層、Envoy SecurityPolicy で実装)
+- DNS レコード (`<svc>.b8m.app` → Cloudflare Tunnel CNAME) は [external-dns-cloudflare](#external-dns-cloudflare) が HTTPRoute から自動生成
+- 設計判断 (なぜ Cloudflare Tunnel か等) は [`docs/architecture.md`](../architecture.md)
+
+---
+
 ## 関連
 
 - [`docs/kubernetes.md`](../kubernetes.md) — クラスタ全体概要・k3s 設定
-- [`docs/network.md`](../network.md) — L2/L3、VIP 一覧、nftables、外部公開フロー
+- [`docs/network.md`](../network.md) — L2/L3、VIP 一覧、nftables
 - [`docs/architecture.md`](../architecture.md) — 認証 2 層、Gateway 統合の設計判断
 - [`docs/platform/certificate.md`](certificate.md) — `*.b8m.app` 証明書の発行
 - [`docs/platform/identity.md`](identity.md) — Zitadel OIDC (Envoy SecurityPolicy が参照)
