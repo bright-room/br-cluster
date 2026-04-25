@@ -216,6 +216,7 @@ OS イメージからやり直す場合は `build-image` → USB-NVMe SSD 焼き
 
 ## 関連
 
+- [`docs/cli.md`](cli.md) — `cluster-forge` CLI 仕様 / 拡張ガイドライン
 - [`docs/hardware.md`](hardware.md) — ノード役割とディスクレイアウト
 - [`docs/network.md`](network.md) — gateway1 が提供する DHCP / DNS / NTP の中身
 - [`docs/kubernetes.md`](kubernetes.md) — `bootstrap-cluster` 以降に Flux が組み立てる中身

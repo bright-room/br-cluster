@@ -9,6 +9,7 @@ br-cluster のドキュメント目次。読みたい目的から該当ファイ
 | 物理ノードの構成・ディスクレイアウト・RTL9210 quirk          | [`hardware.md`](hardware.md) |
 | サブネット / VIP / DHCP / DNS / nftables                      | [`network.md`](network.md) (詳細解説: [`network-nftables-guide.md`](network-nftables-guide.md)) |
 | Packer / Ansible / cluster-forge でゼロから組み上げる         | [`provisioning.md`](provisioning.md) |
+| `cluster-forge` CLI の仕様 / 拡張ガイド                       | [`cli.md`](cli.md) |
 | k3s クラスタ全体像、ブート順、cluster-settings              | [`kubernetes.md`](kubernetes.md) |
 | 設計判断の "なぜ" を一望、外部公開フロー、認証 2 層、管理境界 | [`architecture.md`](architecture.md) |
 | 運用の手順 (シャットダウン / 起動 / k3s リセット 等)         | [`operations.md`](operations.md) |

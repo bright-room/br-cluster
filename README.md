@@ -73,6 +73,7 @@ make check           # lint + test + packer-validate
 - 全体像と設計判断: [`docs/architecture.md`](docs/architecture.md)
 - 物理 / ネットワーク: [`docs/hardware.md`](docs/hardware.md), [`docs/network.md`](docs/network.md)
 - プロビジョニング: [`docs/provisioning.md`](docs/provisioning.md)
+- CLI (`cluster-forge`): [`docs/cli.md`](docs/cli.md)
 - k3s / プラットフォーム: [`docs/kubernetes.md`](docs/kubernetes.md), [`docs/platform/`](docs/platform/)
 - 運用 Runbook: [`docs/operations.md`](docs/operations.md)
 

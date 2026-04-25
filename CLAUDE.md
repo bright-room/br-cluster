@@ -12,7 +12,7 @@
 
 | パス | 責務 | 編集方針 |
 |------|------|----------|
-| `cli/cluster_forge/` | Packer / Ansible / 1Password を束ねる Python CLI | コード変更可、`make test` を通す |
+| `cli/cluster_forge/` | Packer / Ansible / 1Password を束ねる Python CLI ([`docs/cli.md`](docs/cli.md)) | コード変更可、`make test` を通す |
 | `imager/`            | Packer (ARM in Docker) | `packer fmt -check` を通す |
 | `provisioner/`       | Ansible (playbooks / roles / inventories) | `make {env}/provision/lint` を通す |
 | `manifests/`         | Flux で適用される k8s YAML | 追加時は `clusters/prod/platform/kustomization.yaml` に登録 |
