@@ -21,7 +21,7 @@ br-cluster の物理ハードウェアと、各ノードが担う役割をまと
 
 クラスタは自宅 LAN とは別の **専用サブネット (172.22.10.0/24)** を持ち、`br-gateway1` がその境界ルーターを兼ねる。日常使いの端末 (MacBook / Windows PC / スマホ) は自宅ルーター配下の通常 LAN に居て、クラスタへは `br-gateway1` 経由で到達する。
 
-![ネットワークトポロジ](assets/hardware-topology.drawio.svg)
+![ネットワークトポロジ](assets/hardware-topology.svg)
 
 `br-gateway1` だけが 2 系統 (LAN: `eth0` / WAN: `wlan0`) を持ち、残りのノードは `eth0` のみでクラスタ LAN に参加する。
 

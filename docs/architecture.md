@@ -12,47 +12,7 @@ br-cluster の **システム全体像と設計判断の "なぜ" を集約**す
 
 ## 全体構成
 
-```mermaid
-flowchart LR
-  user((Browser))
-
-  subgraph cloudflare["Cloudflare Edge"]
-    cfaccess["CF Access<br/>GitHub Org + WARP"]
-    cftunnel["CF Tunnel"]
-    cfdns["Cloudflare DNS<br/>b8m.app zone"]
-  end
-
-  subgraph lan["自宅 LAN 172.22.10.0/24"]
-    subgraph external["クラスタ外ノード"]
-      gw["br-gateway1<br/>DHCP DNS NTP nftables"]
-      ext["br-external1<br/>Garage S3 for loki and tempo"]
-    end
-
-    subgraph k3s["k3s クラスタ br-node1-6"]
-      cfd["cloudflared Pod"]
-      egw["Envoy Gateway<br/>cluster-gateway 172.22.10.70"]
-      iegw["Envoy Gateway<br/>internal-gateway 172.22.10.71"]
-      apps["Workloads<br/>Grafana Loki Tempo<br/>Zitadel Longhorn etc"]
-      flux["Flux Operator + Flux CD"]
-    end
-  end
-
-  ghrepo[("GitHub<br/>bright-room/br-cluster")]
-  ghzit[("GitHub<br/>br-cluster-zitadel-terraform")]
-  cfrepo[("GitHub<br/>br-cloudflare-terraform")]
-
-  user -->|HTTPS| cfaccess
-  cfaccess --> cftunnel -->|QUIC| cfd -->|HTTPS| egw -->|HTTPRoute| apps
-  apps -->|S3| ext
-
-  ghrepo --> flux --> apps
-  ghzit -. tofu-controller .-> apps
-  cfrepo -. terraform .-> cfaccess
-  cfrepo -. terraform .-> cftunnel
-  cfrepo -. terraform .-> cfdns
-
-  apps -. external-dns .-> cfdns
-```
+![全体構成](assets/architecture-overview.svg)
 
 ## 外部公開フロー
 
@@ -89,29 +49,7 @@ flowchart LR
 
 br-cluster 1 つで全部を管理せず、**責務単位で 4 リポ + 物理運用** に分けている。
 
-```mermaid
-flowchart TB
-  subgraph repo1["bright-room/br-cluster (このリポ)"]
-    a1["k3s 内のリソース<br/>Flux GitOps"]
-    a2["物理 / OS<br/>Packer + Ansible + cluster-forge"]
-  end
-  subgraph repo2["bright-room/br-cloudflare-terraform"]
-    b1["Cloudflare Tunnel"]
-    b2["CF Access App / Policy"]
-    b3["Cloudflare DNS / Zone"]
-  end
-  subgraph repo3["bright-room/br-cluster-zitadel-terraform"]
-    c1["Zitadel テナント / アプリ / ロール"]
-  end
-  subgraph nonk3s["非 k3s インフラ cluster-internal.bright-room.net"]
-    d1["dns / ntp / gateway / external /<br/>node / object-storage"]
-  end
-
-  a1 -. external-dns .-> b3
-  a1 -. tofu-controller .-> c1
-  a1 -. cloudflared .-> b1
-  a1 -. SecurityPolicy issuer .-> c1
-```
+![管理境界](assets/management-boundaries.svg)
 
 | 領域 | 場所 | このリポからの操作 |
 |------|------|-------------------|
