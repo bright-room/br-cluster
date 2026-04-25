@@ -10,33 +10,16 @@
 
 ## グループ全体構成
 
-```mermaid
-flowchart TB
-  subgraph cluster[k3s cluster]
-    subgraph nszit["zitadel namespace"]
-      zit["Zitadel Pod<br/>(auth.b8m.app)"]
-      tfrun["tf-runner<br/>(tofu-controller)"]
-      tfout["Secret tf-zitadel-output<br/>(client_id / client_secret)"]
-    end
-    pg[("CNPG<br/>platform-pg<br/>database: zitadel")]
-    egw[Envoy Gateway<br/>cluster-gateway]
-    coredns["CoreDNS<br/>auth.b8m.app → Envoy VIP"]
-    sp[Envoy SecurityPolicy<br/>各 namespace]
-  end
+![Identity 全体構成](../assets/identity.svg)
 
-  gh[("GitHub<br/>bright-room/br-cluster-zitadel-terraform")]
-  resend[Resend SMTP]
-  user((User Browser))
-  cf[Cloudflare Access]
+OIDC クライアント側の接続パターンには 2 種類ある:
 
-  user -->|*.b8m.app| cf -->|tunnel| egw -->|HTTPRoute| zit
-  zit --> pg
-  tfrun -->|JWT profile| zit
-  tfrun -.git clone.-> gh
-  tfrun -->|writeOutputsToSecret| tfout
-  sp -.OIDC discovery.-> coredns -.short-circuit.-> egw --> zit
-  zit -. メール送信 .-> resend
-```
+| パターン | 例 | 仕組み |
+|---|---|---|
+| **Native OIDC** (アプリ自前) | Grafana | アプリが OIDC / OAuth2 をネイティブに喋る。`tf-zitadel-output` の `<app>_client_id` / `<app>_client_secret` を `ExternalSecret` で取り込み、`auth.b8m.app` の token endpoint に **直接** アクセスする。**`SecurityPolicy` は不要** |
+| **Envoy SecurityPolicy** (Envoy 肩代わり) | Prometheus / Alertmanager / Hubble UI / Longhorn UI 等 | アプリは認証を喋れない / 共通化したい場合、HTTPRoute に `SecurityPolicy` を attach し Envoy が OIDC を肩代わり。未認証なら Zitadel にリダイレクトし、cookie で sidecar 化 |
+
+どちらのパターンでも、Zitadel 側の OIDC アプリ宣言は **`br-cluster-zitadel-terraform` の `zitadel_application_oidc.platform`** に集約され、tofu-controller が apply した結果が `tf-zitadel-output` Secret に書き出される (一次元情報)。クライアント側 (br-cluster) はそれを読むだけ。
 
 ## グループ全体の設計判断
 

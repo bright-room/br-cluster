@@ -36,3 +36,6 @@ provisioner/inventories/*/host_vars/br-gateway1.yaml
 
 ### misc ###
 .tmp/
+
+### docs/assets/logos (third-party brand logos; license/source to be reviewed before committing) ###
+docs/assets/logos/
