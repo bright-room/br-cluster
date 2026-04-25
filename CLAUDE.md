@@ -77,7 +77,11 @@
 
 ## ドキュメントの書き方
 
-- 図は **すべて mermaid**
+- 図の使い分け:
+  - **構造化された図 (シーケンス / フロー / 依存関係) は mermaid**
+  - **リッチなアーキ図 (ネットワーク全体図、物理配線、アイコン多用) は `*.drawio.svg`** を `docs/assets/` 配下に置き、`![](assets/foo.drawio.svg)` で埋め込む
+    - `.drawio.svg` 形式で保存すると GitHub では SVG として表示され、draw.io / VS Code の `hediet.vscode-drawio` で再編集可能
+    - `architecture-beta` + iconify は GitHub プレビューでアイコンが解決されないので使わない
 - Mermaid 図でエラーが出やすいパターン:
   - ノードラベルに `(loki/tempo)` のような括弧 + `/` → 引用符 `"..."` で囲む or 平文化
   - subgraph タイトルの括弧 → 平文化
