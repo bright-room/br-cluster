@@ -10,7 +10,7 @@
 
 ## グループ全体構成
 
-![](../assets/secrets.svg)
+![secrets プラットフォーム構成図](../assets/secrets.svg)
 
 ## グループ全体の設計判断
 

@@ -11,7 +11,7 @@
 
 ## グループ全体構成
 
-![](../assets/storage.svg)
+![storage プラットフォーム構成図](../assets/storage.svg)
 
 ## グループ全体の設計判断
 

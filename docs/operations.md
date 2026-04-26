@@ -346,10 +346,12 @@ curl -k https://172.22.10.70:443 -H 'Host: cluster-gateway.b8m.app'
 
 1. Longhorn UI (`https://longhorn.b8m.app`) でボリュームを確認
 2. PVC 側を編集して新しいサイズに
+
    ```sh
    kubectl edit pvc <name> -n <namespace>
    # spec.resources.requests.storage を増やす
    ```
+
 3. Longhorn の online expansion が走るのを待つ (PVC `Bound` 状態のまま)
 
 **確認:**
@@ -379,11 +381,13 @@ df -h  # アプリ Pod 内で確認
 1. GitHub App の private key を再発行
 2. 1Password の `flux-system` 用 item を更新
 3. `flux-system` namespace の `flux-system` Secret を上書き
+
    ```sh
    kubectl -n flux-system delete secret flux-system
    # Ansible bootstrap/secrets を再投入するか手動で kubectl apply
    make {env}/provision/bootstrap-cluster
    ```
+
 4. `flux reconcile source git flux-system -n flux-system` で fetch を確認
 
 #### 1Password Connect
@@ -391,13 +395,17 @@ df -h  # アプリ Pod 内で確認
 1. 1Password 側で新しい credentials JSON / token を発行
 2. ローカルの `.secret/{env}/1password-credentials.json` と `.connect_token` を更新
 3. `bootstrap` 経由でクラスタ内 Secret も更新
+
    ```sh
    make {env}/provision/bootstrap-cluster
    ```
+
 4. クラスタ内の onepassword-connect Pod を再起動
+
    ```sh
    kubectl -n onepassword rollout restart deployment onepassword-connect
    ```
+
 5. ExternalSecret が再 sync するのを確認 (`kubectl get externalsecret -A`)
 
 **注意:**

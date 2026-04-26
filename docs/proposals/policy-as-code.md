@@ -149,7 +149,7 @@ Phase 1 を merge してから 2 週間後に運用実績を振り返り、Phase
 
 ### (A) ディレクトリ構造
 
-```
+```text
 policies/
 ├── README.md                       # policy 一覧と Rego の書き方
 ├── kubernetes/
@@ -215,12 +215,12 @@ policy-test:
 
 ```make
 policy/test:
-	conftest verify --policy policies/
-	conftest test --combine --policy policies/ manifests/
+ conftest verify --policy policies/
+ conftest test --combine --policy policies/ manifests/
 
 policy/install:
-	# mise.toml に conftest を追加してバージョン管理
-	mise install
+ # mise.toml に conftest を追加してバージョン管理
+ mise install
 ```
 
 `mise.toml` に conftest を追加して、CI とローカルでバージョンを揃える。

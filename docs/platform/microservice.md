@@ -10,7 +10,7 @@
 
 ## グループ全体構成
 
-![](../assets/microservice.svg)
+![マイクロサービス基盤構成図](../assets/microservice.svg)
 
 ## グループ全体の設計判断
 

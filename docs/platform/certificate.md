@@ -11,7 +11,7 @@
 
 ## グループ全体構成
 
-![](../assets/certificate.svg)
+![certificate プラットフォーム構成図](../assets/certificate.svg)
 
 ## グループ全体の設計判断
 

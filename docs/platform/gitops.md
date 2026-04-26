@@ -11,7 +11,7 @@
 
 ## グループ全体構成
 
-![](../assets/gitops.svg)
+![GitOps プラットフォーム構成図](../assets/gitops.svg)
 
 ## グループ全体の設計判断
 

@@ -1,0 +1,20 @@
+{
+  "config": {
+    "default": true,
+    "MD013": false,
+    "MD024": { "siblings_only": true },
+    "MD033": false,
+    "MD041": false,
+    // MD060 (table-column-style) は table のパイプ整列を等幅前提でチェックするが、
+    // 日本語全角文字が混じる table では原理的に整列不可能なため disable。
+    "MD060": false
+  },
+  "globs": ["**/*.md"],
+  "ignores": [
+    "provisioner/collections/**",
+    "provisioner/roles/ipr-cnrs.nftables/**",
+    ".generated/**",
+    ".secret/**",
+    "node_modules/**"
+  ]
+}
