@@ -4,6 +4,7 @@
     manager: auto
 
 - name: Remove list of snap packages
+  when: "'snapd' in ansible_facts.packages"
   block:
     - name: Increment the retry count
       set_fact:
@@ -29,7 +30,6 @@
         msg: "Removing snap package failed, let's give it another shot"
     - name: Retrying deletion
       include_tasks: packages.yaml
-  when: "'snapd' in ansible_facts.packages"
 
 - name: Remove packages
   apt:
