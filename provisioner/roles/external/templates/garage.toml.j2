@@ -8,7 +8,7 @@ consistency_mode = "consistent"
 
 rpc_bind_addr = "[::]:{{ garage.server.rpc_port }}"
 rpc_public_addr = "{{ ext.ip }}:{{ garage.server.rpc_port }}"
-rpc_secret = "{{ secret_garage_rpc_secret }}"
+rpc_secret = "{{ secrets_garage_rpc_secret }}"
 
 [s3_api]
 s3_region = "{{ garage.provisioning.region }}"

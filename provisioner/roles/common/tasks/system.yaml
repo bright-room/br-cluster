@@ -28,7 +28,7 @@
       line: "Domains={{ gateway_host.domains.dns }}"
     - regexp: "^#?FallbackDNS="
       line: "FallbackDNS={{ dns.fallback_servers | join(' ') }}"
-  notify: restart systemd-resolved
+  notify: Restart systemd-resolved
 
 - name: Change default GPU Memory Split
   blockinfile:
@@ -59,7 +59,7 @@
     regexp: '^((?!.*\busb-storage\.quirks=0bda:9210:u\b).*)$'
     line: '\1 usb-storage.quirks=0bda:9210:u'
     backrefs: true
-  notify: reboot
+  notify: Reboot
 
 - name: Update NTP server
   lineinfile:
@@ -78,4 +78,4 @@
 - name: Set timezone
   community.general.timezone:
     name: "{{ timezone }}"
-  notify: reboot
+  notify: Reboot

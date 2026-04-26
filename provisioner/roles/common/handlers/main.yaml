@@ -1,18 +1,18 @@
 ---
-- name: reboot
+- name: Reboot
   reboot:
 
-- name: restart multipath
+- name: Restart multipath
   systemd:
     name: multipathd
     state: restarted
 
-- name: restart systemd-resolved
+- name: Restart systemd-resolved
   service:
     name: systemd-resolved
     state: restarted
 
-- name: restart ssh
+- name: Restart ssh
   service:
     name: ssh
     state: restarted

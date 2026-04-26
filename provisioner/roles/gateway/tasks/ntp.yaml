@@ -19,4 +19,4 @@
     group: "root"
     mode: "0644"
     backup: true
-  notify: restart ntp
+  notify: Restart ntp
