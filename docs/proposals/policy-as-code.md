@@ -114,6 +114,37 @@ policy 1〜4 については現時点で明確な違反は見当たらず、修�
 Phase 4 は本 proposal のスコープ外。Phase 3 まで進んだ時点で別途
 `docs/proposals/gitops-only-enforcement.md` を起こす。
 
+## Phase 1 の運用フォロー (2026-05-10 目安)
+
+Phase 1 を merge してから 2 週間後に運用実績を振り返り、Phase 2 着手要否を
+判断する。**`/schedule` で remote agent を仕込むことも可能** だが、初回は
+手動で振り返る方が判断材料を直接見られて良いので、ここではタスクとして
+記録するに留める。
+
+### 振り返り項目
+
+| 項目 | 確認方法 |
+|------|---------|
+| policy-test job が CI で fire した PR 数  | `gh pr list --state all --search "label:policy" --limit 50` または `gh run list --workflow ci.yaml --json conclusion,event` から `policy-test` step の fail 履歴 |
+| `policies/exceptions.rego` への追加件数   | `git log --since=2026-04-26 -- policies/exceptions.rego` |
+| 偽陽性 (本来通るべき manifest が deny された) の件数 | exception 追加 PR のコミットメッセージから読む |
+| 真の違反捕捉 (規約違反を機械的に弾けた) の件数      | 同上 |
+
+### Phase 2 着手判断の閾値 (目安)
+
+| 状況 | 判断 |
+|------|------|
+| 偽陽性ゼロ + 真の違反捕捉 1 件以上 | Phase 2 (Gatekeeper) proposal 着手 |
+| 偽陽性が複数発生 / policy 設計に問題が見えた | Phase 1 の policy を見直し、Phase 2 は延期 |
+| 該当 PR ゼロ (CI が一度も発火していない)    | 観察期間延長。さらに 2 週間後に再判断 |
+
+### 備考
+
+- もし手動振り返りの忘却リスクがあるなら、`/schedule` で 2026-05-10 に
+  GitHub Issue を起票する agent を仕込む選択肢もある (本 proposal merge 時点
+  では未実施)
+- 振り返り結果は本 proposal の「更新履歴」に追記する形で残す
+
 ## 構成要素 (Phase 1)
 
 ### (A) ディレクトリ構造
