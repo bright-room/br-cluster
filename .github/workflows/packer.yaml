@@ -1,0 +1,29 @@
+---
+name: Packer
+
+on:
+  pull_request:
+    paths:
+      - 'imager/**'
+      - '.github/workflows/packer.yaml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: packer-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # `packer validate` は mkaczanowski/packer-builder-arm の entrypoint が
+  # binfmt_misc セットアップを要求するため `--privileged` 必須。
+  # CI runner に privileged を与える価値が薄いので fmt のみで運用する。
+  fmt:
+    name: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      - uses: hashicorp/setup-packer@1aa358be5cf73883762b302a3a03abd66e75b232  # v3
+        with:
+          version: 1.15.1
+      - run: packer fmt -check imager/

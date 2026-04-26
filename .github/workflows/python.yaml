@@ -1,0 +1,50 @@
+---
+name: Python
+
+on:
+  pull_request:
+    paths:
+      - 'cli/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/python.yaml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac  # v2
+        with:
+          install: true
+          cache: true
+      - run: uv sync --frozen --group dev
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac  # v2
+        with:
+          install: true
+          cache: true
+      - run: uv sync --frozen --group dev
+      - name: pytest with coverage
+        run: uv run pytest -v --cov=cluster_forge --cov-report=term-missing --cov-report=xml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        if: always()
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: ignore

@@ -1,0 +1,86 @@
+---
+name: Manifests
+
+on:
+  pull_request:
+    paths:
+      - 'manifests/**'
+      - 'policies/**'
+      - 'Makefile'
+      - '.github/workflows/manifests.yaml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manifests-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  kustomize-build:
+    name: Kustomize Build + kubeconform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac  # v2
+        with:
+          install: true
+          cache: true
+      - name: Install kubeconform
+        run: |
+          curl -sSL -o /tmp/kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar -xzf /tmp/kubeconform.tar.gz -C /usr/local/bin kubeconform
+      - name: Build & validate cluster overlays
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          fail=0
+          for kfile in manifests/clusters/**/kustomization.yaml; do
+            dir=$(dirname "$kfile")
+            echo "::group::kustomize build $dir"
+            if ! kustomize build "$dir" > /tmp/built.yaml; then
+              echo "::error::kustomize build failed for $dir"
+              fail=1
+              echo "::endgroup::"
+              continue
+            fi
+            # CRD 由来の schema は missing-schemas で許容し、core k8s スキーマを strict で検査
+            if ! kubeconform -strict -ignore-missing-schemas -summary \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+              /tmp/built.yaml; then
+              fail=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $fail
+
+  flux-local:
+    name: flux-local test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac  # v2
+        with:
+          install: true
+          cache: true  # mise から helm / kustomize / flux2 を取得
+      # flux-local は内部で pytest を起動し、root の pyproject.toml が
+      # `testpaths = ["cli/tests"]` を指すため cli/tests/conftest.py が読み込まれる。
+      # conftest が cluster_forge を import するので、project 依存を入れておく。
+      - run: uv sync --frozen --group dev
+      - run: uv pip install flux-local
+      # Flux Kustomization をたどって HelmRelease を offline render
+      - name: flux-local test
+        run: uv run flux-local test --enable-helm --path manifests/clusters/prod -v
+
+  policy-test:
+    name: Policy Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac  # v2
+        with:
+          install: true
+          cache: true
+      - run: make policy/test
