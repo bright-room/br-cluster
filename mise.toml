@@ -6,6 +6,7 @@ k9s = "latest"
 helm = "latest"
 stern = "latest"
 kustomize = "latest"
+conftest = "0.62.0"
 
 [env]
 KUBECONFIG = ".secret/prod/config"
