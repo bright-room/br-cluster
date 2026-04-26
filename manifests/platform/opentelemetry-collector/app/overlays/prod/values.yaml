@@ -1,3 +1,4 @@
+---
 # opentelemetry-collector helm values (prod overlay)
 #
 # Keep the gateway off control-plane Pi (4GB) and spread the 2 replicas

@@ -1,3 +1,4 @@
+---
 # cilium helm values (monitoring)
 
 # Prometheus monitoring for cilium-operator

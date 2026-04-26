@@ -18,7 +18,7 @@
 
 - name: Create cluster token file
   copy:
-    content: "{{ secret_k3s_token }}"
+    content: "{{ secrets_k3s_token }}"
     dest: "{{ k3s.config_dir }}/cluster-token"
     owner: "root"
     group: "root"

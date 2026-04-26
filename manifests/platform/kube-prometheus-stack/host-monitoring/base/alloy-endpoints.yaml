@@ -1,3 +1,4 @@
+---
 # systemd Alloy の HTTP server (:12345) を全 8 ノードで scrape するための
 # EndpointSlice。node_exporter (:9101) の host-nodes と同じ 8 ホストを指すが、
 # port が違うので別スライス。Alloy は journal → Loki 専用として

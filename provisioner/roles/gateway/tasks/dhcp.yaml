@@ -28,7 +28,7 @@
     owner: "root"
     group: "root"
     mode: "0644"
-  notify: restart kea-dhcp4
+  notify: Restart kea-dhcp4
 
 - name: Ensure kea-dhcp4-server is running and enabled
   systemd:

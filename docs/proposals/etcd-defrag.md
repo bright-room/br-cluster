@@ -40,6 +40,7 @@ ssh br-node3 'sudo ps -eo pid,rss,comm --sort=-rss | head -20'
 ```
 
 期待される主要プロセス:
+
 - `k3s-server` — 中で kube-apiserver / controller-manager / scheduler / kubelet /
   embedded etcd が動く。k3s はこれらを単一プロセスに同居させるので、プロセス RSS
   だけでは内訳が取れない点に注意
@@ -203,7 +204,7 @@ WantedBy=timers.target
 
 k3s は etcdctl をバンドルしない。Ansible で別途配布が必要:
 
-- https://github.com/etcd-io/etcd/releases から arm64 の tar.gz を取得
+- <https://github.com/etcd-io/etcd/releases> から arm64 の tar.gz を取得
 - `ansible.builtin.unarchive` で `etcdctl` バイナリだけを `/usr/local/bin/` に展開
   (mode 0755)
 - バージョンは k3s が同梱する etcd のバージョンに合わせるのが安全
@@ -213,16 +214,20 @@ k3s は etcdctl をバンドルしない。Ansible で別途配布が必要:
 ## 実行順序と検証手順
 
 1. **現状計測** — まず defrag の余地があるかを確認する:
-   ```
+
+   ```sh
    ssh br-node1 'sudo ls -lh /var/lib/rancher/k3s/server/db/etcd/member/snap/db'
    ssh br-node2 'sudo ls -lh /var/lib/rancher/k3s/server/db/etcd/member/snap/db'
    ssh br-node3 'sudo ls -lh /var/lib/rancher/k3s/server/db/etcd/member/snap/db'
    ```
+
    この db ファイルが defrag で縮む対象
 2. **1 ノード手動実行** — br-node2 か br-node3 (follower 側) で手動実行:
-   ```
+
+   ```sh
    sudo /usr/local/sbin/k3s-etcd-defrag.sh
    ```
+
 3. **前後比較** — db ファイルサイズと、k9s で etcd プロセスの RSS を観察
 4. **問題なければ Ansible role 化** — `provisioner/roles/k3s_etcd_defrag/` として
    tasks/files/templates を整備

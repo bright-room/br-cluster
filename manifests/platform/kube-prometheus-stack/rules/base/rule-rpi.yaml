@@ -1,3 +1,4 @@
+---
 # Raspberry Pi-specific health alerts.
 #
 # Temperature comes from node_exporter's built-in thermal_zone collector.

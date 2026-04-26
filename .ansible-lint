@@ -13,15 +13,16 @@ mock_roles:
 # yaml rules are checked by yamllint job separately
 skip_list:
   - yaml[line-length]
-  # TODO: roles/secrets/ の内部変数 (`secret_*`, `_op_*`, `_restic_*`) を
-  # role 名 prefix の `secrets_` に揃え、task key 並びを canonical
-  # (name, run_once, when, become, block) に整えてこの skip を外す。
-  - var-naming[no-role-prefix]
-  - key-order[task]
-  # TODO: playbook 内の `import_role: name: bootstrap/verify_nodes` 形式を
-  # `bootstrap/` を分離した独立 role か collection FQRN に置き換えて外す。
+  # `roles/bootstrap/<area>/` のサブディレクトリ配置は意図的な構成
+  # (bootstrap 関連の役割を 1 グループにまとめる)。ここは flat 化しない。
   - role-name[path]
-  # TODO: roles/*/handlers/main.yaml の handler 名を大文字始まりに直して外す。
-  - name[casing]
+  # TODO: roles/{common,external,monitoring_agent,gateway,k3s,k3s_leader_restart,bootstrap/*}
+  # 内の変数 prefix を role 名に揃えてこの skip を外す。
+  # (roles/secrets/ は対応済み)
+  - var-naming[no-role-prefix]
+  # TODO: roles/{k3s,monitoring_agent} の task key 並びを canonical
+  # (name, when, throttle, block) に整えてこの skip を外す。
+  # (roles/secrets/ は対応済み)
+  - key-order[task]
 
 profile: moderate

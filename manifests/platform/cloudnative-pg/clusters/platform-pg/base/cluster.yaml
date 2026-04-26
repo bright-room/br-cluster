@@ -1,3 +1,4 @@
+---
 # Platform-shared PostgreSQL cluster.
 #
 # One physical CNPG cluster hosts multiple logical databases for platform

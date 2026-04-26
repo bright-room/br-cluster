@@ -30,7 +30,7 @@
     owner: root
     group: root
     mode: "0644"
-  notify: reload systemd
+  notify: Reload systemd
 
 - name: Install systemd timer unit
   template:
@@ -39,7 +39,7 @@
     owner: root
     group: root
     mode: "0644"
-  notify: reload systemd
+  notify: Reload systemd
 
 - name: Flush handlers so timer reloads before enable
   meta: flush_handlers

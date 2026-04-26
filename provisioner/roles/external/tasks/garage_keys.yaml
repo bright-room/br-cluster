@@ -1,8 +1,8 @@
 ---
 - name: Set operator credentials from cached secrets
   set_fact:
-    _garage_access_key: "{{ secret_garage_operators[garage_user_item.name]['access_key_id'] }}"
-    _garage_secret_key: "{{ secret_garage_operators[garage_user_item.name]['secret_access_key'] }}"
+    _garage_access_key: "{{ secrets_garage_operators[garage_user_item.name]['access_key_id'] }}"
+    _garage_secret_key: "{{ secrets_garage_operators[garage_user_item.name]['secret_access_key'] }}"
   no_log: true
 
 - name: Check if key already exists

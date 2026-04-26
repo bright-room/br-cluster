@@ -33,7 +33,7 @@
 - name: Create Cloudflare secret file
   lineinfile:
     path: "{{ lets_encrypt.virtual_environment }}/.secrets/cloudflare_credentials.ini"
-    line: "dns_cloudflare_api_token={{ secret_cloudflare_token }}"
+    line: "dns_cloudflare_api_token={{ secrets_cloudflare_token }}"
     create: true
     state: present
     owner: root

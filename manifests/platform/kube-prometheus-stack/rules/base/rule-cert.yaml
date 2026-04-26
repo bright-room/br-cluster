@@ -1,3 +1,4 @@
+---
 # cert-manager certificate health.
 # Requires the cert-manager ServiceMonitor to be picked up by Prometheus —
 # see docs/observability-plan.md P0-E (SM selector mismatch). Until then these

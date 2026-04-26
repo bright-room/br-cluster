@@ -75,7 +75,7 @@ Go 製の OIDC / OAuth2 / SAML IdP。`auth.b8m.app` で公開し、CNPG の `zit
 
 [`platform/coredns`](networking.md#coredns) の hosts プラグインに以下が入っている:
 
-```
+```text
 ${CLUSTER_GATEWAY_IP} auth.b8m.app
 ```
 

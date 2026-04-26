@@ -1,3 +1,4 @@
+---
 # Single EndpointSlice covering the systemd-managed node_exporter (port 9101)
 # on every host — gateway / external / k3s control-plane / k3s workers.
 # This is intentionally parallel to the in-cluster prometheus-node-exporter

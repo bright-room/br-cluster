@@ -17,15 +17,15 @@
 
 ### メトリクス
 
-![](../assets/observability-metrics.svg)
+![metrics 収集パイプライン](../assets/observability-metrics.svg)
 
 ### ログ
 
-![](../assets/observability-logs.svg)
+![logs 収集パイプライン](../assets/observability-logs.svg)
 
 ### トレース
 
-![](../assets/observability-traces.svg)
+![traces 収集パイプライン](../assets/observability-traces.svg)
 
 ## グループ全体の設計判断
 
@@ -92,6 +92,7 @@ Prometheus Operator + Prometheus + Alertmanager + node-exporter DS + kube-state-
 systemd 版 `node_exporter` (`:9101`) と `alloy` (`:12345`) を **k3s 外から** scrape する経路。EndpointSlice で全 8 ノードを列挙し、ServiceMonitor で `job=node-exporter-host` / `job=alloy-host` のラベルを付与。
 
 これにより:
+
 - gateway1 / external1 (k3s 外) も含めた**全 8 ノード**のホスト OS メトリクスが揃う
 - k3s ノードでは **DS の `:9100` と systemd の `:9101` が並走**。片方落ちても継続観測できる (cascade resilience)
 

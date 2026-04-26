@@ -1,3 +1,4 @@
+---
 # K3s-specific overrides
 # K3s runs all control-plane components in a single binary,
 # so individual component scraping must be disabled to avoid

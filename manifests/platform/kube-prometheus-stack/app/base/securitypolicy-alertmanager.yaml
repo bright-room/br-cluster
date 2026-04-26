@@ -1,3 +1,4 @@
+---
 # Gates alertmanager.b8m.app behind Zitadel OIDC at the Envoy Gateway layer.
 # CF Access (github_organization + WARP device posture) still fronts the
 # hostname; this policy adds the application-level identity so Alertmanager

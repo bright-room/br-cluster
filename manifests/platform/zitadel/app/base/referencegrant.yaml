@@ -1,3 +1,4 @@
+---
 # Allows SecurityPolicy resources in other namespaces (kube-prom-stack,
 # longhorn-system, etc.) to reference the zitadel Service via the
 # SecurityPolicy.oidc.provider.backendRefs field. Needed as a workaround

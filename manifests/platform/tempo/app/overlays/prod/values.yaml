@@ -1,3 +1,4 @@
+---
 # tempo helm values (prod overlay)
 
 # Keep Tempo off control-plane nodes (Pi 4GB).

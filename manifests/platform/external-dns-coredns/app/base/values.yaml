@@ -1,3 +1,4 @@
+---
 # external-dns helm values (base) — CoreDNS/etcd (SkyDNS schema) provider
 #
 # Writes A/CNAME records into the etcd instance that br-gateway1's CoreDNS

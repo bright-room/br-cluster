@@ -20,21 +20,21 @@
         src: rpi-metrics.sh.j2
         dest: /usr/local/bin/rpi-metrics.sh
         mode: "0755"
-      notify: restart rpi-metrics timer
+      notify: Restart rpi-metrics timer
 
     - name: Copy rpi-metrics.service
       template:
         src: rpi-metrics.service.j2
         dest: /etc/systemd/system/rpi-metrics.service
         mode: "0644"
-      notify: restart rpi-metrics timer
+      notify: Restart rpi-metrics timer
 
     - name: Copy rpi-metrics.timer
       template:
         src: rpi-metrics.timer.j2
         dest: /etc/systemd/system/rpi-metrics.timer
         mode: "0644"
-      notify: restart rpi-metrics timer
+      notify: Restart rpi-metrics timer
 
     - name: Enable and start rpi-metrics.timer
       systemd:

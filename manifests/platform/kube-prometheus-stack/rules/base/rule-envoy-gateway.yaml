@@ -1,3 +1,4 @@
+---
 # Envoy Gateway proxy に対する HTTP レベルのアラート。
 # PodMonitor `envoy-proxy` (envoy-gateway/monitoring) が :19001/stats/prometheus
 # をスクレイプしている前提。

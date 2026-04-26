@@ -114,7 +114,7 @@
     owner: "root"
     group: "root"
     mode: "0644"
-  notify: restart coredns
+  notify: Restart coredns
 
 - name: Disable and stop systemd-resolved
   systemd:

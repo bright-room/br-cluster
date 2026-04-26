@@ -1,5 +1,5 @@
 ---
-- name: restart garage
+- name: Restart garage
   service:
     name: garage
     state: restarted
@@ -7,12 +7,12 @@
 
 # Caddyfile で admin API を無効化 (admin off) しているため systemctl reload が
 # admin API 経由の CLI 呼び出しで stuck する。restart で置き換える。
-- name: reload caddy
+- name: Reload caddy
   service:
     name: caddy
     state: restarted
 
-- name: restart caddy
+- name: Restart caddy
   service:
     name: caddy
     state: restarted

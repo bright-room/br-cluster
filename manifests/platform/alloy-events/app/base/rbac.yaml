@@ -1,3 +1,4 @@
+---
 # Alloy chart の default RBAC が Events を含むかは app version 依存なので、
 # 確実を期して events get/list/watch を追加で明示する (重複しても害なし)。
 # chart が作る ServiceAccount は alloy-events.alloy-events。

@@ -31,7 +31,7 @@
     name: caddy
     groups: "{{ garage.operator.group }}"
     append: true
-  notify: restart caddy
+  notify: Restart caddy
 
 - name: Ensure Garage SSL directory is group-readable
   file:
@@ -46,7 +46,7 @@
     owner: root
     group: root
     mode: "0644"
-  notify: reload caddy
+  notify: Reload caddy
 
 - name: Create Caddy systemd override directory
   file:

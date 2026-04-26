@@ -40,7 +40,7 @@
       --agree-tos \
       --non-interactive \
       --rsa-key-size 4096 \
-      --email {{ secret_admin_email }} \
+      --email {{ secrets_admin_email }} \
       --domain {{ external_host.domains.object_storage }}
   register: certbot_create
   changed_when:
@@ -83,7 +83,7 @@
     url: "https://garagehq.deuxfleurs.fr/_releases/{{ versions.garage }}/{{ garage_arch }}-unknown-linux-musl/garage"
     dest: "{{ install_dir }}/garage"
     mode: "0755"
-  notify: restart garage
+  notify: Restart garage
 
 # --- Configure ---
 - name: Copy Garage configuration
@@ -93,14 +93,14 @@
     owner: "{{ garage.operator.user }}"
     group: "{{ garage.operator.group }}"
     mode: "0640"
-  notify: restart garage
+  notify: Restart garage
 
 - name: Copy Garage systemd service
   template:
     src: "garage.service.j2"
     dest: "/etc/systemd/system/garage.service"
     mode: "0644"
-  notify: restart garage
+  notify: Restart garage
 
 - name: Enable and start Garage
   systemd:

@@ -1,3 +1,4 @@
+---
 # Host-level health. Works for both DaemonSet node-exporter (k3s nodes)
 # and systemd node_exporter (external nodes, and br-node1〜6 once P1-A lands).
 apiVersion: monitoring.coreos.com/v1

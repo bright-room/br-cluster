@@ -1,3 +1,4 @@
+---
 # loki helm values (base)
 #
 # SingleBinary deployment backed by Garage (S3-compatible) on br-external1.

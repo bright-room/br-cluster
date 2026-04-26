@@ -29,4 +29,4 @@
       line: "GSSAPIAuthentication no"
     - regexp: "^#?X11Forwarding.*"
       line: "X11Forwarding no"
-  notify: restart ssh
+  notify: Restart ssh

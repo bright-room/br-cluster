@@ -1,3 +1,4 @@
+---
 # zitadel helm values (prod overlay)
 #
 # Pin to worker nodes with modest limits for Pi (8GB workers).

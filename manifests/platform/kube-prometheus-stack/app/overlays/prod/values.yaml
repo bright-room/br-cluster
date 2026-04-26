@@ -1,3 +1,4 @@
+---
 # kube-prometheus-stack helm values (prod overlay)
 
 # Keep stateful / heavy components off control-plane nodes (Pi 4GB).

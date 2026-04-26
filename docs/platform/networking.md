@@ -16,15 +16,15 @@
 
 外向き (HTTPS リクエスト) のフロー:
 
-![](../assets/networking-external.svg)
+![クラスタ外部ネットワーク構成](../assets/networking-external.svg)
 
 LAN 内サービス (Loki push 等) のフロー:
 
-![](../assets/networking-internal.svg)
+![クラスタ内部ネットワーク構成](../assets/networking-internal.svg)
 
 データプレーン / コントロールプレーンの依存関係:
 
-![](../assets/networking-dependency.svg)
+![ネットワーク依存関係](../assets/networking-dependency.svg)
 
 ## グループ全体の設計判断
 

@@ -1,3 +1,4 @@
+---
 # monitoring_agent role (systemd node_exporter + rpi-metrics + Alloy journal)
 # の自己死活監視。ソースは systemd node_exporter の --collector.systemd で
 # provisioner/roles/monitoring_agent/templates/node_exporter.service.j2 で
