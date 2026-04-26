@@ -1,11 +1,11 @@
 ---
-name: Packer
+name: Packer CI
 
 on:
   pull_request:
     paths:
       - 'imager/**'
-      - '.github/workflows/packer.yaml'
+      - '.github/workflows/packer-ci.yaml'
 
 permissions:
   contents: read
@@ -19,7 +19,7 @@ jobs:
   # binfmt_misc セットアップを要求するため `--privileged` 必須。
   # CI runner に privileged を与える価値が薄いので fmt のみで運用する。
   fmt:
-    name: fmt
+    name: packer-fmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
