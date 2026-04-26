@@ -1,29 +1,67 @@
-.PHONY: lint format test packer-validate policy/test policy/verify check bootstrap clean clean-all
+.PHONY: help \
+        lint format test \
+        yaml/lint actions/lint ansible/lint \
+        packer/fmt \
+        manifests/build manifests/flux-local \
+        policy/test policy/verify \
+        check
 
-# === Development ===
+# === Help ===
 
-lint:
+help:
+	@awk 'BEGIN{FS=":.*?## "} /^[a-zA-Z0-9_\/.-]+:.*?## / {printf "  \033[36m%-28s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+# === Development (Python) ===
+
+lint: ## ruff check + format check
 	uv run ruff check .
 	uv run ruff format --check .
 
-format:
+format: ## ruff format (write)
 	uv run ruff format .
 
-test:
-	uv run pytest -v
+test: ## pytest with coverage
+	uv run pytest -v --cov=cluster_forge --cov-report=term-missing
 
-packer-validate:
+# === YAML / Actions ===
+
+yaml/lint: ## yamllint
+	mise exec -- yamllint -c .yamllint.yaml .
+
+actions/lint: ## actionlint (.github/workflows)
+	mise exec -- actionlint -color
+
+# === Ansible ===
+
+ansible/lint: ## ansible-lint (env 非依存、CI と同じ呼び出し)
+	cd provisioner && mise exec -- ansible-galaxy collection install -r requirements.yaml -p ./collections >/dev/null
+	# `roles/ipr-cnrs.nftables` は gitignore された vendor role。CI の checkout には
+	# 存在しないので exclude_paths に書いても効かないが、ローカルには bootstrap で
+	# 落ちてくるので CLI で明示的に除外する。
+	cd provisioner && mise exec -- ansible-lint --exclude roles/ipr-cnrs.nftables --exclude collections playbooks/
+
+# === Packer ===
+
+packer/fmt: ## packer fmt -check (validate は --privileged 必須なので fmt のみ)
 	packer fmt -check imager/
 
-# Rego ポリシーの単体テスト
-policy/verify:
+# === Manifests / Policy ===
+
+manifests/build: ## kustomize build + kubeconform on all cluster overlays
+	mise exec -- ./scripts/manifests-build.sh
+
+manifests/flux-local: ## flux-local test (HelmRelease offline render)
+	uv run flux-local test --enable-helm --path manifests/clusters/prod -v
+
+policy/verify: ## Rego ポリシーの単体テスト
 	mise exec -- conftest verify --policy policies/
 
-# manifests/platform/ をポリシーで検査 (--combine で cross-resource を解決)
-policy/test: policy/verify
+policy/test: policy/verify ## manifests/platform/ をポリシーで検査
 	mise exec -- conftest test --combine --policy policies/ manifests/platform/
 
-check: lint test packer-validate policy/test
+# === Aggregate ===
+
+check: lint test yaml/lint actions/lint ansible/lint packer/fmt manifests/build manifests/flux-local policy/test ## CI 等価チェック一式
 
 # === Cluster Operations ===
 

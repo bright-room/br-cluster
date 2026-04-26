@@ -5,6 +5,11 @@ exclude_paths:
   - provisioner/roles/ipr-cnrs.nftables/
   - .secret/
   - .generated/
+  # cluster-forge generate-inventory が生成する gitignore 済ファイル。
+  # CI checkout には存在しないが、ローカルでは ansible-lint に拾われるため除外する。
+  # ansible-lint は provisioner/ から起動するので相対パス両方を列挙。
+  - inventories/dev/group_vars/all/cluster_hosts.yaml
+  - inventories/prod/group_vars/all/cluster_hosts.yaml
 
 # vendored role を mock 扱いにして playbook 側の syntax-check を通す
 mock_roles:
