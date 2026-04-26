@@ -23,11 +23,11 @@
       tags: [always]
 
   roles:
-    - role: bootstrap_verify_nodes
+    - role: bootstrap/verify_nodes
       tags: [verify]
 
-    - role: bootstrap_secrets
+    - role: bootstrap/secrets
       tags: [secrets]
 
-    - role: bootstrap_fluxcd
+    - role: bootstrap/fluxcd
       tags: [fluxcd]

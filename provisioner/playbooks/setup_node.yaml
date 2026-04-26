@@ -65,20 +65,20 @@
         - kube-vip
 
   roles:
-    - role: bootstrap_cilium
+    - role: bootstrap/cilium
       tags: [cilium]
       vars:
         cilium_values_base: /tmp/bootstrap-manifests/platform/cilium/app/base/values.yaml
         cilium_values_overlay: /tmp/bootstrap-manifests/platform/cilium/app/overlays/prod/values.yaml
         cilium_config_overlay: /tmp/bootstrap-manifests/platform/cilium/config/overlays/prod
 
-    - role: bootstrap_coredns
+    - role: bootstrap/coredns
       tags: [coredns]
       vars:
         coredns_values_base: /tmp/bootstrap-manifests/platform/coredns/app/base/values.yaml
         coredns_values_overlay: /tmp/bootstrap-manifests/platform/coredns/app/overlays/prod/values.yaml
 
-    - role: bootstrap_kube_vip
+    - role: bootstrap/kube_vip
       tags: [kube-vip]
       vars:
         kube_vip_values_base: /tmp/bootstrap-manifests/platform/kube-vip/app/base/values.yaml
