@@ -6,6 +6,8 @@ on:
     paths:
       - '.github/workflows/**'
       - '.github/actions/**'
+      - 'mise.toml'
+      - 'mise.lock'
 
 permissions:
   contents: read

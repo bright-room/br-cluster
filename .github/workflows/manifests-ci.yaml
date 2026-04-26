@@ -6,7 +6,12 @@ on:
     paths:
       - 'manifests/**'
       - 'policies/**'
+      - 'scripts/manifests-build.sh'
       - 'Makefile'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'mise.toml'
+      - 'mise.lock'
       - '.github/workflows/manifests-ci.yaml'
 
 permissions:
