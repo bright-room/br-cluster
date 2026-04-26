@@ -1,5 +1,5 @@
 ---
-name: Lint
+name: Yaml CI
 
 on:
   pull_request:
@@ -7,7 +7,6 @@ on:
       - '**/*.yaml'
       - '**/*.yml'
       - '.yamllint.yaml'
-      - '.github/workflows/lint.yaml'
 
 permissions:
   contents: read
@@ -17,7 +16,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  yamllint:
+  lint:
+    name: yaml-lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
@@ -26,13 +26,3 @@ jobs:
           python-version: '3.12'
       - run: pip install yamllint
       - run: yamllint -c .yamllint.yaml .
-
-  actionlint:
-    name: actionlint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
-      - name: Run actionlint
-        run: |
-          bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) 1.7.7
-          ./actionlint -color

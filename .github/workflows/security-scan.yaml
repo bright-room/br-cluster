@@ -1,5 +1,5 @@
 ---
-name: Security
+name: Security scan
 
 on:
   pull_request:
@@ -19,7 +19,7 @@ jobs:
   # secret scan は GitHub 標準の Secret Scanning に委譲 (Public repo なら無償)
   # Settings → Code security → Secret scanning を ON にすること
   osv-scanner:
-    name: OSV Scanner
+    name: osv-scan
     # reusable workflow 側で permissions / SARIF upload を持つ
     permissions:
       actions: read

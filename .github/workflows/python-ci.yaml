@@ -1,5 +1,5 @@
 ---
-name: Python
+name: Python CI
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
       - 'cli/**'
       - 'pyproject.toml'
       - 'uv.lock'
-      - '.github/workflows/python.yaml'
+      - '.github/workflows/python-ci.yaml'
 
 permissions:
   contents: read

@@ -1,5 +1,5 @@
 ---
-name: Manifests
+name: Manifests CI
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
       - 'manifests/**'
       - 'policies/**'
       - 'Makefile'
-      - '.github/workflows/manifests.yaml'
+      - '.github/workflows/manifests-ci.yaml'
 
 permissions:
   contents: read
@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   kustomize-build:
-    name: Kustomize Build + kubeconform
+    name: kustomize-build + kubeconform
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
@@ -52,7 +52,7 @@ jobs:
           exit $fail
 
   flux-local:
-    name: flux-local test
+    name: flux-local-test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
@@ -70,7 +70,7 @@ jobs:
         run: uv run flux-local test --enable-helm --path manifests/clusters/prod -v
 
   policy-test:
-    name: Policy Test
+    name: policy-test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
