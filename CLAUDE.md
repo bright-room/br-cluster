@@ -52,6 +52,21 @@
 - **PR 単位で 1 トピック**。bug fix と refactor を混ぜない
 - 大きな変更は **proposal** を `docs/proposals/` に書いて先に合意形成 (例: [`docs/proposals/etcd-defrag.md`](docs/proposals/etcd-defrag.md))
 
+## Policy as Code (Conftest)
+
+`manifests/platform/` は CI で Conftest により Rego ポリシー検査される ([`policies/`](policies/) 配下)。Phase 1 のルール:
+
+| 対象 | 要求 |
+|------|------|
+| `HelmRelease` | `chart.spec.version` (HelmRepository style) または `chartRef` 先 OCIRepository の `ref.tag/digest` を pin。floating (`*`, `x.x`, `^/~/>/<` 始まり) 禁止 |
+| `HelmRelease` | sourceRef / chartRef は同一リポ内に定義された HelmRepository / OCIRepository のみ参照可 |
+| `Secret` | `data` / `stringData` 直書き禁止。ExternalSecret (1Password) / cert-manager 経由で生成 |
+| `Service` (LoadBalancer) | `lb-ipam.cilium.io/ips` annotation で IP 固定 (詳細 → [`docs/network.md`](docs/network.md)) |
+
+ローカル検査: `make policy/test`。新しいポリシーや例外の追加は [`docs/proposals/policy-as-code.md`](docs/proposals/policy-as-code.md) の段階導入計画に沿う。
+
+**例外を追加する場合**: [`policies/exceptions.rego`](policies/exceptions.rego) に `Kind/namespace/name` の形式で entry 追加 + コミットメッセージで理由を必ず明記。例外なしで通せるなら manifest 側を直す方が筋。
+
 ## chicken-and-egg な依存 (ブートストラップ時要注意)
 
 | 依存 | なぜ問題か | 対処 |

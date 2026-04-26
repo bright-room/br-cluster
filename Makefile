@@ -1,4 +1,4 @@
-.PHONY: lint format test packer-validate check bootstrap clean clean-all
+.PHONY: lint format test packer-validate policy/test policy/verify check bootstrap clean clean-all
 
 # === Development ===
 
@@ -15,7 +15,15 @@ test:
 packer-validate:
 	packer fmt -check imager/
 
-check: lint test packer-validate
+# Rego ポリシーの単体テスト
+policy/verify:
+	mise exec -- conftest verify --policy policies/
+
+# manifests/platform/ をポリシーで検査 (--combine で cross-resource を解決)
+policy/test: policy/verify
+	mise exec -- conftest test --combine --policy policies/ manifests/platform/
+
+check: lint test packer-validate policy/test
 
 # === Cluster Operations ===
 

@@ -38,3 +38,16 @@ jobs:
 
       - name: Packer fmt check
         run: packer fmt -check imager/
+
+  policy-test:
+    name: Policy Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: jdx/mise-action@v2
+        with:
+          install: true
+          cache: true
+
+      - run: make policy/test
