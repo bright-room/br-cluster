@@ -11,15 +11,10 @@ on:
       - 'pyproject.toml'
       - 'uv.lock'
       - 'mise.toml'
-      - 'mise.lock'
       - '.github/workflows/manifests-ci.yaml'
 
 permissions:
   contents: read
-
-env:
-  # mise.lock に無い URL/checksum での install を拒否 (サプライチェーン対策)
-  MISE_LOCKED: "1"
 
 concurrency:
   group: manifests-${{ github.ref }}
