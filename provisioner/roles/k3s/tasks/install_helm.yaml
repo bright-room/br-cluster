@@ -15,6 +15,7 @@
   register: helm_check
 
 - name: Install helm
+  when: not helm_check.stat.exists
   block:
     - name: Download and extract helm binary
       unarchive:
@@ -29,4 +30,3 @@
         dest: /usr/local/bin/helm
         mode: "0755"
         remote_src: true
-  when: not helm_check.stat.exists

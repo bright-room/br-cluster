@@ -11,6 +11,7 @@
   register: kubectl_check
 
 - name: Install kubectl
+  when: not kubectl_check.stat.exists
   block:
     - name: Download kubectl binary
       get_url:
@@ -27,4 +28,3 @@
     - name: Verify kubectl checksum
       shell: "echo \"$(cat {{ tmp_dir }}/kubectl.sha256)  {{ install_dir }}/kubectl\" | sha256sum --check"
       changed_when: false
-  when: not kubectl_check.stat.exists

@@ -1,5 +1,6 @@
 ---
 - name: Install primary master
+  when: is_primary_control_node | bool
   block:
     - name: Download k3s installation script
       get_url:
@@ -32,9 +33,9 @@
         mode: "0600"
         remote_src: true
 
-  when: is_primary_control_node | bool
-
 - name: Install secondary masters
+  throttle: 1
+  when: not (is_primary_control_node | bool)
   block:
     - name: Wait for primary master
       wait_for:
@@ -74,5 +75,3 @@
         group: "{{ ansible_user }}"
         mode: "0600"
         remote_src: true
-  throttle: 1
-  when: not (is_primary_control_node | bool)

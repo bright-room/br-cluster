@@ -20,9 +20,5 @@ skip_list:
   # 内の変数 prefix を role 名に揃えてこの skip を外す。
   # (roles/secrets/ は対応済み)
   - var-naming[no-role-prefix]
-  # TODO: roles/{k3s,monitoring_agent} の task key 並びを canonical
-  # (name, when, throttle, block) に整えてこの skip を外す。
-  # (roles/secrets/ は対応済み)
-  - key-order[task]
 
 profile: moderate
