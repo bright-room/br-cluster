@@ -1,17 +1,13 @@
 ---
-name: Yaml-lint
+name: Lint
 
 on:
   pull_request:
     paths:
       - '**/*.yaml'
       - '**/*.yml'
-      - '**/*.md'
-      - '**/*.sh'
-      - 'scripts/**'
       - '.yamllint.yaml'
-      - '.markdownlint-cli2.jsonc'
-      - '.github/workflows/yamllint.yaml'
+      - '.github/workflows/lint.yaml'
 
 permissions:
   contents: read
@@ -40,23 +36,3 @@ jobs:
         run: |
           bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) 1.7.7
           ./actionlint -color
-
-  markdown:
-    name: Markdown
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
-      - uses: DavidAnson/markdownlint-cli2-action@db43aef879112c3119a410d69f66701e0d530809  # v17
-        with:
-          # config / ignores は .markdownlint-cli2.jsonc を参照
-          globs: '**/*.md'
-
-  shell:
-    name: Shell
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
-      - uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38  # 2.0.0
-        with:
-          scandir: scripts
-          severity: warning

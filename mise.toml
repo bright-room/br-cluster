@@ -7,6 +7,7 @@ helm = "latest"
 stern = "latest"
 kustomize = "latest"
 conftest = "0.62.0"
+kubeconform = "0.6.7"
 
 [env]
 KUBECONFIG = ".secret/prod/config"
