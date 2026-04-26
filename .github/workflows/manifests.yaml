@@ -26,11 +26,6 @@ jobs:
         with:
           install: true
           cache: true
-      - name: Install kubeconform
-        run: |
-          curl -sSL -o /tmp/kubeconform.tar.gz \
-            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
-          tar -xzf /tmp/kubeconform.tar.gz -C /usr/local/bin kubeconform
       - name: Build & validate cluster overlays
         run: |
           set -euo pipefail
