@@ -1,3 +1,4 @@
+---
 name: Packer
 
 on:
@@ -14,8 +15,11 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  validate:
-    name: Validate
+  # `packer validate` は mkaczanowski/packer-builder-arm の entrypoint が
+  # binfmt_misc セットアップを要求するため `--privileged` 必須。
+  # CI runner に privileged を与える価値が薄いので fmt のみで運用する。
+  fmt:
+    name: fmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
@@ -23,12 +27,3 @@ jobs:
         with:
           version: 1.15.1
       - run: packer fmt -check imager/
-      # validate は本番 build と同じ mkaczanowski/packer-builder-arm を使う
-      # (arm builder plugin がイメージに同梱されているため)
-      - name: packer validate (in builder image)
-        run: |
-          docker run --rm \
-            -v "${{ github.workspace }}/imager:/build/packer" \
-            -w /build/packer \
-            mkaczanowski/packer-builder-arm:latest \
-            validate -var 'hostname=ci' .

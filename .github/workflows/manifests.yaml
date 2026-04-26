@@ -1,3 +1,4 @@
+---
 name: Manifests
 
 on:
@@ -64,14 +65,14 @@ jobs:
         with:
           install: true
           cache: true  # mise から helm / kustomize / flux2 を取得
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
-        with:
-          python-version: '3.12'
-          cache: pip
-      - run: pip install flux-local
+      # flux-local は内部で pytest を起動し、root の pyproject.toml が
+      # `testpaths = ["cli/tests"]` を指すため cli/tests/conftest.py が読み込まれる。
+      # conftest が cluster_forge を import するので、project 依存を入れておく。
+      - run: uv sync --frozen --group dev
+      - run: uv pip install flux-local
       # Flux Kustomization をたどって HelmRelease を offline render
       - name: flux-local test
-        run: flux-local test --enable-helm --path manifests/clusters/prod -v
+        run: uv run flux-local test --enable-helm --path manifests/clusters/prod -v
 
   policy-test:
     name: Policy Test

@@ -17,11 +17,15 @@ rules:
   comments:
     min-spaces-from-content: 1
   comments-indentation: disable
-  document-start:
-    present: false
+  # 既存 manifest はマルチドキュメント (`*-app.yaml`) で `---` を使い、
+  # 単ドキュメントの kustomization 等は `---` 無し、という mixed 運用。
+  # 統一する価値が薄いので check しない。
+  document-start: disable
   indentation:
     spaces: 2
-    indent-sequences: consistent
+    # 既存 manifest が `patches:` を indent しない流儀の所と indent する所を
+    # 混在させているので、sequence の indent は問わない。
+    indent-sequences: whatever
   braces:
     max-spaces-inside: 1
   octal-values:

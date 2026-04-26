@@ -9,5 +9,10 @@ exclude_paths:
 # yaml rules are checked by yamllint job separately
 skip_list:
   - yaml[line-length]
+  # TODO: roles/secrets/ の内部変数 (`secret_*`, `_op_*`, `_restic_*`) を
+  # role 名 prefix の `secrets_` に揃える + task key 並びを canonical
+  # (name, run_once, when, become, block) に整える。別 PR で対応。
+  - var-naming[no-role-prefix]
+  - key-order[task]
 
 profile: moderate
