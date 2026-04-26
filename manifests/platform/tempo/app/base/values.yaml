@@ -1,3 +1,4 @@
+---
 # tempo helm values (base, grafana/tempo single-binary chart)
 #
 # Single-binary backed by Garage (S3-compatible) on br-external1.

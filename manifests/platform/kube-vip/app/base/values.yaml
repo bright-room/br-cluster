@@ -1,3 +1,4 @@
+---
 # kube-vip helm values (base)
 config:
   address: "${KUBE_VIP_ADDRESS}"

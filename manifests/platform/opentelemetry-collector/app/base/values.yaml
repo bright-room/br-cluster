@@ -1,3 +1,4 @@
+---
 # opentelemetry-collector helm values (base, open-telemetry/opentelemetry-collector chart)
 #
 # Phase A: gateway-mode Collector that sits between Alloy (agent) and the

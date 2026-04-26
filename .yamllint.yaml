@@ -17,14 +17,11 @@ rules:
   comments:
     min-spaces-from-content: 1
   comments-indentation: disable
-  # TODO: 全 YAML を `---` 始まりに統一して `present: true` に戻す
-  # (現状 357 ファイルが先頭 `---` 無し、マルチドキュメントの一部が `---` 有り)。
-  document-start: disable
+  document-start:
+    present: true
   indentation:
     spaces: 2
-    # TODO: `patches:` 等の sequence indent をリポジトリ全体で indented に
-    # 揃えて `consistent` (or default) に戻す。
-    indent-sequences: whatever
+    indent-sequences: consistent
   braces:
     max-spaces-inside: 1
   octal-values:

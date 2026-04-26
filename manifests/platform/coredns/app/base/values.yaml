@@ -1,3 +1,4 @@
+---
 # coredns helm values (base)
 replicaCount: 2
 rollingUpdate:

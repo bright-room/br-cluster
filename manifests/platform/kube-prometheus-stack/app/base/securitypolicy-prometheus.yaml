@@ -1,3 +1,4 @@
+---
 # Gates prometheus.b8m.app behind Zitadel OIDC at the Envoy Gateway layer.
 # backendRefs points at the Zitadel Service directly (see
 # securitypolicy-alertmanager.yaml for the c-ares rationale).

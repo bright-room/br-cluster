@@ -1,3 +1,4 @@
+---
 # Monitoring pipeline self-health and cluster-core liveness.
 # These rules answer: "is the monitoring stack itself working?" and
 # "is k3s still serving?"

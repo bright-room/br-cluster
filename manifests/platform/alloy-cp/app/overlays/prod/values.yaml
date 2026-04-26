@@ -1,3 +1,4 @@
+---
 # alloy-cp helm values (prod overlay)
 #
 # Shadow-mode phase 1: target br-node2 only (2nd CP, not primary).

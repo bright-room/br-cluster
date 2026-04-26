@@ -1,3 +1,4 @@
+---
 # Pod / Deployment / StatefulSet / Job level alerts, derived from
 # kube-state-metrics. No extra scrape dependencies.
 apiVersion: monitoring.coreos.com/v1

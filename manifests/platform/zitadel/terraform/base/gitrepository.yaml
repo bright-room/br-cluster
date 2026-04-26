@@ -1,3 +1,4 @@
+---
 # Lives in flux-system so it can reuse the existing GitHub App credentials
 # Secret (flux-system) set up for the root sync. Install the same GitHub App
 # on bright-room/br-cluster-zitadel-terraform to grant clone access.

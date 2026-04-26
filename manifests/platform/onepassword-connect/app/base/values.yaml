@@ -1,3 +1,4 @@
+---
 # onepassword-connect helm values (base)
 connect:
   credentialsName: op-credentials

@@ -1,3 +1,4 @@
+---
 # Gates hubble.b8m.app behind Zitadel OIDC at the Envoy Gateway layer.
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy

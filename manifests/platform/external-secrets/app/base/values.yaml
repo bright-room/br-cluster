@@ -1,2 +1,3 @@
+---
 # external-secrets helm values (base)
 installCRDs: true

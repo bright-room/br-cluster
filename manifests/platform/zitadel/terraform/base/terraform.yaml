@@ -1,3 +1,4 @@
+---
 # Drives `terraform plan` / `apply` inside the cluster against this cluster's
 # own Zitadel instance. State is stored as a Secret under the tofu-controller
 # namespace (kubernetes backend, injected by the controller), so state lifecycle

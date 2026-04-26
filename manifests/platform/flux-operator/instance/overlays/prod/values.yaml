@@ -1,3 +1,4 @@
+---
 # flux-instance helm values (prod overlay)
 instance:
   sync:

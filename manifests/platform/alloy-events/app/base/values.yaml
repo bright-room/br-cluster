@@ -1,3 +1,4 @@
+---
 # alloy helm values — dedicated instance for shipping K8s Events to Loki (P2-A)
 #
 # 既存の alloy DaemonSet (Pod log tailing) とは別インスタンスを立てる:

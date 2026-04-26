@@ -1,3 +1,4 @@
+---
 # loki helm values (prod overlay)
 #
 # Pin SingleBinary + gateway to workers (Pi 4GB) with modest limits.

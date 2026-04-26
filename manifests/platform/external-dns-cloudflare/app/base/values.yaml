@@ -1,3 +1,4 @@
+---
 # external-dns helm values (base) — Cloudflare provider
 provider:
   name: cloudflare

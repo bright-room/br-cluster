@@ -1,3 +1,4 @@
+---
 services:
   op-connect-api:
     image: 1password/connect-api:latest

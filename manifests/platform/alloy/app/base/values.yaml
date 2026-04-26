@@ -1,3 +1,4 @@
+---
 # alloy helm values (base)
 #
 # Single agent replacing the retired fluent-bit + fluentd stack. Runs as a
