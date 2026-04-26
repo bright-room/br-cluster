@@ -10,8 +10,12 @@ on:
 permissions:
   contents: read
 
+env:
+  # mise.lock に無い URL/checksum での install を拒否 (サプライチェーン対策)
+  MISE_LOCKED: "1"
+
 concurrency:
-  group: lint-${{ github.ref }}
+  group: actions-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
