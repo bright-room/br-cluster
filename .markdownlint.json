@@ -1,5 +1,5 @@
 {
-  "$comment": "TODO: 既存 docs/ 配下に MD010/031/032/034/036/040/045 違反が 36 件残っている。別 PR で markdownlint-cli2 --fix と手修正で潰し、これらを再有効化する。",
+  "$comment": "TODO: 既存 docs/ 配下の MD010/031/032/034/036/040/045 違反 (36 件) を markdownlint-cli2 --fix と手修正で潰し、これらを再有効化する。",
   "default": true,
   "MD010": false,
   "MD013": false,
