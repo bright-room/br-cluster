@@ -31,6 +31,7 @@ br-cluster のドキュメント目次。読みたい目的から該当ファイ
 | Storage                   | Longhorn / csi-external-snapshotter                                                                        | [`platform/storage.md`](platform/storage.md) |
 | Observability             | kube-prometheus-stack / Grafana / Loki / Tempo / OTel Collector / Alloy×3 / hubble-flow-exporter / metrics-server | [`platform/observability.md`](platform/observability.md) |
 | GitOps                    | Flux Operator / Flux CD / tofu-controller                                                                  | [`platform/gitops.md`](platform/gitops.md) |
+| Policy as Code            | Conftest + Rego (`policies/`) — CI で manifests を検査                                                     | [`platform/policy.md`](platform/policy.md) |
 
 ## 書き方の前提
 
