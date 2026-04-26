@@ -1,7 +1,7 @@
 ---
 services:
   op-connect-api:
-    image: 1password/connect-api:latest
+    image: 1password/connect-api:latest@sha256:e915c0c843972f02b0e7e2de502bda8bd4a092288b3f1866098a857bd715a281
     hostname: ${ENV}-op-connect-api
     ports:
       - "8080:8080"
@@ -11,7 +11,7 @@ services:
       - op-data:/home/opuser/.op/data
 
   op-connect-sync:
-    image: 1password/connect-sync:latest
+    image: 1password/connect-sync:latest@sha256:6297ca6136c0f0fb096bc64c49e1bc8df2aab35282ebff8c7bb60745ef176d0d
     hostname: ${ENV}-op-connect-sync
     environment:
       OP_SESSION: ${OP_SESSION}

@@ -1,4 +1,4 @@
-FROM debian:bookworm-slim AS builder
+FROM debian:bookworm-slim@sha256:f9c6a2fd2ddbc23e336b6257a5245e31f996953ef06cd13a59fa0a1df2d5c252 AS builder
 
 ARG TARGETARCH
 
@@ -24,7 +24,7 @@ RUN curl -LO "https://get.helm.sh/helm-v4.1.3-linux-${TARGETARCH}.tar.gz" && \
     tar -xzf helm-v4.1.3-linux-${TARGETARCH}.tar.gz && \
     install -o root -g root -m 0755 linux-${TARGETARCH}/helm /usr/local/bin/helm
 
-FROM python:3.14.3-slim-bookworm
+FROM python:3.14.3-slim-bookworm@sha256:f21c0d5a44c56805654c15abccc1b2fd576c8d93aca0a3f74b4aba2dc92510e2
 
 COPY --from=builder /usr/bin/op /usr/bin/
 COPY --from=builder /usr/local/bin/kubectl /usr/local/bin/
