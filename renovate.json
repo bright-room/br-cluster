@@ -37,6 +37,10 @@
     {
       "matchManagers": ["mise"],
       "groupName": "mise tools"
+    },
+    {
+      "matchManagers": ["flux"],
+      "pinDigests": false
     }
   ],
   "customManagers": [
