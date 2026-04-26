@@ -11,39 +11,7 @@
 
 ## グループ全体構成
 
-```mermaid
-flowchart TB
-  subgraph local["手元 / GitHub"]
-    git[("GitHub<br/>bright-room/br-cluster")]
-    gitzit[("GitHub<br/>br-cluster-zitadel-terraform")]
-  end
-
-  subgraph fluxsys["flux-system namespace"]
-    fop["Flux Operator<br/>(HelmRelease を作るだけ)"]
-    finst["FluxInstance CR"]
-    src["source-controller"]
-    kctl["kustomize-controller"]
-    hctl["helm-controller"]
-    nctl["notification-controller"]
-    tofu["tofu-controller<br/>(Terraform CRD)"]
-
-    gr1["GitRepository<br/>flux-system<br/>(this repo)"]
-    gr2["GitRepository<br/>zitadel-terraform"]
-    rootkust["Kustomization<br/>flux-system root"]
-    platkust["Kustomization 群<br/>(各 platform app)"]
-    tfres["Terraform<br/>zitadel"]
-  end
-
-  fop --> finst
-  finst -. install / upgrade .-> src & kctl & hctl & nctl
-
-  git --> gr1 --> rootkust --> platkust
-  rootkust -.includes.-> gr1
-  gitzit --> gr2 --> tfres
-  tofu -.reconcile.-> tfres
-
-  platkust -.creates.-> hctl
-```
+![](../assets/gitops.svg)
 
 ## グループ全体の設計判断
 

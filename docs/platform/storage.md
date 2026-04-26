@@ -11,38 +11,7 @@
 
 ## グループ全体構成
 
-```mermaid
-flowchart TB
-  subgraph nodes["worker ノード"]
-    n4["br-node4<br/>/var/lib/longhorn"]
-    n5["br-node5<br/>/var/lib/longhorn"]
-    n6["br-node6<br/>/var/lib/longhorn"]
-  end
-
-  subgraph lhns["longhorn-system namespace"]
-    lhmgr["longhorn-manager DS"]
-    lhcsi["longhorn-csi-plugin DS"]
-    lhui["longhorn-frontend / longhorn-ui"]
-    lhdrv["StorageClass: longhorn"]
-  end
-
-  subgraph kubesys["kube-system namespace"]
-    snap["snapshot-controller<br/>(VolumeSnapshot CRD)"]
-  end
-
-  pvc[(PersistentVolumeClaim)]
-  vs[(VolumeSnapshot)]
-
-  app[Application Pod]
-
-  app --> pvc
-  pvc -->|storageClassName| lhdrv
-  lhdrv --> lhmgr --> n4 & n5 & n6
-  pvc -. snapshot .-> vs
-  vs --> snap --> lhcsi
-
-  egw[Envoy Gateway<br/>cluster-gateway] --> lhui
-```
+![](../assets/storage.svg)
 
 ## グループ全体の設計判断
 

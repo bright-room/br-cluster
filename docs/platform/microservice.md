@@ -10,36 +10,7 @@
 
 ## グループ全体構成
 
-```mermaid
-flowchart TB
-  subgraph cnpgns["cnpg-system"]
-    op[CloudNativePG<br/>Operator]
-  end
-
-  subgraph pgns["platform-pg namespace"]
-    cluster[(Cluster: platform-pg<br/>instances: 2<br/>PG 16.4)]
-    pri[(primary)]
-    standby[(standby)]
-    svcrw[Service<br/>platform-pg-rw]
-    svcro[Service<br/>platform-pg-ro]
-  end
-
-  subgraph apps[アプリ側]
-    zit[Zitadel]
-  end
-
-  longhorn[(Longhorn PVC<br/>5Gi × 2)]
-  prom[Prometheus<br/>PodMonitor]
-  op -.reconcile.-> cluster
-  cluster --> pri & standby
-  pri --- longhorn
-  standby --- longhorn
-  pri --> svcrw
-  standby --> svcro
-
-  zit -->|database: zitadel<br/>role: zitadel| svcrw
-  cluster -->|metrics| prom
-```
+![](../assets/microservice.svg)
 
 ## グループ全体の設計判断
 
