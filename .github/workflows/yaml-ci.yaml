@@ -16,7 +16,7 @@ env:
   MISE_LOCKED: "1"
 
 concurrency:
-  group: lint-${{ github.ref }}
+  group: yaml-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
