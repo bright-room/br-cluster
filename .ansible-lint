@@ -1,0 +1,13 @@
+---
+# Run only on first-party content; vendored collections/roles are skipped.
+exclude_paths:
+  - provisioner/collections/
+  - provisioner/roles/ipr-cnrs.nftables/
+  - .secret/
+  - .generated/
+
+# yaml rules are checked by yamllint job separately
+skip_list:
+  - yaml[line-length]
+
+profile: moderate

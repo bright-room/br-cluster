@@ -27,6 +27,7 @@ testpaths = ["cli/tests"]
 [dependency-groups]
 dev = [
     "pytest>=8.0",
+    "pytest-cov>=5.0",
     "ruff>=0.11",
 ]
 

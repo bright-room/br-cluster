@@ -1,0 +1,29 @@
+---
+extends: default
+
+ignore: |
+  provisioner/collections/
+  provisioner/roles/ipr-cnrs.nftables/
+  .secret/
+  .generated/
+  uv.lock
+
+rules:
+  line-length:
+    max: 200
+    level: warning
+  truthy:
+    allowed-values: ["true", "false", "on"]  # GitHub Actions uses `on:`
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: disable
+  document-start:
+    present: false
+  indentation:
+    spaces: 2
+    indent-sequences: consistent
+  braces:
+    max-spaces-inside: 1
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: false
