@@ -7,6 +7,8 @@ on:
       - 'cli/**'
       - 'pyproject.toml'
       - 'uv.lock'
+      - 'mise.toml'
+      - 'mise.lock'
       - '.github/workflows/python-ci.yaml'
 
 permissions:

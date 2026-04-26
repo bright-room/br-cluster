@@ -11,6 +11,8 @@ on:
       - 'provisioner/ansible.cfg'
       - 'provisioner/requirements.yaml'
       - '.ansible-lint'
+      - 'mise.toml'
+      - 'mise.lock'
       - '.github/workflows/ansible-ci.yaml'
 
 permissions:
