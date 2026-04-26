@@ -2,7 +2,8 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended",
-    "helpers:pinGitHubActionDigests"
+    "helpers:pinGitHubActionDigests",
+    "docker:pinDigests"
   ],
   "timezone": "Asia/Tokyo",
   "schedule": ["before 9am on saturday"],
@@ -10,10 +11,16 @@
   "prConcurrentLimit": 0,
   "prHourlyLimit": 0,
   "separateMinorPatch": true,
-  "minimumReleaseAge": "3 days",
+  "minimumReleaseAge": "7 days",
   "automerge": false,
+  "rebaseWhen": "behind-base-branch",
+  "osvVulnerabilityAlerts": true,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 9am on saturday"]
+  },
   "major": {
-    "minimumReleaseAge": "7 days",
+    "minimumReleaseAge": "14 days",
     "automerge": false
   },
   "flux": {
@@ -22,6 +29,16 @@
   "kustomize": {
     "managerFilePatterns": ["/manifests/.+/kustomization\\.ya?ml$/"]
   },
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions"
+    },
+    {
+      "matchManagers": ["mise"],
+      "groupName": "mise tools"
+    }
+  ],
   "customManagers": [
     {
       "customType": "regex",
