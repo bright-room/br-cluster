@@ -156,7 +156,7 @@ Phase 1 を merge してから 4 週間後に運用実績を振り返る。
 
 ### (A) 配置
 
-```
+```text
 manifests/platform/argo-workflows/
 ├── kustomization.yaml
 ├── namespace.yaml
