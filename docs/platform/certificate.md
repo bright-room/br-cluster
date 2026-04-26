@@ -11,34 +11,7 @@
 
 ## グループ全体構成
 
-```mermaid
-flowchart LR
-  op[(1Password<br/>item: cert-bot)]
-  es[External Secrets]
-  cf[Cloudflare API]
-  acme[Let's Encrypt ACME]
-
-  subgraph cm[cert-manager]
-    ctrl[cert-manager controller]
-    li[ClusterIssuer<br/>letsencrypt-issuer]
-    ssi[ClusterIssuer<br/>self-signed-issuer]
-    cai[ClusterIssuer<br/>ca-issuer]
-    cacert[Certificate<br/>br-cluster-ca]
-  end
-
-  egw[Gateway<br/>cluster-gateway<br/>annotation:<br/>cert-manager.io/cluster-issuer]
-  cert[Certificate<br/>cluster-gateway-tls]
-  secret[(Secret<br/>cluster-gateway-tls)]
-
-  op --> es --> cm
-  ssi --> cacert --> cai
-  egw -. annotation .-> ctrl
-  ctrl --> li
-  li -- DNS01 --> cf
-  li -. ACME order .- acme
-  ctrl --> cert --> secret
-  egw -.uses.-> secret
-```
+![](../assets/certificate.svg)
 
 ## グループ全体の設計判断
 

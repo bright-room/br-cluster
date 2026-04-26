@@ -10,37 +10,7 @@
 
 ## グループ全体構成
 
-```mermaid
-flowchart LR
-  saas[("1Password SaaS<br/>Vault: br-cluster-prod")]
-
-  subgraph cluster["k3s cluster"]
-    subgraph opns["onepassword namespace"]
-      op["onepassword-connect<br/>API + Sync"]
-      cred[("Secret op-credentials<br/>+ onepassword-connect-token")]
-    end
-
-    subgraph esns["external-secrets namespace"]
-      eso["External Secrets<br/>Operator"]
-      css1["ClusterSecretStore<br/>onepassword-backend"]
-      css2["ClusterSecretStore<br/>kubernetes-backend"]
-      sa["ServiceAccount<br/>kubernetes-backend<br/>read zitadel ns"]
-    end
-
-    es1["ExternalSecret<br/>各 namespace"]
-    es2["ExternalSecret<br/>rename bridge"]
-    sec1[("Secret in app ns")]
-    tfout[("Secret tf-zitadel-output<br/>in zitadel ns")]
-  end
-
-  saas <-. sync .-> op
-  cred --> op
-  op --- css1
-  sa --- css2
-  es1 --> css1 --> sec1
-  es2 --> css2
-  css2 -. read .-> tfout --> es2 --> sec1
-```
+![](../assets/secrets.svg)
 
 ## グループ全体の設計判断
 

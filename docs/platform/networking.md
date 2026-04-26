@@ -16,55 +16,15 @@
 
 外向き (HTTPS リクエスト) のフロー:
 
-```mermaid
-flowchart LR
-  user((Browser))
-  cf["Cloudflare<br/>Edge + Access + Tunnel"]
-  cfd["cloudflared Pod<br/>(QUIC outbound)"]
-  egw["Envoy Gateway<br/>cluster-gateway<br/>172.22.10.70"]
-  app[Application Pod]
-
-  user -->|HTTPS *.b8m.app| cf
-  cf -->|QUIC| cfd
-  cfd -->|HTTPS, SNI=cluster-gateway.b8m.app| egw
-  egw -->|HTTPRoute<br/>Host 振分| app
-```
+![](../assets/networking-external.svg)
 
 LAN 内サービス (Loki push 等) のフロー:
 
-```mermaid
-flowchart LR
-  alloy["Alloy<br/>(gateway1 / external1)"]
-  iegw["Envoy Gateway<br/>internal-gateway<br/>172.22.10.71"]
-  loki[Loki]
-  alloy -->|HTTP *.cluster-internal…| iegw
-  iegw --> loki
-```
+![](../assets/networking-internal.svg)
 
 データプレーン / コントロールプレーンの依存関係:
 
-```mermaid
-flowchart TB
-  subgraph dp[データプレーン]
-    cilium[Cilium DaemonSet<br/>CNI + eBPF kube-proxy<br/>+ LB-IPAM + L2 Ann.]
-    coredns[CoreDNS<br/>cluster DNS]
-    kubevip[kube-vip<br/>API VIP + svc LB ARP]
-    envoy[Envoy Gateway<br/>L7 / TLS / OIDC]
-    cfd[cloudflared<br/>Tunnel client]
-  end
-
-  subgraph cp[コントロールプレーン]
-    extcf[external-dns-cloudflare<br/>→ Cloudflare DNS]
-    extcd[external-dns-coredns<br/>→ gateway1 etcd / CoreDNS]
-  end
-
-  cilium --> coredns
-  cilium --> envoy
-  kubevip -.k8s API VIP.-> coredns
-  envoy --> cfd
-  envoy -.Gateway 監視.-> extcf
-  envoy -.Gateway 監視.-> extcd
-```
+![](../assets/networking-dependency.svg)
 
 ## グループ全体の設計判断
 

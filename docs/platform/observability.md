@@ -13,63 +13,19 @@
 
 ## グループ全体構成
 
-```mermaid
-flowchart LR
-  subgraph hosts["全 8 ノード (systemd, Ansible 管理)"]
-    sne["node_exporter :9101"]
-    salloy["alloy :12345<br/>journal → Loki"]
-  end
+メトリクス / ログ / トレースで経路が異なるので 3 つに分けて図示する。
 
-  subgraph k3s["k3s クラスタ"]
-    subgraph collect["収集"]
-      ne_ds["node-exporter DS :9100<br/>(k3s ノードのみ)"]
-      ksm["kube-state-metrics"]
-      kubelet["kubelet / cAdvisor"]
-      alloy_w["alloy DS<br/>(worker)<br/>pod log + OTLP"]
-      alloy_cp["alloy-cp DS<br/>(control-plane)<br/>pod log only"]
-      alloy_ev["alloy-events Deploy<br/>k8s events"]
-      hubble["hubble-flow-exporter<br/>Cilium dropped flows"]
-      ms["metrics-server"]
-      sm["ServiceMonitor / PodMonitor<br/>(Cilium / Envoy / cert-mgr<br/>/ Longhorn / CNPG ...)"]
-    end
+### メトリクス
 
-    subgraph process["処理"]
-      otelc["OpenTelemetry Collector<br/>(gateway, replicas=2)<br/>tail_sampling / batch"]
-    end
+![](../assets/observability-metrics.svg)
 
-    subgraph store["保存"]
-      prom[("Prometheus<br/>14d / 50GB<br/>on Longhorn")]
-      am["Alertmanager"]
-      loki[("Loki<br/>SingleBinary")]
-      tempo[("Tempo")]
-    end
+### ログ
 
-    grafana["Grafana<br/>(grafana.b8m.app)"]
-  end
+![](../assets/observability-logs.svg)
 
-  garage[("br-external1 Garage S3<br/>object-storage.cluster-internal:3900")]
+### トレース
 
-  sne -. scrape .-> prom
-  salloy -. scrape .-> prom
-  ne_ds -. scrape .-> prom
-  ksm & kubelet & ms & sm -. scrape .-> prom
-
-  alloy_w -->|pod logs| loki
-  alloy_cp -->|pod logs| loki
-  alloy_ev -->|events| loki
-  salloy -->|journal| loki
-  hubble -->|drops| loki
-
-  alloy_w -->|OTLP traces+metrics| otelc
-  otelc -->|traces| tempo
-  otelc -->|remote_write| prom
-
-  loki <-. chunks .-> garage
-  tempo <-. blocks .-> garage
-
-  prom --> am
-  prom & loki & tempo --> grafana
-```
+![](../assets/observability-traces.svg)
 
 ## グループ全体の設計判断
 
