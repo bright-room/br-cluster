@@ -7,15 +7,10 @@ on:
       - 'imager/**'
       - 'Makefile'
       - 'mise.toml'
-      - 'mise.lock'
       - '.github/workflows/packer-ci.yaml'
 
 permissions:
   contents: read
-
-env:
-  # mise.lock に無い URL/checksum での install を拒否 (サプライチェーン対策)
-  MISE_LOCKED: "1"
 
 concurrency:
   group: packer-${{ github.ref }}

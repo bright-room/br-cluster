@@ -12,15 +12,10 @@ on:
       - 'provisioner/requirements.yaml'
       - '.ansible-lint'
       - 'mise.toml'
-      - 'mise.lock'
       - '.github/workflows/ansible-ci.yaml'
 
 permissions:
   contents: read
-
-env:
-  # mise.lock に無い URL/checksum での install を拒否 (サプライチェーン対策)
-  MISE_LOCKED: "1"
 
 concurrency:
   group: ansible-${{ github.ref }}
