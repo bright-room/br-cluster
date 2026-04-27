@@ -4,7 +4,8 @@
 prometheus:
   prometheusSpec:
     retention: 14d
-    retentionSize: 50GB
+    # PVC 容量 (10Gi) の ~80%。これより大きいと容量ベース GC が発火せず PVC を食い潰す。
+    retentionSize: 8GB
     walCompression: true
     # Accept remote_write from the OTel Collector gateway (Phase A).
     enableRemoteWriteReceiver: true
