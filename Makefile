@@ -6,6 +6,11 @@
         policy/test policy/verify \
         check
 
+# `pyproject.toml` / `uv.lock` は cli/ 配下にある。pytest / ruff は cwd=cli で
+# 動かしたいので `--directory cli`、cluster-forge / flux-local はリポルートを
+# cwd に保ちたいので `--project cli` を使う。
+UV_RUN_CLI := uv run --project cli
+
 # === Help ===
 
 help:
@@ -14,14 +19,14 @@ help:
 # === Development (Python) ===
 
 lint: ## ruff check + format check
-	uv run ruff check .
-	uv run ruff format --check .
+	uv run --directory cli ruff check .
+	uv run --directory cli ruff format --check .
 
 format: ## ruff format (write)
-	uv run ruff format .
+	uv run --directory cli ruff format .
 
 test: ## pytest with coverage
-	uv run pytest -v --cov=cluster_forge --cov-report=term-missing
+	uv run --directory cli pytest -v --cov=cluster_forge --cov-report=term-missing
 
 # === YAML / Actions ===
 
@@ -51,7 +56,7 @@ manifests/build: ## kustomize build + kubeconform on all cluster overlays
 	mise exec -- ./scripts/manifests-build.sh
 
 manifests/flux-local: ## flux-local test (HelmRelease offline render)
-	uv run flux-local test --enable-helm --path manifests/clusters/prod -v
+	$(UV_RUN_CLI) flux-local test --enable-helm --path manifests/clusters/prod -v
 
 policy/verify: ## Rego ポリシーの単体テスト
 	mise exec -- conftest verify --policy policies/
@@ -66,65 +71,65 @@ check: lint test yaml/lint actions/lint ansible/lint packer/fmt manifests/build 
 # === Cluster Operations ===
 
 dev/bootstrap:
-	uv run cluster-forge bootstrap --env dev
+	$(UV_RUN_CLI) cluster-forge bootstrap --env dev
 
 dev/clean:
-	uv run cluster-forge clean --env dev
+	$(UV_RUN_CLI) cluster-forge clean --env dev
 
 dev/clean-all:
-	uv run cluster-forge clean --env dev --all
+	$(UV_RUN_CLI) cluster-forge clean --env dev --all
 
 prod/bootstrap:
-	uv run cluster-forge bootstrap --env prod
+	$(UV_RUN_CLI) cluster-forge bootstrap --env prod
 
 prod/clean:
-	uv run cluster-forge clean --env prod
+	$(UV_RUN_CLI) cluster-forge clean --env prod
 
 prod/clean-all:
-	uv run cluster-forge clean --env prod --all
+	$(UV_RUN_CLI) cluster-forge clean --env prod --all
 
 dev/generate-config:
-	uv run cluster-forge generate-config --env dev
+	$(UV_RUN_CLI) cluster-forge generate-config --env dev
 
 prod/generate-config:
-	uv run cluster-forge generate-config --env prod
+	$(UV_RUN_CLI) cluster-forge generate-config --env prod
 
 dev/build-image:
-	uv run cluster-forge build-image --env dev
+	$(UV_RUN_CLI) cluster-forge build-image --env dev
 
 prod/build-image:
-	uv run cluster-forge build-image --env prod
+	$(UV_RUN_CLI) cluster-forge build-image --env prod
 
 dev/image-build/%:
-	uv run cluster-forge build-image --env dev --server $*
+	$(UV_RUN_CLI) cluster-forge build-image --env dev --server $*
 
 prod/image-build/%:
-	uv run cluster-forge build-image --env prod --server $*
+	$(UV_RUN_CLI) cluster-forge build-image --env prod --server $*
 
 # === Inventory Generation ===
 
 dev/generate-inventory:
-	uv run cluster-forge generate-inventory --env dev
+	$(UV_RUN_CLI) cluster-forge generate-inventory --env dev
 
 prod/generate-inventory:
-	uv run cluster-forge generate-inventory --env prod
+	$(UV_RUN_CLI) cluster-forge generate-inventory --env prod
 
 # === Provisioning ===
 # Usage: make dev/provision/setup-node, make prod/provision/k3s-start, etc.
 
 PLAYBOOKS := setup-node setup-gateway setup-external setup-monitoring-agent bootstrap-cluster k3s-start k3s-stop k3s-reset setup-k3s-leader-restart shutdown-cluster
 
-$(foreach pb,$(PLAYBOOKS),$(eval dev/provision/$(pb):; uv run cluster-forge provision run --env dev $(pb)))
-$(foreach pb,$(PLAYBOOKS),$(eval prod/provision/$(pb):; uv run cluster-forge provision run --env prod $(pb)))
+$(foreach pb,$(PLAYBOOKS),$(eval dev/provision/$(pb):; $(UV_RUN_CLI) cluster-forge provision run --env dev $(pb)))
+$(foreach pb,$(PLAYBOOKS),$(eval prod/provision/$(pb):; $(UV_RUN_CLI) cluster-forge provision run --env prod $(pb)))
 
 dev/provision/ping:
-	uv run cluster-forge provision ping --env dev
+	$(UV_RUN_CLI) cluster-forge provision ping --env dev
 
 prod/provision/ping:
-	uv run cluster-forge provision ping --env prod
+	$(UV_RUN_CLI) cluster-forge provision ping --env prod
 
 dev/provision/lint:
-	uv run cluster-forge provision lint --env dev
+	$(UV_RUN_CLI) cluster-forge provision lint --env dev
 
 prod/provision/lint:
-	uv run cluster-forge provision lint --env prod
+	$(UV_RUN_CLI) cluster-forge provision lint --env prod

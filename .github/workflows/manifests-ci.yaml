@@ -8,8 +8,8 @@ on:
       - 'policies/**'
       - 'scripts/manifests-build.sh'
       - 'Makefile'
-      - 'pyproject.toml'
-      - 'uv.lock'
+      - 'cli/pyproject.toml'
+      - 'cli/uv.lock'
       - 'mise.toml'
       - '.github/workflows/manifests-ci.yaml'
 
@@ -42,11 +42,11 @@ jobs:
         with:
           install: true
           cache: true  # mise から helm / kustomize / flux2 を取得
-      # flux-local は内部で pytest を起動し、root の pyproject.toml が
-      # `testpaths = ["cli/tests"]` を指すため cli/tests/conftest.py が読み込まれる。
+      # flux-local は内部で pytest を起動し、cli/pyproject.toml の
+      # `testpaths = ["tests"]` を指すため cli/tests/conftest.py が読み込まれる。
       # conftest が cluster_forge を import するので、project 依存ごと dev group で入れる
       # (flux-local は pyproject の dev group に追加済)。
-      - run: uv sync --frozen --group dev
+      - run: uv sync --project cli --frozen --group dev
       # Flux Kustomization をたどって HelmRelease を offline render
       - name: flux-local test
         run: make manifests/flux-local

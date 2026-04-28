@@ -41,7 +41,7 @@
 ## ツール
 
 - `mise` で Python / `uv` / packer 等のバージョンを揃える (`mise install`)
-- Python は `uv run` 経由で実行 (`uv run cluster-forge ...` または `make {env}/...`)
+- Python プロジェクトは `cli/` 配下 (`cli/pyproject.toml` / `cli/uv.lock`)。リポルートから叩くときは `uv sync --project cli` / `uv run --project cli cluster-forge ...` または `make {env}/...`
 - Make ターゲットが CLI のラッパー。**通常運用は Make を叩く** ([`docs/provisioning.md`](docs/provisioning.md))
 - Flux / kubectl / cmctl 等 k8s 系ツールは前提
 

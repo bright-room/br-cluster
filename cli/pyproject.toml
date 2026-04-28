@@ -19,10 +19,10 @@ dependencies = [
 cluster-forge = "cluster_forge.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["cli/cluster_forge"]
+packages = ["cluster_forge"]
 
 [tool.pytest.ini_options]
-testpaths = ["cli/tests"]
+testpaths = ["tests"]
 
 [dependency-groups]
 dev = [

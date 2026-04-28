@@ -30,9 +30,9 @@
 ### 必要なツール
 
 ```sh
-mise install         # Python / uv / packer 等のバージョン揃え
-uv sync              # Python 依存
-docker info          # Docker daemon が動くこと
+mise install                       # Python / uv / packer 等のバージョン揃え
+uv sync --project cli              # Python 依存 (pyproject.toml は cli/ 配下)
+docker info                        # Docker daemon が動くこと
 ```
 
 ### 1Password 認証情報

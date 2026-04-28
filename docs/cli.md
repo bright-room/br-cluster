@@ -143,7 +143,7 @@ flowchart TB
 `cli/tests/` に pytest。
 
 ```sh
-make test                 # = uv run pytest -v
+make test                 # = uv run --directory cli pytest -v
 ```
 
 | テストファイル | 対象 |
@@ -213,4 +213,4 @@ make test                 # = uv run pytest -v
 - [`docs/operations.md`](operations.md) — 日常運用 (Make ターゲット主体)
 - [`Makefile`](../Makefile) — CLI のラッパー
 - [`servers.yaml`](../servers.yaml) — サーバー定義の SoT
-- [`pyproject.toml`](../pyproject.toml) — Python 依存とエントリポイント定義
+- [`cli/pyproject.toml`](../cli/pyproject.toml) — Python 依存とエントリポイント定義

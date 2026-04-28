@@ -68,7 +68,7 @@ flowchart TB
 
 ## 主要コマンド
 
-CLI は `uv run cluster-forge ...`、同等の Make ターゲット (`make {env}/...`) も用意されている (`Makefile`)。
+CLI は `uv run --project cli cluster-forge ...`、同等の Make ターゲット (`make {env}/...`) も用意されている (`Makefile`)。
 
 | 用途 | CLI | Make |
 |------|-----|------|

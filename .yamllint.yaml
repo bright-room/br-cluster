@@ -6,7 +6,7 @@ ignore: |
   provisioner/roles/ipr-cnrs.nftables/
   .secret/
   .generated/
-  uv.lock
+  cli/uv.lock
 
 rules:
   line-length:

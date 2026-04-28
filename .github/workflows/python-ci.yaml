@@ -5,8 +5,6 @@ on:
   pull_request:
     paths:
       - 'cli/**'
-      - 'pyproject.toml'
-      - 'uv.lock'
       - 'mise.toml'
       - '.github/workflows/python-ci.yaml'
 
@@ -27,9 +25,8 @@ jobs:
         with:
           install: true
           cache: true
-      - run: uv sync --frozen --group dev
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
+      - run: uv sync --project cli --frozen --group dev
+      - run: make lint
 
   test:
     name: Test
@@ -40,12 +37,12 @@ jobs:
         with:
           install: true
           cache: true
-      - run: uv sync --frozen --group dev
+      - run: uv sync --project cli --frozen --group dev
       - name: pytest with coverage
-        run: uv run pytest -v --cov=cluster_forge --cov-report=term-missing --cov-report=xml
+        run: uv run --directory cli pytest -v --cov=cluster_forge --cov-report=term-missing --cov-report=xml
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         if: always()
         with:
           name: coverage-xml
-          path: coverage.xml
+          path: cli/coverage.xml
           if-no-files-found: ignore
