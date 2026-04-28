@@ -13,7 +13,6 @@ OS イメージ生成 (Packer) からノード初期構築 (Ansible)、クラス
 ```mermaid
 flowchart TB
   servers["servers.yaml<br/>(SoT)"]
-  opcli[("1Password<br/>(host op CLI)")]
   manifests["manifests/<br/>(GitOps 設定)"]
 
   subgraph imageflow["イメージ系"]
@@ -41,15 +40,14 @@ flowchart TB
   cluster[動作中のクラスタ]
 
   servers --> gen
-  opcli --> gen
+  opconnect --> gen
   gen --> ci --> pkr --> img --> ssd --> pi
 
   servers --> inv
-  opcli --> inv
+  opconnect --> inv
   inv --> invf
 
   servers --> bs
-  opcli --> bs
   bs --> sshd
   bs --> opconnect
   bs --> runner
@@ -62,9 +60,9 @@ flowchart TB
 
 ポイント:
 
-- `generate-config` / `build-image` / `generate-inventory` は **`bootstrap` 不要**。ホストの `op` CLI で 1Password から直接 secret を読む
-- `provision run` のためだけに `bootstrap` (= 1Password Connect 起動 + SSH 鍵書き出し + ansible-runner 起動) が必要
-- ansible-runner は `OP_CONNECT_HOST: http://${ENV}-op-connect-api:8080` を介して Connect API から secret を取る (`secrets` ロール)。**ホストの `op` CLI とは別経路**
+- 1Password アクセスは **Connect REST に一本化** (`OnePasswordConnectProvider`)。`generate-config` / `generate-inventory` / `build-image` (–-skip-generate なし) は内部で `op-connect-{api,sync}` を `up -d` してから secret を取りに行く
+- `bootstrap` は SSH 鍵書き出し + ansible-runner 起動を追加で行う。Connect 起動は `_ensure_connect()` が共通化
+- ansible-runner は `OP_CONNECT_HOST: http://${ENV}-op-connect-api:8080` を介して同じ Connect API から secret を取る (`secrets` ロール)。CLI / Pod で経路が揃う
 - ansible-runner には `manifests/` も read-only マウントされ、Cilium / CoreDNS / kube-vip の bootstrap で参照する
 - 各ステップは独立・冪等
 

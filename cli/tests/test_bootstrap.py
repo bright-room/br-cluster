@@ -6,13 +6,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from cluster_forge.bootstrap import (
-    ConnectClient,
     ServerSSHInfo,
     fetch_server_ssh_info,
     generate_ssh_config,
     write_ssh_keys,
 )
 from cluster_forge.models import ServerDefinition, ServerType
+from cluster_forge.op_connect import ConnectClient
 
 
 @pytest.fixture
@@ -144,11 +144,16 @@ class TestGenerateSSHConfig:
 class TestFetchServerSSHInfo:
     def test_fetches_gateway_with_external_ip(self) -> None:
         client = MagicMock(spec=ConnectClient)
-        client.get_field.side_effect = lambda vault, item, field: {
-            ("vault", "br-gateway1", "external_ip_address"): "198.51.100.50",
-            ("vault", "br-gateway1", "username"): "bradmin",
-            ("vault", "br-gateway1_ssh", "public key"): "ssh-ed25519 AAAA",
-        }[(vault, item, field)]
+        client.get_field.side_effect = lambda vault, item, field, *, section=None: {
+            (
+                "vault",
+                "br-gateway1",
+                "external_ip_address",
+                "admin_console",
+            ): "198.51.100.50",
+            ("vault", "br-gateway1", "username", None): "bradmin",
+            ("vault", "br-gateway1_ssh", "public key", None): "ssh-ed25519 AAAA",
+        }[(vault, item, field, section)]
 
         server = ServerDefinition(name="br-gateway1", type=ServerType.GATEWAY)
         info = fetch_server_ssh_info(client, "vault", server)
@@ -157,11 +162,11 @@ class TestFetchServerSSHInfo:
 
     def test_fetches_node_with_internal_ip(self) -> None:
         client = MagicMock(spec=ConnectClient)
-        client.get_field.side_effect = lambda vault, item, field: {
-            ("vault", "br-node1", "ip_address"): "192.0.2.10",
-            ("vault", "br-node1", "username"): "bradmin",
-            ("vault", "br-node1_ssh", "public key"): "ssh-ed25519 AAAA",
-        }[(vault, item, field)]
+        client.get_field.side_effect = lambda vault, item, field, *, section=None: {
+            ("vault", "br-node1", "ip_address", None): "192.0.2.10",
+            ("vault", "br-node1", "username", None): "bradmin",
+            ("vault", "br-node1_ssh", "public key", None): "ssh-ed25519 AAAA",
+        }[(vault, item, field, section)]
 
         server = ServerDefinition(name="br-node1", type=ServerType.NODE)
         info = fetch_server_ssh_info(client, "vault", server)
@@ -170,14 +175,14 @@ class TestFetchServerSSHInfo:
 
 
 class TestConnectClient:
-    @patch("cluster_forge.bootstrap.urllib.request.urlopen")
+    @patch("cluster_forge.op_connect.urllib.request.urlopen")
     def test_wait_for_ready_succeeds(self, mock_urlopen: MagicMock) -> None:
         mock_urlopen.return_value.__enter__ = lambda s: s
         mock_urlopen.return_value.__exit__ = MagicMock(return_value=False)
         client = ConnectClient(token="test-token")
         client.wait_for_ready(timeout=5)
 
-    @patch("cluster_forge.bootstrap.urllib.request.urlopen")
+    @patch("cluster_forge.op_connect.urllib.request.urlopen")
     def test_wait_for_ready_timeout(self, mock_urlopen: MagicMock) -> None:
         mock_urlopen.side_effect = OSError("refused")
         client = ConnectClient(token="test-token")
