@@ -6,7 +6,7 @@
 
 ## 役割
 
-`cluster-forge` は **薄いオーケストレーション層**。実際の処理は外部ツール (Packer / Ansible / `op` CLI / Docker) が行い、CLI はそれらに渡す引数の生成と起動順序の制御だけを担当する。
+`cluster-forge` は **薄いオーケストレーション層**。実際の処理は外部ツール (Packer / Ansible / 1Password Connect / Docker) が行い、CLI はそれらに渡す引数の生成と起動順序の制御だけを担当する。
 
 | 担当する | 担当しない |
 |----------|-----------|
@@ -29,8 +29,9 @@ flowchart TB
   end
 
   subgraph providers[外部システム アダプタ]
-    secrets[secrets.py<br/>1Password CLI 呼び出し]
-    bs[bootstrap.py<br/>1Password Connect REST]
+    opc[op_connect.py<br/>1Password Connect REST クライアント]
+    secrets[secrets.py<br/>SecretProvider / Connect バックエンド]
+    bs[bootstrap.py<br/>SSH 鍵取得 / docker/ssh 生成]
     pkr[packer.py<br/>docker run packer-arm]
     prov[provisioner.py<br/>compose exec ansible-runner]
     cfg[config_generator.py<br/>Jinja2 で cloud-init 生成]
@@ -43,8 +44,9 @@ flowchart TB
   end
 
   cli --> inv --> models
-  cli --> secrets
-  cli --> bs
+  cli --> opc
+  cli --> secrets --> opc
+  cli --> bs --> opc
   cli --> pkr
   cli --> prov
   cli --> cfg --> udj & nej
@@ -55,11 +57,12 @@ flowchart TB
 
 | モジュール | 行数 | 役割 |
 |-----------|------|------|
-| `cli.py`               | 262 | Click app のエントリポイント。`bootstrap` / `generate-config` / `build-image` / `generate-inventory` / `provision *` / `clean` の各サブコマンドを提供 |
+| `cli.py`               | 252 | Click app のエントリポイント。`bootstrap` / `generate-config` / `build-image` / `generate-inventory` / `provision *` / `clean` の各サブコマンドを提供 |
 | `models.py`            |  32 | `ServerType` / `K8sRole` / `ServerDefinition` / `Inventory` の Pydantic モデル |
 | `inventory.py`         |  12 | `servers.yaml` を読んで `Inventory` を返すだけの薄い層 |
-| `secrets.py`           | 166 | `SecretProvider` インターフェース + `OnePasswordCliProvider` (host の `op` CLI 経由) + `MockSecretProvider` (テスト用) |
-| `bootstrap.py`         | 153 | 1Password Connect REST API クライアント。SSH 鍵の取得、`docker/ssh/config` 生成 |
+| `op_connect.py`        |  90 | 1Password Connect REST クライアント (`ConnectClient`)。vault / item キャッシュ + section 対応 |
+| `secrets.py`           | 175 | `SecretProvider` インターフェース + `OnePasswordConnectProvider` (Connect REST 経由) + `MockSecretProvider` (テスト用) |
+| `bootstrap.py`         |  88 | Connect REST 経由で SSH 公開鍵を取得し `docker/ssh/{keys,config}` を生成 |
 | `config_generator.py`  |  78 | Jinja2 で `user-data` / `network-config` を server ごとに生成 |
 | `inventory_generator.py` | 181 | servers.yaml + 1Password から Ansible inventory (`hosts.yaml` / `cluster_hosts.yaml` / `host_vars/`) を生成 |
 | `packer.py`            |  63 | `docker run mkaczanowski/packer-builder-arm` を起動して OS イメージをビルド |
@@ -71,9 +74,9 @@ flowchart TB
 | コマンド | 用途 | 詳細 |
 |---------|------|------|
 | `cluster-forge bootstrap --env <env>`            | 1Password Connect (Compose) と Ansible Runner を起動、SSH 鍵を `docker/ssh/` に書き出し | [`docs/provisioning.md#step-2-bootstrap-1password-connect--ansible-runner`](provisioning.md) |
-| `cluster-forge generate-config --env <env> [--server <name>]` | `servers.yaml` + 1Password から cloud-init を `.generated/cloud-init/{env}/<server>/` に生成 | host の `op` CLI を使う (Connect 不要) |
+| `cluster-forge generate-config --env <env> [--server <name>]` | `servers.yaml` + 1Password から cloud-init を `.generated/cloud-init/{env}/<server>/` に生成 | Connect コンテナを内部で `up -d` する |
 | `cluster-forge build-image --env <env> [--server <name>] [--skip-generate]` | Packer で `.generated/images/{env}/<server>.img` を生成 (デフォルトで `generate-config` を先に走らせる) | Docker daemon が必要 |
-| `cluster-forge generate-inventory --env <env>`   | Ansible inventory を `provisioner/inventories/{env}/` に生成 | host の `op` CLI を使う |
+| `cluster-forge generate-inventory --env <env>`   | Ansible inventory を `provisioner/inventories/{env}/` に生成 | Connect コンテナを内部で `up -d` する |
 | `cluster-forge provision setup --env <env>`      | Ansible Runner 内で `ansible-galaxy install -r requirements.yaml` | 初回のみ |
 | `cluster-forge provision run --env <env> <playbook> [--check]` | Ansible Runner 内で playbook を実行 (`--check` で dry-run) | playbook key 一覧は下表 |
 | `cluster-forge provision ping --env <env>`       | 全ホスト疎通確認 | |
@@ -113,23 +116,25 @@ flowchart TB
 | lint                     | `cluster-forge provision lint --env {env}`         | `make {env}/provision/lint` |
 | clean                    | `cluster-forge clean --env {env} [--all]`          | `make {env}/clean` / `make {env}/clean-all` |
 
-## 1Password アクセスの 2 経路
+## 1Password アクセス
 
-`cluster-forge` は 1Password を **2 つの経路**で叩く。混同しないこと。
+`cluster-forge` の 1Password 経路は **Connect REST API に一本化**されている (`op_connect.ConnectClient`)。CLI は内部で 1Password Connect コンテナ (`compose.yaml` の `op-connect-api` / `op-connect-sync`) を起動し、`http://localhost:8080/v1/...` を叩く。
 
-| 経路 | クライアント | いつ使う | 認証 |
-|------|--------------|----------|------|
-| **host `op` CLI** (`OnePasswordCliProvider`) | `subprocess.run(["op", "read", uri])` | `generate-config` / `build-image` / `generate-inventory` (= ホストでの事前準備) | `op` CLI のセッション (運用者がローカルで `op signin` 済み) |
-| **Connect REST API** (`bootstrap.ConnectClient`) | `urllib.request` で `http://localhost:8080/v1/...` | `bootstrap` で SSH 情報を取得 / クラスタ内 Pod が触る Vault | `OP_CONNECT_TOKEN` |
+| 項目 | 内容 |
+|------|------|
+| 実装 | `cluster_forge/op_connect.py: ConnectClient` (vault id / item を内部キャッシュ、section 対応 `get_field`) |
+| Provider | `cluster_forge/secrets.py: OnePasswordConnectProvider(SecretProvider)` |
+| 起動 | `cli.py: _ensure_connect(env)` が `docker compose up -d op-connect-api op-connect-sync` → `/heartbeat` を待つ |
+| 認証 | `.secret/{env}/.connect_token` (Bearer) と `.secret/{env}/1password-credentials.json` (Connect コンテナ向け) |
+| 利用箇所 | `bootstrap` / `generate-config` / `generate-inventory` / `build-image` (–-skip-generate なし) |
 
-`bootstrap` は Connect API を起動するためのものであり、**`generate-*` / `build-image` には不要**。
+ホストの `op` CLI は **使わない** (`op signin` 不要)。Ansible Runner も同じ Connect API (`OP_CONNECT_HOST: http://${ENV}-op-connect-api:8080`) を使うので、CLI / Pod ともに認証経路が揃う。
 
 ## 環境前提
 
 - Python 3.12+
 - `uv` (依存解決と実行)
-- Docker daemon (Compose と Packer ARM コンテナ)
-- `op` CLI (host で `op signin` 済み)
+- Docker daemon (Compose、1Password Connect、Packer ARM コンテナ)
 - `mise install` で `python` / `uv` / `packer` のバージョンを揃える
 - `.secret/{env}/1password-credentials.json` と `.secret/{env}/.connect_token` (リポ非追跡、1Password 管理者から取得)
 
@@ -176,7 +181,7 @@ make test                 # = uv run pytest -v
 ### 新しい 1Password フィールドを参照
 
 1. `cli/cluster_forge/secrets.py` の `ServerSecrets` / `NetworkSecrets` / `InventorySecrets` のいずれか適切な dataclass にフィールドを追加
-2. `OnePasswordCliProvider` の `get_*_secrets` で `_read("op://br-cluster-{env}/<item>/<field>")` を追加
+2. `OnePasswordConnectProvider` の `get_*_secrets` で `self._client.get_field(self._vault, <item>, <label>, section=<section?>)` を追加
 3. `MockSecretProvider` (テスト用) にも同フィールドを返すように
 4. 1Password Vault `br-cluster-{env}` 側に該当 item / field を作成 (両環境分)
 5. テストを追加 (`test_config_generator.py` / `test_inventory_generator.py`)
@@ -187,7 +192,7 @@ make test                 # = uv run pytest -v
 
 - **オプション標準化**: env は `ENV_OPTION` (必須 / `dev`/`prod`)、server は `SERVER_OPTION` (任意)
 - **`compose_cmd` / `compose_env`**: Compose 経由の操作なら `_compose_cmd(env)` / `_compose_env(env)` で組み立て (環境変数 `OP_SESSION` / `OP_CONNECT_TOKEN` / `SSH_AUTH_SOCK` を含む)
-- **直接ホストで動く処理**: `OnePasswordCliProvider(env)` を渡す。`bootstrap` 不要にする
+- **1Password を引きたい処理**: `client = _ensure_connect(env)` → `OnePasswordConnectProvider(client, env)`。`_ensure_connect` が Connect コンテナ起動 + heartbeat 待ちを担当
 - **副作用は明示**: `subprocess.run(..., check=True)` で例外伝播。CLI 側で `click.ClickException` に変換するのは認証情報欠落のような UX 上必要な場合のみ
 
 ## デザイン判断
@@ -196,7 +201,7 @@ make test                 # = uv run pytest -v
 |------|------|-----------------|------|
 | CLI の言語 | Python (Click) | Bash / Go | Pydantic / Jinja / passlib 等のエコシステム流用、テストが書きやすい |
 | 設定の SoT | `servers.yaml` (Pydantic で検証) | CLI 引数 | サーバー一覧を 1 箇所に集約、CLI は読むだけ |
-| 1Password 経路 | 2 経路を明示分離 (`OnePasswordCliProvider` と `ConnectClient`) | 統一 | host 用 / Pod 用で認証の出所が違うため、別実装で分離した方が責務が明確 |
+| 1Password 経路 | Connect REST に一本化 (`OnePasswordConnectProvider` + `ConnectClient`) | host `op` CLI と Connect の 2 経路併存 | Ansible Runner も Connect 経由なので CLI / Pod の認証経路が揃う。`op signin` 不要、CI / 別マシンでも動かしやすい |
 | Packer / Ansible 起動 | `subprocess.run` + Docker | Python ライブラリ呼び出し | バージョン固定が容易、ホスト環境を汚さない |
 | テスト | `subprocess` を mock、外部呼び出しは引数組み立てだけテスト | 実コマンドを実行 | CI で 1Password / Docker daemon を要求しない |
 | ロギング | `click.echo` のみ、構造化ログなし | logging モジュール | CLI なので人間向けの一行 echo で十分 |

@@ -1,16 +1,10 @@
 from __future__ import annotations
 
-import json
-import time
-import urllib.error
-import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import urlencode
 
 from cluster_forge.models import ServerDefinition, ServerType
-
-CONNECT_API_PORT = 8080
+from cluster_forge.op_connect import ConnectClient
 
 SSH_CONFIG_HEADER = """\
 CanonicalizeHostname yes
@@ -31,65 +25,6 @@ class ServerSSHInfo:
     server_type: ServerType
 
 
-class ConnectClient:
-    """1Password Connect REST API client."""
-
-    def __init__(self, token: str, port: int = CONNECT_API_PORT) -> None:
-        self._base_url = f"http://localhost:{port}"
-        self._token = token
-        self._vault_cache: dict[str, str] = {}
-
-    def _request(self, path: str) -> list | dict:
-        req = urllib.request.Request(
-            f"{self._base_url}{path}",
-            headers={
-                "Authorization": f"Bearer {self._token}",
-                "Accept": "application/json",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            return json.loads(resp.read())
-
-    def wait_for_ready(self, timeout: int = 60) -> None:
-        """Poll /heartbeat until the API is ready."""
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            try:
-                req = urllib.request.Request(f"{self._base_url}/heartbeat")
-                with urllib.request.urlopen(req, timeout=5):
-                    return
-            except (urllib.error.URLError, OSError):
-                time.sleep(2)
-        msg = f"Connect API not ready after {timeout}s"
-        raise TimeoutError(msg)
-
-    def _resolve_vault_id(self, vault_name: str) -> str:
-        if vault_name in self._vault_cache:
-            return self._vault_cache[vault_name]
-        vaults = self._request("/v1/vaults")
-        for v in vaults:
-            if v["name"] == vault_name:
-                self._vault_cache[vault_name] = v["id"]
-                return v["id"]
-        msg = f"Vault not found: {vault_name}"
-        raise ValueError(msg)
-
-    def get_field(self, vault_name: str, item_title: str, field_label: str) -> str:
-        vault_id = self._resolve_vault_id(vault_name)
-        params = urlencode({"filter": f'title eq "{item_title}"'})
-        items = self._request(f"/v1/vaults/{vault_id}/items?{params}")
-        if not items:
-            msg = f"Item not found: {item_title} in {vault_name}"
-            raise ValueError(msg)
-        item_id = items[0]["id"]
-        item = self._request(f"/v1/vaults/{vault_id}/items/{item_id}")
-        for field in item.get("fields", []):
-            if field.get("label") == field_label:
-                return field.get("value", "")
-        msg = f"Field '{field_label}' not found in {item_title}"
-        raise ValueError(msg)
-
-
 def fetch_server_ssh_info(
     client: ConnectClient,
     vault_name: str,
@@ -99,7 +34,8 @@ def fetch_server_ssh_info(
     ip_field = (
         "external_ip_address" if server.type == ServerType.GATEWAY else "ip_address"
     )
-    hostname = client.get_field(vault_name, server.name, ip_field)
+    section = "admin_console" if server.type == ServerType.GATEWAY else None
+    hostname = client.get_field(vault_name, server.name, ip_field, section=section)
     username = client.get_field(vault_name, server.name, "username")
     public_key = client.get_field(vault_name, f"{server.name}_ssh", "public key")
     return ServerSSHInfo(
@@ -133,7 +69,6 @@ def generate_ssh_config(
         None,
     )
     lines = [SSH_CONFIG_HEADER]
-    # Gateway first, then others
     sorted_infos = sorted(
         server_infos,
         key=lambda s: (s.server_type != ServerType.GATEWAY, s.name),

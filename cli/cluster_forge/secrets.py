@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import subprocess
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+
+from cluster_forge.op_connect import ConnectClient
 
 
 @dataclass
@@ -43,53 +44,61 @@ class SecretProvider(ABC):
     ) -> InventorySecrets: ...
 
 
-class OnePasswordCliProvider(SecretProvider):
-    def __init__(self, env: str) -> None:
-        self._env = env
-        self._vault_prefix = f"op://br-cluster-{env}"
+class OnePasswordConnectProvider(SecretProvider):
+    """SecretProvider backed by 1Password Connect REST API."""
 
-    def _read(self, uri: str) -> str:
-        result = subprocess.run(
-            ["op", "read", uri],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        return result.stdout.strip()
+    WIFI_ITEM = "home_wifi"
+    ADMIN_SECTION = "admin_console"
+
+    def __init__(self, client: ConnectClient, env: str) -> None:
+        self._client = client
+        self._vault = f"br-cluster-{env}"
 
     def get_server_secrets(self, env: str, server_name: str) -> ServerSecrets:
-        base = f"{self._vault_prefix}/{server_name}"
+        get = self._client.get_field
         return ServerSecrets(
-            hostname=self._read(f"{base}/hostname"),
-            root_password=self._read(f"{base}/admin_console/admin_password"),
-            operator_username=self._read(f"{base}/username"),
-            operator_password=self._read(f"{base}/password"),
-            operator_pubkey=self._read(
-                f"op://br-cluster-{self._env}/{server_name}_ssh/public key"
+            hostname=get(self._vault, server_name, "hostname"),
+            root_password=get(
+                self._vault,
+                server_name,
+                "admin_password",
+                section=self.ADMIN_SECTION,
             ),
+            operator_username=get(self._vault, server_name, "username"),
+            operator_password=get(self._vault, server_name, "password"),
+            operator_pubkey=get(self._vault, f"{server_name}_ssh", "public key"),
         )
 
     def get_network_secrets(self, env: str, server_name: str) -> NetworkSecrets:
-        base = f"{self._vault_prefix}/{server_name}"
-        wifi = f"{self._vault_prefix}/home_wifi"
+        get = self._client.get_field
         return NetworkSecrets(
-            internal_ip=self._read(f"{base}/ip_address"),
-            external_ip=self._read(f"{base}/admin_console/external_ip_address"),
-            gateway_ip=self._read(f"{wifi}/GatewayIP"),
-            ssid=self._read(f"{wifi}/network_name"),
-            wifi_password=self._read(f"{wifi}/wireless_password"),
+            internal_ip=get(self._vault, server_name, "ip_address"),
+            external_ip=get(
+                self._vault,
+                server_name,
+                "external_ip_address",
+                section=self.ADMIN_SECTION,
+            ),
+            gateway_ip=get(self._vault, self.WIFI_ITEM, "GatewayIP"),
+            ssid=get(self._vault, self.WIFI_ITEM, "network_name"),
+            wifi_password=get(self._vault, self.WIFI_ITEM, "wireless_password"),
         )
 
     def get_inventory_secrets(
         self, env: str, server_name: str, *, is_gateway: bool = False
     ) -> InventorySecrets:
-        base = f"{self._vault_prefix}/{server_name}"
+        get = self._client.get_field
         wan_ip = None
         if is_gateway:
-            wan_ip = self._read(f"{base}/admin_console/external_ip_address")
+            wan_ip = get(
+                self._vault,
+                server_name,
+                "external_ip_address",
+                section=self.ADMIN_SECTION,
+            )
         return InventorySecrets(
-            ip_address=self._read(f"{base}/ip_address"),
-            mac_address=self._read(f"{base}/mac_address"),
+            ip_address=get(self._vault, server_name, "ip_address"),
+            mac_address=get(self._vault, server_name, "mac_address"),
             wan_ip=wan_ip,
         )
 
