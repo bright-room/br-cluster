@@ -63,7 +63,7 @@ fi
 # Discord は 2000 文字制限。超えそうなら切り詰める
 content=$(printf '%s' "$content" | head -c 1900)
 
-payload=$(jq -n --arg c "$content" '{content: $c}')
+payload=$(jq -n --arg c "$content" '{username: "unattended-upgrades", content: $c}')
 
 curl -sS -m 10 -H "Content-Type: application/json" \
   -X POST -d "$payload" \
