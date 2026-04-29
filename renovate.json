@@ -41,6 +41,14 @@
     {
       "matchManagers": ["flux"],
       "pinDigests": false
+    },
+    {
+      "matchPackageNames": ["k3s-io/k3s"],
+      "groupName": "k3s"
+    },
+    {
+      "matchPackageNames": ["rancher/system-upgrade-controller"],
+      "groupName": "system-upgrade-controller"
     }
   ],
   "customManagers": [
@@ -51,6 +59,16 @@
       ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?) versioning=(?<versioning>.*?)\\n.*?default\\s*=\\s*\"(?<currentValue>.*?)\""
+      ]
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/manifests/platform/system-upgrade-controller/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?) versioning=(?<versioning>.*?)\\n\\s*-\\s*https://github\\.com/[^/]+/[^/]+/releases/download/(?<currentValue>v[0-9.]+)/",
+        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?) versioning=(?<versioning>.*?)\\n\\s*version:\\s*\"(?<currentValue>.*?)\""
       ]
     }
   ]
