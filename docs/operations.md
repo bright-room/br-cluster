@@ -14,6 +14,7 @@
 | 認証          | [B4 新 OIDC 保護アプリ追加](#b4-新-oidc-保護アプリ追加) |
 | ストレージ    | [B5 Longhorn ボリューム拡張](#b5-longhorn-ボリューム拡張) |
 | Secret        | [B6 GitHub App / 1Password Connect token のローテーション](#b6-github-app--1password-connect-token-のローテーション) |
+| アップグレード | [k3s クラスタアップグレード](runbooks/k3s-upgrade.md) — SUC 経由の通常手順 / minor チェックリスト / rollback / 個別ノード復旧 |
 
 ---
 
