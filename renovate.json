@@ -15,6 +15,7 @@
   "automerge": false,
   "rebaseWhen": "behind-base-branch",
   "osvVulnerabilityAlerts": true,
+  "dependencyDashboard": true,
   "lockFileMaintenance": {
     "enabled": true,
     "schedule": ["before 9am on saturday"]
@@ -49,6 +50,14 @@
     {
       "matchPackageNames": ["rancher/system-upgrade-controller"],
       "groupName": "system-upgrade-controller"
+    },
+    {
+      "matchPackageNames": [
+        "coredns/coredns",
+        "prometheus/node_exporter",
+        "grafana/alloy"
+      ],
+      "extractVersion": "^v(?<version>.+)$"
     }
   ],
   "customManagers": [
@@ -70,6 +79,16 @@
         "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?) versioning=(?<versioning>.*?)\\n\\s*-\\s*https://github\\.com/[^/]+/[^/]+/releases/download/(?<currentValue>v[0-9.]+)/",
         "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?) versioning=(?<versioning>.*?)\\n\\s*version:\\s*\"(?<currentValue>.*?)\""
       ]
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/provisioner/inventories/base/group_vars/all/versions\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\n\\s*[a-z_]+:\\s*\"(?<currentValue>.*?)\""
+      ],
+      "versioningTemplate": "{{#if versioning}}{{versioning}}{{else}}semver{{/if}}"
     }
   ]
 }
