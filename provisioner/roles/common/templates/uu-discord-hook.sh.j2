@@ -29,8 +29,9 @@ if [ -z "$pkgs_line" ]; then
   exit 0
 fi
 pkgs=$(printf '%s\n' "$pkgs_line" | sed 's/.*Packages that will be upgraded:[[:space:]]*//' | tr ' ' '\n' | grep -v '^$' | sort -u)
+# pkgs が空なら通知しない (printf '%s\n' "" | wc -l は 1 を返すので $pkgs の中身で判定する)
+[ -n "$pkgs" ] || exit 0
 count=$(printf '%s\n' "$pkgs" | wc -l | tr -d ' ')
-[ "$count" -gt 0 ] || exit 0
 
 # エラーを拾う (なければ空)
 errors=$(printf '%s\n' "$block" | grep -E "^[^[:space:]].*ERROR|Traceback" | head -n5 || true)
