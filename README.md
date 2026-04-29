@@ -7,6 +7,8 @@
 - 外部公開は **Cloudflare Tunnel + Access** + **Envoy Gateway** + **Zitadel OIDC**
 - 設計判断と全体像は [`docs/architecture.md`](docs/architecture.md)
 
+![pis](./docs/images/20260414_115955.JPG)
+
 ## ディレクトリ構成
 
 | ディレクトリ      | 役割 |
