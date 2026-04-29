@@ -47,24 +47,42 @@ if [ "$count" -gt 10 ]; then
 ... and $((count - 10)) more"
 fi
 
-content="**[${HOSTNAME_SHORT}]** unattended-upgrades: ${count} package(s) upgraded
+# 状態に応じた embed の色 (左ライン)。エラー > reboot-required > 通常成功 の優先順。
+#   赤 0xED4245 = 15548997, 黄 0xFEE75C = 16705372, 緑 0x57F287 = 5763719
+if [ -n "$errors" ]; then
+  color=15548997
+elif [ "$reboot_required" = "yes" ]; then
+  color=16705372
+else
+  color=5763719
+fi
+
+description="**${count} package(s) upgraded**
 \`\`\`
 ${pkg_list}
 \`\`\`
 reboot-required: ${reboot_required}"
 
 if [ -n "$errors" ]; then
-  content="${content}
+  description="${description}
 errors:
 \`\`\`
 ${errors}
 \`\`\`"
 fi
 
-# Discord は 2000 文字制限。超えそうなら切り詰める
-content=$(printf '%s' "$content" | head -c 1900)
+# Discord embed の description 上限は 4096 文字。安全のため 3900 で切る
+description=$(printf '%s' "$description" | head -c 3900)
 
-payload=$(jq -n --arg c "$content" '{content: $c}')
+title="[${HOSTNAME_SHORT}] unattended-upgrades"
+timestamp=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+
+payload=$(jq -n \
+  --arg title "$title" \
+  --arg desc "$description" \
+  --argjson color "$color" \
+  --arg ts "$timestamp" \
+  '{embeds: [{title: $title, description: $desc, color: $color, timestamp: $ts}]}')
 
 curl -sS -m 10 -H "Content-Type: application/json" \
   -X POST -d "$payload" \
