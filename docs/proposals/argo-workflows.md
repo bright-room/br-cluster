@@ -24,11 +24,10 @@
 | Longhorn snapshot → Garage S3 への export | 依存 + リトライ + 通知 |
 | Zitadel / CoreDNS rewrite 等の周期的 health check & 自動修復 | 定期実行 + 条件分岐通知 |
 | 外部 webhook を受けてクラスタ内整備バッチを起動 | 外部トリガ |
-| 複数ノードの etcd defrag を 1 台ずつ順次実行 (cf. `etcd-defrag.md`) | 依存 + 排他制御 (semaphore) |
+| 複数ノードに跨る順次メンテナンスバッチ (例: 全 CP の順次処理) | 依存 + 排他制御 (semaphore) |
 
-これらを「都度 CronJob を生やす」運用は限界がある。`docs/proposals/etcd-defrag.md`
-で議論されているような順次実行も、Workflows の DAG + `synchronization` で
-表現すれば一元化できる。
+これらを「都度 CronJob を生やす」運用は限界がある。順次実行が必要な
+ジョブも、Workflows の DAG + `synchronization` で表現すれば一元化できる。
 
 ## ゴール / 非ゴール
 
@@ -124,7 +123,7 @@ flowchart LR
 | **Phase 0** | この proposal で合意 | レビュー approval |
 | **Phase 1** | Argo Workflows + Argo Events 導入。受け入れ基準 1〜7 を満たす | サンプル CronWorkflow / Sensor / WorkflowTemplate が main で動作、Discord 通知到達 |
 | **Phase 2** | 既存 CronJob 群の棚卸し → Workflows 化 candidate を proposal で個別議論 | 別 proposal 起票 |
-| **Phase 3** | etcd defrag (`etcd-defrag.md`) を Workflows DAG + semaphore で実装 | 別 proposal で詳細化 |
+| **Phase 3** | 順次メンテナンス系ジョブ (例: 複数ノード跨ぎの段階処理) を Workflows DAG + semaphore で実装 | 別 proposal で詳細化 |
 | **Phase 4** | バックアップ / DR 系ジョブの Workflows 化 | 別 proposal |
 
 Phase 2 以降は本 proposal のスコープ外。Phase 1 が安定運用に入ってから
@@ -241,7 +240,7 @@ workflowDefaults:
 - **完了/失敗通知の一元化** — Workflow 単位で通知ロジックを書かなくても Discord に届く
 - **UI でリラン・ステップ単位再実行** — オペレーション工数の削減
 - **ジョブ履歴の永続化** — Pod 退役後も実行履歴・ログ・成果物が参照可能
-- **Phase 3 etcd defrag 等の安全な順次実行** — semaphore で排他制御
+- **Phase 3 で想定する順次メンテナンス系ジョブの安全な実行** — semaphore で排他制御
 
 ## リスク・注意
 
