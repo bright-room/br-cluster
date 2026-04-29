@@ -6,8 +6,8 @@ configuration:
   # k3s-leader-restart.timer (master idx 0/1/2 が 03:00 / 04:00 / 05:00 JST に
   # ±15 min jitter で発火) と完全分離するため 01:00–02:30 JST に固定。
   startTime: "01:00"
-  endTime:   "02:30"
-  timeZone:  "Asia/Tokyo"
+  endTime: "02:30"
+  timeZone: "Asia/Tokyo"
   rebootDays: [mo, tu, we, th, fr, sa, su]
   rebootSentinel: /var/run/reboot-required
   # CP node が同時に落ちて etcd quorum を割らないように 1 ノードずつ
