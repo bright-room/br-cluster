@@ -24,6 +24,7 @@
       vars:
         required_secrets:
           - k3s_token
+          - discord_webhook
       tags: [always]
 
     - name: Common system configuration
@@ -115,6 +116,7 @@
       vars:
         required_secrets:
           - k3s_token
+          - discord_webhook
       tags: [always]
 
     - name: Common system configuration

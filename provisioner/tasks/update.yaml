@@ -1,4 +1,28 @@
 ---
+# unattended-upgrades と apt の lock を奪い合うと Ansible が刺さるため、
+# Ansible 経由の手動更新中だけ apt-daily 系 timer を停止する。
+# (proposal: docs/proposals/ubuntu-auto-update.md リスク表)。
+- name: Stop apt-daily timers during Ansible-driven update
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+  loop:
+    - apt-daily.timer
+    - apt-daily-upgrade.timer
+  failed_when: false  # 初回プロビ時は unattended-upgrades 未導入の可能性
+
+- name: Wait for apt locks to release
+  shell: |
+    set -e
+    for _ in $(seq 1 60); do
+      if ! fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock >/dev/null 2>&1; then
+        exit 0
+      fi
+      sleep 5
+    done
+    exit 1
+  changed_when: false
+
 - name: Update apt repository and cache
   apt:
     update_cache: true
@@ -25,3 +49,12 @@
     post_reboot_delay: 30
     test_command: uptime
   when: reboot_required_file.stat.exists
+
+- name: Restart apt-daily timers
+  systemd:
+    name: "{{ item }}"
+    state: started
+  loop:
+    - apt-daily.timer
+    - apt-daily-upgrade.timer
+  failed_when: false  # unattended-upgrades 未導入のホストでは存在しない

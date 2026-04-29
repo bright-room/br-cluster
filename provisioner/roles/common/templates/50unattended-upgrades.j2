@@ -1,0 +1,27 @@
+// Managed by Ansible (role: common, task: unattended_upgrades). Do not edit manually.
+//
+// Phase 1 では security pocket のみを自動適用する (proposal: docs/proposals/ubuntu-auto-update.md)。
+// k3s ノードは kured が reboot を担当するため Automatic-Reboot=false。
+// gateway / external は group_vars で Automatic-Reboot=true に override する。
+
+Unattended-Upgrade::Allowed-Origins {
+{% for origin in unattended_upgrades_allowed_origins %}
+    "{{ origin }}";
+{% endfor %}
+};
+
+Unattended-Upgrade::Package-Blacklist {
+{% for pkg in unattended_upgrades_package_blacklist %}
+    "{{ pkg }}";
+{% endfor %}
+};
+
+Unattended-Upgrade::DevRelease "false";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+
+Unattended-Upgrade::Automatic-Reboot "{{ 'true' if unattended_upgrades_automatic_reboot else 'false' }}";
+Unattended-Upgrade::Automatic-Reboot-WithUsers "false";
+Unattended-Upgrade::Automatic-Reboot-Time "{{ unattended_upgrades_automatic_reboot_time }}";
+
+Acquire::http::Timeout "{{ unattended_upgrades_download_timeout }}";

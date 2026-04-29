@@ -47,7 +47,7 @@ homelab という性質上、月単位で更新が遅延する事故が起きや
 | 適用対象 | **`${distro_id}:${distro_codename}-security` のみ (Phase 1)** | feature update を巻き込むと API 仕様変更で Ansible 冪等性が崩れるリスク |
 | reboot 自動化 (k3s ノード) | **kured (Kubernetes Reboot Daemon)** | `/var/run/reboot-required` を検知 → cordon/drain → 1 台ずつ reboot。etcd quorum を壊さない |
 | reboot 自動化 (非 k3s) | **`unattended-upgrades` の `Automatic-Reboot=true` + 時間帯指定** | kured は k3s 前提。gateway / external は単純に時間で再起動 |
-| reboot 時刻 | **k3s: kured の `--reboot-days` / `--start-time` で深夜帯**、**gateway: 03:00 JST**、**external: 04:00 JST** | 利用が無い時間帯。gateway → external の順で重ならせない |
+| reboot 時刻 | **k3s: kured を 01:00–02:30 JST**、**gateway: 03:00 JST**、**external: 04:00 JST** | 利用が無い時間帯 + `k3s-leader-restart.timer` (03:00 / 04:00 / 05:00 JST + 15 min jitter) と被らないように分離。gateway → external の順で重ならせない |
 | `needrestart` | **引き続き uninstall** | Pi で重い + 対話プロンプトで Ansible が刺さる過去事例。代わりに kured / 時間 reboot で吸収 |
 | 設定の SoT | **Ansible role `common` 配下に `unattended_upgrades` task 追加** | provisioner で完結、cloud-init は触らない。再プロビ時も再現される |
 | kured の deploy | **`manifests/platform/kured/` を Flux 経由** | 他 platform component と同列。HelmRelease で pin |
@@ -100,7 +100,7 @@ flowchart LR
 |---|------|---------|
 | 1 | **security update が毎日自動適用される** | 任意ノードで `/var/log/unattended-upgrades/unattended-upgrades.log` に当日のエントリ。`apt-config dump` で `Unattended-Upgrade::Allowed-Origins` が security のみ |
 | 2 | **k3s ノードは kured で 1 台ずつ reboot** | テスト用に `touch /var/run/reboot-required` を 2 ノードで実行 → 同時 reboot されず、片方ずつ cordon/drain → reboot されることをログ + `kubectl get nodes` で確認 |
-| 3 | **kured が指定時間帯のみ動く** | `--start-time` / `--end-time` (例: 02:00-05:00 JST) 外で `reboot-required` を作っても reboot されない |
+| 3 | **kured が指定時間帯のみ動く** | `--start-time` / `--end-time` (01:00–02:30 JST) 外で `reboot-required` を作っても reboot されない |
 | 4 | **kured が Discord に通知する** | テストで reboot 発火 → Discord に "rebooting node X" / "rebooted" が届く |
 | 5 | **gateway / external は時刻指定で reboot** | `unattended-upgrades` の `Automatic-Reboot-Time` が `03:00` / `04:00` で設定済。`/etc/apt/apt.conf.d/50unattended-upgrades` を Ansible で確認 |
 | 6 | **uu の結果が Discord に届く** | hook スクリプトを設置し、`unattended-upgrade --dry-run` で発火 → Discord に成果サマリが届く |
@@ -128,6 +128,7 @@ Phase 1 を merge してから 4 週間後に振り返る。
 | etcd quorum が崩れていないか | `kubectl get nodes` で同時 NotReady が 1 台以下に収まっているか |
 | Discord 通知の S/N 比 | "毎日 0 件更新" の通知がノイズなら頻度を週次集約に切替 |
 | kured 自体のリソース消費 | `kubectl top pod -n kube-system -l app=kured` |
+| `k3s-leader-restart` の safety net (`force_restart_uptime_days: 30`) 発火頻度 | `journalctl -u k3s-leader-restart` で "uptime ...d > 30d: force restart" のログ件数。kured が月数回 reboot するようになっていれば 0 件のはず → Phase 3 で leader-restart の頻度ダウン or 撤去を検討 |
 
 ### Phase 2 着手判断の閾値 (目安)
 
@@ -201,8 +202,12 @@ manifests/platform/kured/
 ```yaml
 configuration:
   rebootDays: [mo, tu, we, th, fr, sa, su]
-  startTime: "02:00"
-  endTime:   "05:00"
+  # k3s-leader-restart.timer (master idx 0/1/2 が 03:00 / 04:00 / 05:00 JST に
+  # 最大 15 min jitter で発火) と完全に分離する。kured の reboot 中に
+  # leader-restart の `systemctl restart k3s` が走ると drain がリトライに
+  # なるため、窓を 01:00–02:30 JST に固定する。
+  startTime: "01:00"
+  endTime:   "02:30"
   timeZone:  "Asia/Tokyo"
   rebootSentinel: /var/run/reboot-required
   # 同時 reboot 上限 (k3s CP の quorum を壊さないため必ず 1)
@@ -221,12 +226,22 @@ configuration:
 
 ### (D) Discord 通知
 
-| 通知元 | 内容 | 経路 |
-|--------|------|------|
-| `unattended-upgrades` post-invoke hook | host 名 + 更新パッケージ件数 + (あれば) エラー | host 上で `curl` で webhook POST |
-| kured | reboot 開始 / 完了 | kured `notifyUrl` (shoutrrr 形式の Discord URL) |
+**送信先チャンネル:** `#br-cluster-prod-maintenance` (新規 / Notification カテゴリ)。
+正常系 (uu / kured 両方) を 1 本に集約する。alert チャンネル (`#br-cluster-prod-alert`)
+には Phase 2 で Prometheus alert (例: `reboot-required` が長期間滞留) を分離する余地を残す。
+将来 system-upgrade-controller 経由の k3s upgrade 通知もこのチャンネルに寄せる前提で
+"maintenance" 命名にしている。
 
-通知過多になったら hook を「変更があった日のみ」「週次サマリ」に切替。
+**Webhook URL は kured / uu で共有 (1Password エントリ 1 個)**。
+チャンネル分離が必要になったら 1Password エントリ追加で後から分離可能。
+
+| 通知元 | 内容 | 経路 | 頻度 |
+|--------|------|------|------|
+| `unattended-upgrades` post-invoke hook | host 名 + 更新パッケージ件数 + (あれば) エラー | host 上で `curl` で webhook POST | **変更があった日のみ** (0 件の日はスキップ) |
+| kured | reboot 開始 / 完了 | kured `notifyUrl` (shoutrrr 形式の Discord URL) | reboot 発火時のみ |
+
+ノイズが多ければ Phase 2 で「週次サマリ」に切替。逆にエラー時にメンションを足す
+(`@here` 等) のは Phase 2 で alert 経路に寄せる方が筋が良いので Phase 1 では入れない。
 
 ### (E) 既存 `tasks/update.yaml` との関係
 
@@ -255,6 +270,7 @@ configuration:
 | **security pocket でも稀に regression** | rollback 手順 (`apt install pkg=ver`) を `docs/runbooks/` に残す。Phase 2 で手順整備 |
 | **Discord webhook URL 漏洩** | 1Password → ExternalSecret (kured) / Ansible secrets (uu)。`policies/` 準拠 |
 | **kured の HelmRelease が壊れて reboot されない** | `unattended-upgrades.log` と Discord で「reboot-required が積み上がっている」を観測可能に |
+| **`k3s-leader-restart.timer` と kured reboot の時刻衝突** | 別役割 (前者は k3s プロセス restart で leader 偏り解消、後者は OS reboot)。kured 窓を 01:00–02:30 JST、leader-restart は 03:00 / 04:00 / 05:00 JST に固定して分離。Phase 1 では `k3s-leader-restart` を現状維持し、Phase 2 で kured 由来の reboot 頻度を見て `force_restart_uptime_days: 30` safety net の必要性を再評価 |
 
 ## 作業範囲 (Phase 1)
 
@@ -282,13 +298,18 @@ configuration:
 ## 未決事項 / 要確認
 
 - kured chart のバージョン (Phase 1 着手時に最新 stable を pin)
-- Discord webhook を kured / uu で共有するか分離するか (チャンネル運用次第)
-- `unattended-upgrades` の通知頻度 (毎日 vs 変更あった日のみ vs 週次サマリ)
-- `--blocking-pod-selector` の初期セット (Longhorn 以外に必要か)
 - gateway 再起動時の DNS 短断が許容できるか実機検証 (TTL / cache hit ratio で判断)
-- ESM ((Pro) repo) を使うか — Ubuntu Pro が無いなら `ESMApps` / `ESM` の origin は無効になるだけ。判断は Phase 1 で
 - Phase 1 で Renovate に kured chart の更新ルールが乗るか dry-run 確認
+
+### 2026-04-30 確定
+
+- **Discord webhook は kured / uu で共有** (1Password エントリ 1 個)。チャンネルは新規 `#br-cluster-prod-maintenance` (Notification カテゴリ) に集約
+- **uu の通知頻度は「変更があった日のみ」**。0 件の日はスキップ。ノイズが残れば Phase 2 で週次サマリ化
+- **`--blocking-pod-selector` 初期値は `longhorn.io/component=instance-manager` のみ**。他は Phase 2 観察で追加判断
+- **ESM origin (`ESMApps` / `ESM`) は allowlist に含めたまま**。Ubuntu Pro 未契約なので無効扱いになり実害なし。将来契約した時に勝手に効くメリット側を取る
 
 ## 更新履歴
 
 - 2026-04-30 初版
+- 2026-04-30 kured 窓を 01:00–02:30 JST に変更 (k3s-leader-restart.timer と分離)。`k3s-leader-restart` との役割分担と Phase 2 観察項目を追記
+- 2026-04-30 Discord 通知を `#br-cluster-prod-maintenance` (新規) に集約、webhook 共有、uu は「変更があった日のみ」、ESM origin は allowlist に含めたまま、blocking-pod-selector 初期値を Longhorn instance-manager のみで確定
