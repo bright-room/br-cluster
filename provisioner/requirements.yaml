@@ -1,5 +1,6 @@
 ---
 roles:
+  # renovate: datasource=galaxy depName=ipr-cnrs.nftables
   - name: ipr-cnrs.nftables
     version: v2.2.6
 

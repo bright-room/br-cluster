@@ -1,12 +1,20 @@
 ---
 versions:
+  # renovate: datasource=github-releases depName=k3s-io/k3s versioning=loose
   k3s: "v1.35.3+k3s1"
+  # renovate: datasource=github-releases depName=kubernetes/kubernetes
   kubectl: "v1.35.0"
+  # renovate: datasource=github-releases depName=helm/helm
   helm: "v4.0.0"
+  # renovate: datasource=github-releases depName=deuxfleurs-org/garage
   garage: "v2.2.0"
-  restic: "0.18.1"
+  # renovate: datasource=github-releases depName=etcd-io/etcd
   etcd: "v3.6.0"
+  # renovate: datasource=github-releases depName=coredns/coredns
   coredns: "1.14.2"
+  # renovate: datasource=pypi depName=certbot
   certbot: "5.4.0"
+  # renovate: datasource=github-releases depName=prometheus/node_exporter
   node_exporter: "1.11.0"
+  # renovate: datasource=github-releases depName=grafana/alloy
   alloy: "1.15.1"
