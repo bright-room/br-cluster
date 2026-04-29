@@ -12,9 +12,12 @@ configuration:
   rebootSentinel: /var/run/reboot-required
   # CP node が同時に落ちて etcd quorum を割らないように 1 ノードずつ
   concurrency: 1
-  # Longhorn の volume rebuild 中は drain で詰まるので reboot を抑止
-  blockingPodSelector:
-    - longhorn.io/component=instance-manager
+  # blockingPodSelector は空にして drain は Longhorn 側の挙動に任せる。
+  # instance-manager は DaemonSet で常駐するため `longhorn.io/component=instance-manager`
+  # を入れると永続的にブロックされて reboot が一切走らなくなる。
+  # rebuild 中だけ止める仕組みは Phase 2 で alert ベース (--alert-filter-regexp)
+  # に置き換える方針。
+  blockingPodSelector: []
   # notifyUrl は KURED_NOTIFY_URL env var で上書きする (chart の挙動)。
   # ExternalSecret から injected された Secret を参照するため values 側は空。
   notifyUrl: ""

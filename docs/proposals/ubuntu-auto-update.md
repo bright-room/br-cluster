@@ -53,7 +53,7 @@ homelab という性質上、月単位で更新が遅延する事故が起きや
 | kured の deploy | **`manifests/platform/kured/` を Flux 経由** | 他 platform component と同列。HelmRelease で pin |
 | 通知 | **kured の Slack/Webhook 通知 → Discord webhook** + **`unattended-upgrades` の `Mail` を Discord webhook に転送するシェル** | reboot は kured が、apt 結果は uu が出す。集約は将来 Argo Events に寄せる余地あり |
 | Discord webhook 管理 | **1Password → ExternalSecret** (kured 用) / **1Password CLI で `.env` 配布** (uu 用、Ansible で配置) | `policies/` 平文 Secret 禁止に準拠。uu はホスト側スクリプトなので k8s Secret は使えない |
-| reboot 抑止フラグ | kured の `--blocking-pod-selector` / `--alert-filter-regexp` で必要に応じて抑止 | Longhorn rebuild 中の reboot を避ける等の運用フックを残す |
+| reboot 抑止フラグ | Phase 1 では `--blocking-pod-selector` を **空** にする (実機検証で `longhorn.io/component=instance-manager` 指定だと DaemonSet が常駐してマッチし続け永遠に reboot されないことを確認したため)。Phase 2 で `--alert-filter-regexp` + Prometheus alert (LonghornVolumeRebuilding 等) に置き換える | drain 安全性は Longhorn 側 PDB / drain 挙動に委ねる |
 
 ### 検討したが採らなかった案
 
@@ -305,7 +305,7 @@ configuration:
 
 - **Discord webhook は kured / uu で共有** (1Password エントリ 1 個)。チャンネルは新規 `#br-cluster-prod-maintenance` (Notification カテゴリ) に集約
 - **uu の通知頻度は「変更があった日のみ」**。0 件の日はスキップ。ノイズが残れば Phase 2 で週次サマリ化
-- **`--blocking-pod-selector` 初期値は `longhorn.io/component=instance-manager` のみ**。他は Phase 2 観察で追加判断
+- **`--blocking-pod-selector` は空で start** (PR-2 実機検証で `longhorn.io/component=instance-manager` 指定だと DaemonSet 常駐により常時マッチ → reboot が一切走らないことを確認)。drain 安全性は Longhorn の PDB / drain 挙動に委ねる。Phase 2 で alert ベース抑止 (`--alert-filter-regexp` + LonghornVolumeRebuilding 等) に置き換え
 - **ESM origin (`ESMApps` / `ESM`) は allowlist に含めたまま**。Ubuntu Pro 未契約なので無効扱いになり実害なし。将来契約した時に勝手に効くメリット側を取る
 
 ## 更新履歴
@@ -313,3 +313,4 @@ configuration:
 - 2026-04-30 初版
 - 2026-04-30 kured 窓を 01:00–02:30 JST に変更 (k3s-leader-restart.timer と分離)。`k3s-leader-restart` との役割分担と Phase 2 観察項目を追記
 - 2026-04-30 Discord 通知を `#br-cluster-prod-maintenance` (新規) に集約、webhook 共有、uu は「変更があった日のみ」、ESM origin は allowlist に含めたまま、blocking-pod-selector 初期値を Longhorn instance-manager のみで確定
+- 2026-04-30 PR-2 実機検証で `blocking-pod-selector: longhorn.io/component=instance-manager` が DaemonSet 常駐により永続ブロックを引き起こすと判明 → 空に変更。Phase 2 で alert ベース抑止に再設計予定
