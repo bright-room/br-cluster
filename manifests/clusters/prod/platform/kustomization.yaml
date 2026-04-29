@@ -20,6 +20,7 @@ resources:
   - hubble-flow-exporter-app.yaml
   - kube-prometheus-stack-app.yaml
   - kube-vip-app.yaml
+  - kured-app.yaml
   - loki-app.yaml
   - longhorn-app.yaml
   - metrics-server-app.yaml

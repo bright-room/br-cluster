@@ -1,0 +1,42 @@
+---
+# kured (Kubernetes Reboot Daemon) — k3s ノードの security update 後 reboot を
+# 1 台ずつ cordon / drain 込みで処理する。
+# proposal: docs/proposals/ubuntu-auto-update.md
+configuration:
+  # k3s-leader-restart.timer (master idx 0/1/2 が 03:00 / 04:00 / 05:00 JST に
+  # ±15 min jitter で発火) と完全分離するため 01:00–02:30 JST に固定。
+  startTime: "01:00"
+  endTime:   "02:30"
+  timeZone:  "Asia/Tokyo"
+  rebootDays: [mo, tu, we, th, fr, sa, su]
+  rebootSentinel: /var/run/reboot-required
+  # CP node が同時に落ちて etcd quorum を割らないように 1 ノードずつ
+  concurrency: 1
+  # Longhorn の volume rebuild 中は drain で詰まるので reboot を抑止
+  blockingPodSelector:
+    - longhorn.io/component=instance-manager
+  # notifyUrl は KURED_NOTIFY_URL env var で上書きする (chart の挙動)。
+  # ExternalSecret から injected された Secret を参照するため values 側は空。
+  notifyUrl: ""
+  messageTemplateDrain: "Draining node %s"
+  messageTemplateReboot: "Rebooting node %s"
+  messageTemplateUncordon: "Node %s rebooted & uncordoned"
+
+# kured は KURED_<UPPER_SNAKE> env で flag を上書きできる。
+# notifyUrl を Secret 経由で渡すために KURED_NOTIFY_URL に展開する。
+extraEnvVars:
+  - name: KURED_NOTIFY_URL
+    valueFrom:
+      secretKeyRef:
+        name: kured-discord-webhook
+        key: notify-url
+
+# k3s ノード (master + worker) のみで動かす。gateway / external は
+# unattended-upgrades 自身が reboot するので kured 不要。
+nodeSelector:
+  kubernetes.io/os: linux
+
+# control-plane / NoSchedule taint も含めて全 node に行き渡らせる
+tolerations:
+  - effect: NoSchedule
+    operator: Exists
