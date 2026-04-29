@@ -16,3 +16,7 @@
   service:
     name: ssh
     state: restarted
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: true

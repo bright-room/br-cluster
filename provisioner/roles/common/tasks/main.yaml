@@ -18,3 +18,7 @@
 - name: SSH configuration
   include_tasks: ssh.yaml
   tags: [system]
+
+- name: Configure unattended-upgrades
+  include_tasks: unattended_upgrades.yaml
+  tags: [system, unattended-upgrades]

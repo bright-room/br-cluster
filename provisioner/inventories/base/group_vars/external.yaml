@@ -1,0 +1,5 @@
+---
+# External 専用の override。kured 管理外のため unattended-upgrades 自身で reboot させる。
+# 04:00 JST に再起動 (Loki / Tempo 書き込み先 Garage S3 の停止時間。gateway (03:00) と被らせない)。
+unattended_upgrades_automatic_reboot: true
+unattended_upgrades_automatic_reboot_time: "04:00"

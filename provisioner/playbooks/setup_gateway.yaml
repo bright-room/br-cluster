@@ -4,12 +4,26 @@
   gather_facts: true
   become: true
 
+  collections:
+    - onepassword.connect
+
+  environment:
+    OP_CONNECT_TOKEN: "{{ lookup('env', 'OP_CONNECT_TOKEN') }}"
+    OP_CONNECT_HOST: "{{ lookup('env', 'OP_CONNECT_HOST') }}"
+
   pre_tasks:
     - name: Package update
       include_tasks: ../tasks/update.yaml
       tags: [always]
 
   roles:
+    - name: Fetch required secrets
+      role: secrets
+      vars:
+        required_secrets:
+          - discord_webhook
+      tags: [always]
+
     - name: Common system configuration
       role: common
       tags: [system]

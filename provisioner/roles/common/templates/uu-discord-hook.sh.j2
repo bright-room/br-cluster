@@ -1,0 +1,91 @@
+#!/bin/bash
+# Managed by Ansible (role: common, task: unattended_upgrades). Do not edit manually.
+#
+# apt-daily-upgrade.service の ExecStartPost から呼ばれる。
+# 直近の unattended-upgrades 実行で更新があったときだけ Discord に通知する。
+# 0 件 / log 未取得 / webhook 未設定なら silent に exit 0 する (apt-daily の失敗扱い回避)。
+
+set -u
+
+WEBHOOK_FILE="{{ unattended_upgrades_discord_webhook_env_file }}"
+LOG=/var/log/unattended-upgrades/unattended-upgrades.log
+HOSTNAME_SHORT=$(hostname -s)
+
+# webhook URL が無ければ何もしない (1Password 未配信 / Phase 0 状態を許容)
+[ -r "$WEBHOOK_FILE" ] || exit 0
+# shellcheck disable=SC1090
+. "$WEBHOOK_FILE"
+[ -n "${DISCORD_WEBHOOK_URL:-}" ] || exit 0
+[ -r "$LOG" ] || exit 0
+
+# 直近の "Starting unattended upgrades script" 以降を抽出
+last_start_line=$(grep -n "Starting unattended upgrades script" "$LOG" | tail -n1 | cut -d: -f1)
+[ -n "$last_start_line" ] || exit 0
+block=$(tail -n +"$last_start_line" "$LOG")
+
+# パッケージリストを抽出。"Packages that will be upgraded:" が無ければ更新無し → 黙って終了
+pkgs_line=$(printf '%s\n' "$block" | grep "Packages that will be upgraded:" | tail -n1)
+if [ -z "$pkgs_line" ]; then
+  exit 0
+fi
+pkgs=$(printf '%s\n' "$pkgs_line" | sed 's/.*Packages that will be upgraded:[[:space:]]*//' | tr ' ' '\n' | grep -v '^$' | sort -u)
+# pkgs が空なら通知しない (printf '%s\n' "" | wc -l は 1 を返すので $pkgs の中身で判定する)
+[ -n "$pkgs" ] || exit 0
+count=$(printf '%s\n' "$pkgs" | wc -l | tr -d ' ')
+
+# エラーを拾う (なければ空)
+errors=$(printf '%s\n' "$block" | grep -E "^[^[:space:]].*ERROR|Traceback" | head -n5 || true)
+
+# reboot-required の有無
+reboot_required="no"
+[ -e /var/run/reboot-required ] && reboot_required="yes"
+
+# パッケージ一覧 (10 件まで)
+pkg_list=$(printf '%s\n' "$pkgs" | head -n10 | sed 's/^/- /')
+if [ "$count" -gt 10 ]; then
+  pkg_list="${pkg_list}
+... and $((count - 10)) more"
+fi
+
+# 状態に応じた embed の色 (左ライン)。エラー > reboot-required > 通常成功 の優先順。
+#   赤 0xED4245 = 15548997, 黄 0xFEE75C = 16705372, 緑 0x57F287 = 5763719
+if [ -n "$errors" ]; then
+  color=15548997
+elif [ "$reboot_required" = "yes" ]; then
+  color=16705372
+else
+  color=5763719
+fi
+
+description="**${count} package(s) upgraded**
+\`\`\`
+${pkg_list}
+\`\`\`
+reboot-required: ${reboot_required}"
+
+if [ -n "$errors" ]; then
+  description="${description}
+errors:
+\`\`\`
+${errors}
+\`\`\`"
+fi
+
+# Discord embed の description 上限は 4096 文字。安全のため 3900 で切る
+description=$(printf '%s' "$description" | head -c 3900)
+
+title="[${HOSTNAME_SHORT}] unattended-upgrades"
+timestamp=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+
+payload=$(jq -n \
+  --arg title "$title" \
+  --arg desc "$description" \
+  --argjson color "$color" \
+  --arg ts "$timestamp" \
+  '{embeds: [{title: $title, description: $desc, color: $color, timestamp: $ts}]}')
+
+curl -sS -m 10 -H "Content-Type: application/json" \
+  -X POST -d "$payload" \
+  "$DISCORD_WEBHOOK_URL" >/dev/null 2>&1 || true
+
+exit 0

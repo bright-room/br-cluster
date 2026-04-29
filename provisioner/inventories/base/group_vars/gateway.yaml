@@ -1,0 +1,5 @@
+---
+# Gateway 専用の override。kured 管理外のため unattended-upgrades 自身で reboot させる。
+# 03:00 JST に再起動 (DNS / NTP の停止時間。external (04:00) と被らせない)。
+unattended_upgrades_automatic_reboot: true
+unattended_upgrades_automatic_reboot_time: "03:00"

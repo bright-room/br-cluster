@@ -18,3 +18,19 @@ install_packages:
   - tar
   - bzip2
   - unzip
+
+# unattended-upgrades の挙動。group_vars で gateway / external が
+# unattended_upgrades_automatic_reboot{,_time} を個別に override する想定。
+# k3s ノードは kured が reboot を担当するので automatic_reboot=false を維持。
+unattended_upgrades_allowed_origins:
+  - "${distro_id}:${distro_codename}-security"
+  - "${distro_id}ESMApps:${distro_codename}-apps-security"
+  - "${distro_id}ESM:${distro_codename}-infra-security"
+unattended_upgrades_package_blacklist:
+  - "k3s"
+  - "k3s-selinux"
+unattended_upgrades_automatic_reboot: false
+unattended_upgrades_automatic_reboot_time: "03:00"
+unattended_upgrades_download_timeout: 300
+unattended_upgrades_discord_webhook_env_file: /etc/default/uu-discord-hook
+unattended_upgrades_discord_hook_script: /usr/local/sbin/uu-discord-hook.sh
