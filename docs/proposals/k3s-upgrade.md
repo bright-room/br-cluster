@@ -57,7 +57,7 @@
 |------|------|------|
 | アップグレード方式 | **system-upgrade-controller (SUC)** | k3s 公式推奨。`Plan` CRD で declarative、Flux/GitOps と相性良。time window / concurrency / cordon / prepare 順序 / version skew 保護が組み込み済 |
 | バージョン指定 | **`version` フィールドで pin** (channel ではない) | channel は新版が出たら **window 内で勝手に走る**。homelab では release note を読んで判断する工程を挟みたい |
-| バージョン追跡 | **Renovate `customManager`** で `Plan` YAML の `version:` 行を datasource=`github-releases` (`k3s-io/k3s`) で監視 | 既存 Renovate と同じ仕組みで PR レビュー → merge → Flux が apply → SUC が window 内で実行 |
+| バージョン追跡 | **Renovate `customManager`** で **(a) `Plan` YAML の `version:` 行** を datasource=`github-releases` (`k3s-io/k3s`) で監視、**(b) `base/kustomization.yaml` の release-asset URL** を `rancher/system-upgrade-controller` で監視 | Renovate の `kustomize` manager は Git ref 形式 (`?ref=<tag>`) しか自動検知しない。release asset URL 形式は customManager regex でしか拾えないため、Plan version と同じ customManager にまとめる |
 | 適用順序 | **server-plan → agent-plan** (agent plan に `prepare` で server-plan 待ち合わせ) | 公式パターン通り。CP 完了後に worker が動く |
 | concurrency | **server: 1 / agent: 1** | quorum 維持 + Pod 退避を直列化 |
 | cordon | **`cordon: true`** (両 Plan) | drain は SUC 既定 (k3s-upgrade image が処理) |
@@ -114,14 +114,14 @@ Phase 1 は 1a / 1b に分割する。**1a が本 proposal の実装スコープ
 
 ### Phase 1a (本 proposal でやり切る範囲)
 
-| # | 機能 | 検証方法 |
-|---|------|---------|
-| 1 | **SUC が動作** | `kubectl get pods -n system-upgrade` で controller Running、`kubectl get plans -A` で server-plan / agent-plan が見える |
-| 2 | **Renovate が `Plan` の `version` を検知して PR を出す** | server-plan の `version` を 1 つ古いパッチに戻し、Renovate dry-run で PR が立つこと |
-| 3 | **テスト worker 1 台で patch upgrade が走る** | nodeSelector を `kubernetes.io/hostname: <test-worker>` に絞った状態で patch を 1 段上げ、当該 1 台で Job が走り完了 |
-| 4 | **concurrency=1 が効く** | テスト用に複数台向けにした場合でも、同一 Plan 内で複数ノード Job が同時に走らない (動作観察用に nodeSelector を一時的に広げて確認) |
-| 5 | **prepare による server → agent 待ち合わせが機能** | server-plan を進めた後に agent-plan の prepare Job が server-plan 完了を待っていることを `kubectl get jobs -n system-upgrade -w` で確認 |
-| 6 | **rollback runbook (snapshot 抜きの手順) が手順通り動く** | テスト worker 1 台で `Plan` の `version` を旧版に戻す経路 (k3s-upgrade image が downgrade を拒否することの確認 + Ansible 経由戻しの手順記述) |
+| # | 機能 | 検証方法 | 状況 |
+|---|------|---------|------|
+| 1 | **SUC が動作** | `kubectl get pods -n system-upgrade` で controller Running、`kubectl get plans -A` で server-plan / agent-plan が見える | ✅ PR1/2 で確認 |
+| 2 | **Renovate が `Plan` の `version` を検知して PR を出す** | PR3 merge 後、次の Renovate run で k3s 新版への bump PR が `groupName: k3s` で起票されること | ⏳ 起票待ち (土曜 9am or 手動 trigger) |
+| 3 | **テスト worker 1 台で patch upgrade が走る** | nodeSelector を `kubernetes.io/hostname=br-node5` に絞った状態で、Renovate 経由 (or 手動) で `version` を 1 段上げて Job が走り完了 | △ no-op Job 実走確認済、本物の patch は #2 の Renovate PR merge 時に達成見込み |
+| 4 | **concurrency=1 が効く** | Job 構造で複数 Job が同時起動しないこと (Phase 1a は 1 ノード限定なので並列衝突は未観察、Phase 1b で実観察) | ✅ Job 構造で確認 |
+| 5 | **prepare による server → agent 待ち合わせが機能** | server-plan の Job 完了後に agent-plan の prepare Job が走ることを `kubectl get jobs -n system-upgrade -w` で確認 | ✅ PR2 reconcile 時に server 完了 17:42:05 → agent 完了 17:42:16 で順序確認 |
+| 6 | **rollback runbook (snapshot 抜きの手順) が手順通り動く** | k3s-upgrade image が downgrade を拒否することの記述 + Ansible 経由戻しの手順記述 | ✅ PR4 で記述 |
 
 ### Phase 1b (provisioner 別 proposal 決着後)
 
@@ -135,13 +135,13 @@ Phase 1 は 1a / 1b に分割する。**1a が本 proposal の実装スコープ
 
 ## 段階導入計画
 
-| Phase | 内容 | 完了条件 |
-|-------|------|---------|
-| **Phase 0** | この proposal で合意 | レビュー approval |
-| **Phase 1a** | SUC を Flux で導入 + `Plan` 2 本 (テスト worker 限定 nodeSelector、`window` は動作確認のため広め) + Renovate customManager + 限定 runbook (snapshot 抜き) | 受け入れ基準 1〜6 |
-| **Phase 1b** | provisioner 別 proposal の snapshot 経路に乗せて、nodeSelector 本番並び + `window` 02:00-05:00 JST + runbook 完成 | 受け入れ基準 7〜11 |
-| **Phase 2** | 1〜2 回のパッチ更新を実機で回し、運用フォロー (実所要時間 / 障害有無 / window 設定の妥当性) | 別 PR (proposal 不要) |
-| **Phase 3** | minor 跨ぎを 1 回経験 → チェックリスト拡充。channel-based に切り替えるかの判断 | 別 PR or proposal |
+| Phase | 内容 | 完了条件 | 状況 |
+|-------|------|---------|------|
+| **Phase 0** | この proposal で合意 | レビュー approval | ✅ |
+| **Phase 1a** | SUC を Flux で導入 + `Plan` 2 本 (テスト worker 限定 nodeSelector、`window` は動作確認のため広め) + Renovate customManager + 限定 runbook (snapshot 抜き) | 受け入れ基準 1〜6 | ✅ 着地 (PR1〜4 / `#232`〜`#235`)、Renovate 起票待ちのみ残 |
+| **Phase 1b** | provisioner 別 proposal の snapshot 経路に乗せて、nodeSelector 本番並び + `window` 02:00-05:00 JST + runbook 完成 | 受け入れ基準 7〜11 | ⏳ provisioner 別 proposal 待ち |
+| **Phase 2** | 1〜2 回のパッチ更新を実機で回し、運用フォロー (実所要時間 / 障害有無 / window 設定の妥当性) | 別 PR (proposal 不要) | — |
+| **Phase 3** | minor 跨ぎを 1 回経験 → チェックリスト拡充。channel-based に切り替えるかの判断 | 別 PR or proposal | — |
 
 ## Phase 1 の運用フォロー (2026-05-30 目安)
 
@@ -272,17 +272,47 @@ spec:
 
 `prepare` で `server-plan` 完了を待つのが公式パターン。
 
-#### Phase 1a 段階での暫定値
+#### Phase 1a 段階での暫定値 (2026-04-30 着地)
 
-上記は Phase 1b の最終形。Phase 1a では以下に差し替えて導入する:
+上記は Phase 1b の最終形。Phase 1a では以下に差し替えて導入した:
 
-- `nodeSelector` を `kubernetes.io/hostname: <test-worker>` に絞る (両 Plan、prod 影響を遮断)
-- `window` は **未指定 (24h いつでも)** にして手動 trigger で動作確認、Phase 1b で 02:00-05:00 JST に絞る
-- `version` は現行 `versions.k3s` と同値 (no-op) で初導入し、Plan が apply されること / SUC が skip 判定すること を確認してから patch を 1 段上げて実走
+- `nodeSelector` を `kubernetes.io/hostname: br-node5` に絞る (両 Plan、prod 影響を遮断)
+- `window` は **未指定 (24h いつでも)** で動作確認、Phase 1b で 02:00-05:00 JST に絞る
+- `version` は現行 `versions.k3s` と同値 (`v1.35.3+k3s1`) で初導入
 
-### (B) Renovate: `Plan` の `version` 用 customManager
+**test-worker = br-node5 を選んだ理由**:
 
-`renovate.json` に追記:
+| worker | Pod 総数 | PVC mount Pod 数 | Longhorn replica |
+|---|---|---|---|
+| br-node4 | 18 | 4 (stateful あり) | 7 |
+| **br-node5** | **43** | **0 (stateless のみ)** | 7 |
+| br-node6 | 20 | 3 (stateful あり) | 7 |
+
+Pod 数は多いが全部 stateless なので drain → reschedule が軽い。
+stateful Pod のある br-node4/6 は Longhorn detach/reattach + replica rebuild
+リスクが乗るため避ける。Longhorn replica は 3 worker 均等 (7/7/7) で
+br-node5 一時離脱でも冗長性確保。
+
+**観察された挙動 (Phase 1a 実装で判明)**:
+
+- `nodeSelector: kubernetes.io/hostname=br-node5` は role label を問わず
+  hostname だけで match する。**server-plan も br-node5 で Job を起こす**
+  (worker でも k3s-upgrade image はバイナリ checksum 比較で no-op exit)。
+  Phase 1b で server-plan を control-plane label の selector に書き換える際は、
+  この差を意識して切り替える
+- `cordon: true` は **no-op upgrade (バイナリ書き換え skip) でも drain を実行する**。
+  br-node5 上の Pod 43 個が drain → 別 worker に再配置 → uncordon 後に戻る
+  動きが発生した。Phase 1b で `window` を有効化する根拠が裏付けられた
+- agent-plan の `prepare: { args: [prepare, server-plan] }` は server-plan の
+  Job 完了を待つ。実機で server-plan 完了 17:42:05 → agent-plan 完了 17:42:16
+  の順序を確認
+
+### (B) Renovate: SUC controller / Plan の version 用 customManager
+
+`renovate.json` に追記する customManager は **2 種類のバージョン参照を 1 つの regex manager で拾う**形にする:
+
+- (a) `Plan` の `spec.version` 行 — k3s 本体のバージョン
+- (b) `base/kustomization.yaml` の release asset URL — SUC controller のバージョン
 
 ```json
 {
@@ -290,26 +320,24 @@ spec:
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "/manifests/platform/system-upgrade-controller/.+-plan\\.ya?ml$/"
+        "/manifests/platform/system-upgrade-controller/.+\\.ya?ml$/"
       ],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\n\\s*version:\\s*\"(?<currentValue>.*?)\""
-      ],
-      "versioningTemplate": "{{#if versioning}}{{versioning}}{{else}}loose{{/if}}"
+        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?) versioning=(?<versioning>.*?)\\n\\s*-\\s*https://github\\.com/[^/]+/[^/]+/releases/download/(?<currentValue>v[0-9.]+)/",
+        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?) versioning=(?<versioning>.*?)\\n\\s*version:\\s*\"(?<currentValue>.*?)\""
+      ]
     }
   ]
 }
 ```
 
-server-plan と agent-plan が **同じ version で同期** されるよう、Renovate の
-`groupName` で 1 PR にまとめる:
+`versioning=` は必須にして既存 imager 用 customManager の慣習に合わせる
+(k3s は `loose`、SUC は `semver`)。
 
-```json
-{
-  "matchPackageNames": ["k3s-io/k3s"],
-  "groupName": "k3s"
-}
-```
+`packageRules` で:
+
+- `k3s-io/k3s` → `groupName: k3s` (server-plan + agent-plan を 1 PR にまとめる)
+- `rancher/system-upgrade-controller` → `groupName: system-upgrade-controller` (crd.yaml + system-upgrade-controller.yaml の 2 URL を 1 PR にまとめる)
 
 ### (C) provisioner 領域 (別 proposal)
 
@@ -364,6 +392,8 @@ Phase 1a の runbook では snapshot 取得ステップを「(別 proposal で�
 | **etcd snapshot を取り忘れて merge** | runbook の通常手順で先に `make prod/k3s/snapshot` を踏む。将来は Plan の `prepare` に snapshot job を組み込む余地 |
 | **SUC Job のセキュリティ** | host IPC/NET/PID + `CAP_SYS_BOOT` + `/host` rw。`system-upgrade` namespace を `policies/exceptions.rego` 等で隔離 (今は無いが Phase 2 で必要なら追加) |
 | **アップグレード中に Renovate が他の HelmRelease PR を merge** | 運用ルール: k3s upgrade window の前後 24h は他の PR を merge しない (runbook 明記) |
+| **`cordon: true` は no-op upgrade でも drain を実行する** (Phase 1a で観察) | `version` 一致でバイナリ書き換えは skip されるが、cordon → drain → uncordon の流れは走る。Phase 1b で `window` を有効化することで影響時間帯を制御する |
+| **hostname 限定 nodeSelector は role label を見ない** (Phase 1a で観察) | Phase 1a の Plan は `kubernetes.io/hostname=br-node5` だけで絞っているため、server-plan も worker (br-node5) に Job を起こす (k3s-upgrade image はバイナリ checksum で no-op exit するので実害無し)。Phase 1b で本番 selector に切り替える際の挙動差として留意 |
 
 ## 作業範囲
 
@@ -395,15 +425,30 @@ Phase 1a の runbook では snapshot 取得ステップを「(別 proposal で�
 
 ## 未決事項 / 要確認
 
-- SUC のバージョン (Phase 1 着手時に最新 stable を tag pin、`v0.16.0` は仮)
-- Renovate の `versioning` (`loose` で `vX.Y.Z+k3sN` を扱えるか dry-run で確認、ダメなら `regex` versioning に切替)
-- `version` pin と `versions.yaml` の同期を Renovate の `groupName` でまとめられるか dry-run 確認
-- window を 02:00-05:00 にするか (kured と被るがほぼ不問の想定)
-- minor 跨ぎ時の手順 — Plan の `version` を 1 minor ずつ段階更新する運用ルール
+- Renovate の `versioning=loose` で `vX.Y.Z+k3sN` を扱えるか — Phase 1a で設定済、最初の Renovate 起票 (`k3s` group) で実証 (起票待ち)
+- `version` pin と `versions.yaml` の同期を Renovate の `groupName: k3s` でまとめられるか — provisioner 別 proposal 側で `versions.yaml` の k3s 行に同 groupName を付ける時に検証
+- window を 02:00-05:00 にするか (kured と被るがほぼ不問の想定) — Phase 1b 着手時に最終決定
 - `prepare` 段階に etcd snapshot job を組み込む案 (Phase 2 で再検討)
 - `system-upgrade` namespace のセキュリティ境界 (Phase 2 で必要なら policy 追加)
 - channel-based に切り替える場合の判断基準 (Phase 3)
+- Phase 1a 観察事項を Phase 1b に持ち越し:
+  - `cordon: true` の no-op 時 drain 挙動が運用上どこまで許容できるか (Phase 1b で `window` 有効化する前提)
+  - server-plan の本番 selector 切替 (`kubernetes.io/hostname` → `node-role.kubernetes.io/control-plane: "true"`) を、稼働中 cluster で安全に実施する手順
+
+### 解決済 (Phase 1a で着地)
+
+- ~~SUC のバージョン (`v0.16.0` は仮)~~ → `v0.19.2` (PR1)
+- ~~minor 跨ぎ時の手順~~ → runbook の minor チェックリストに記載 (PR4)
 
 ## 更新履歴
 
 - 2026-04-30 初版 (Ansible 自作 rolling 案で書き始めたが、k3s 公式 [Automated Upgrades](https://docs.k3s.io/upgrades/automated) を再評価し SUC 採用に切替。provisioner (Ansible) 領域 — etcd snapshot playbook / Make ターゲット / `versions.yaml` 同期 — は別 proposal に切り出し、Phase 1 は 1a (本 proposal で実装) / 1b (provisioner 別 proposal 決着後) に分割する形で着地)
+- 2026-04-30 Phase 1a 着地 (PR `#232`〜`#235`) を反映:
+  - **(B) Renovate 節**: customManager は **Plan の `version:` 行と `base/kustomization.yaml` の release-asset URL の 2 種を 1 manager で拾う**形に修正 (`kustomize` manager は Git ref 形式しか自動検知しないため URL 側にも customManager 必須)。`packageRules` で k3s / SUC 各々を `groupName` でまとめる形に
+  - **採用/不採用 行 (バージョン追跡)**: 上記に合わせて修正
+  - **Phase 1a 暫定値**: test-worker = `br-node5` (PVC mount 0 / stateless 集中) を選定理由つきで明記
+  - **Phase 1a 観察事項を追記**: hostname 限定 selector は server-plan も match して Job を起こす / `cordon: true` は no-op でも drain を実行する
+  - **リスク表**: 上記 2 観察を行追加
+  - **Phase 1a 受け入れ基準**: 達成状況列を追加 (1, 4, 5, 6 ✅ / 2 起票待ち / 3 no-op 確認、本物 patch は Renovate PR で達成見込み)
+  - **段階導入計画**: Phase 1a を ✅ 着地マーク
+  - **未決事項**: 解決済 (`v0.16.0` 仮、minor 跨ぎ手順) を整理、Phase 1b 持ち越し観察事項を追加
