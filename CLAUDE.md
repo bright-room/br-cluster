@@ -50,7 +50,7 @@
 - ブランチ命名: `feat/...` / `fix/...` / `docs/...` / `revert/...` (`git log` のパターン参照)
 - コミットメッセージ: 既存の Conventional Commits 風 (`feat(scope): ...` / `fix(scope): ...`)。日本語可
 - **PR 単位で 1 トピック**。bug fix と refactor を混ぜない
-- 大きな変更は **proposal** を `docs/proposals/` に書いて先に合意形成 (例: [`docs/proposals/etcd-defrag.md`](docs/proposals/etcd-defrag.md))
+- 大きな変更は **proposal** を `docs/proposals/` に書いて先に合意形成 (例: [`docs/proposals/argo-workflows.md`](docs/proposals/argo-workflows.md))
 
 ## Policy as Code (Conftest)
 
