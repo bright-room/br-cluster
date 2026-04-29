@@ -15,6 +15,10 @@
 >
 > 別 proposal `ubuntu-auto-update.md` (OS パッケージ自動更新) とはスコープを
 > 完全に分ける。
+>
+> また、**provisioner (Ansible) 領域の作業 — etcd snapshot playbook / Make
+> ターゲット / `versions.yaml` 同期 — は別 proposal に切り出す**。本 proposal
+> は manifests + Renovate + runbook の k8s 側完結スコープに絞る。
 
 ## 背景・動機
 
@@ -44,8 +48,8 @@
 
 | | 内容 |
 |---|------|
-| ゴール | (1) **system-upgrade-controller を Flux 経由で導入** し、`Plan` CRD で server / agent の順次アップグレードを宣言的に管理。(2) **Renovate で `Plan` の `version` を追跡** し PR が自動で立つ。(3) **アップグレード前の etcd snapshot 取得** を Ansible playbook で別経路から実行できるようにする。(4) **rollback runbook** を `docs/runbooks/k3s-upgrade.md` に整備。(5) **minor upgrade チェックリスト** を runbook に明文化 |
-| 非ゴール | (1) **完全自動 (channel-based)** — `version` pin で運用し PR レビューを必ず挟む。(2) k3s 周辺コンポーネント (cert-manager / Cilium / Flux 等) の更新自動化 (Renovate 既存ルールで別管理)。(3) HA control-plane を 5 台に増やす等の構成変更。(4) PR merge と同時に自動 apply (Plan は Flux で apply されるが、`window` で時間帯を絞ることで人間が観察可能な時間帯に限定) |
+| ゴール | (1) **system-upgrade-controller を Flux 経由で導入** し、`Plan` CRD で server / agent の順次アップグレードを宣言的に管理。(2) **Renovate で `Plan` の `version` を追跡** し PR が自動で立つ。(3) **rollback runbook** を `docs/runbooks/k3s-upgrade.md` に整備。(4) **minor upgrade チェックリスト** を runbook に明文化 |
+| 非ゴール | (1) **完全自動 (channel-based)** — `version` pin で運用し PR レビューを必ず挟む。(2) k3s 周辺コンポーネント (cert-manager / Cilium / Flux 等) の更新自動化 (Renovate 既存ルールで別管理)。(3) HA control-plane を 5 台に増やす等の構成変更。(4) PR merge と同時に自動 apply (Plan は Flux で apply されるが、`window` で時間帯を絞ることで人間が観察可能な時間帯に限定)。(5) **provisioner (Ansible) 領域の作業** — etcd snapshot playbook / `make prod/k3s/snapshot` / `versions.yaml` との同期 — は別 proposal で扱う |
 
 ## 採用 / 不採用 / 理由
 
@@ -58,7 +62,7 @@
 | concurrency | **server: 1 / agent: 1** | quorum 維持 + Pod 退避を直列化 |
 | cordon | **`cordon: true`** (両 Plan) | drain は SUC 既定 (k3s-upgrade image が処理) |
 | time window | **`window` で 02:00-05:00 JST に限定** | 利用が無い時間帯。`ubuntu-auto-update.md` の kured (02:00-05:00) と被るが、k3s upgrade 時に Renovate 他 PR を merge しないルールで吸収 |
-| etcd snapshot | **SUC ではなく Ansible で取得** (`make prod/k3s/snapshot`) | SUC は snapshot 取得を組み込んでいない。`Plan` の `prepare` に snapshot job を入れる方式もあるが、ホスト側 `k3s etcd-snapshot save` の方が単純 |
+| etcd snapshot | **SUC ではなく Ansible で取得** (`make prod/k3s/snapshot`) | SUC は snapshot 取得を組み込んでいない。`Plan` の `prepare` に snapshot job を入れる方式もあるが、ホスト側 `k3s etcd-snapshot save` の方が単純。**実装は別 proposal (provisioner 領域)** |
 | Plan の merge トリガ | **PR merge と同時に Flux が `Plan` を apply** | window で時間帯が絞られるので深夜まで実行は始まらない。merge は人間が release note 確認後に行う |
 | 配置 | `manifests/platform/system-upgrade-controller/` (新設) | 他 platform component と同列 |
 | controller の deploy 方式 | **公式 `system-upgrade-controller.yaml` を kustomize で取り込み** (Helm chart 提供なし) | k3s 公式は `kubectl apply -f` 前提。`HelmRelease` 制約 (policy 1, 2) は kustomize に来ないが、ref pin (tag) は明示する |
@@ -75,6 +79,7 @@
 | **Renovate automerge で SUC `Plan` を自動更新** | k3s 中核すぎる。`automerge: false` 維持 |
 | **完全手動 (現状維持)** | 動機の裏返し |
 | **HelmRelease で k3s を入れる** | k3s は OS systemd サービス。Helm 管理対象外 |
+| **`upgrade.image` のタグに k3s バージョンを埋め込んで Renovate docker manager で自動検知** | customManager を書かずに済むが、`rancher/k3s-upgrade` のタグが k3s release と同期しているという暗黙依存に乗る形になる。k3s 中核なのでこの依存は避け、`# renovate:` コメント + customManager regex で k3s release を直接 datasource にする (proposal 案 (B)) |
 
 ## アーキテクチャ概要
 
@@ -105,23 +110,36 @@ flowchart TB
 
 ## Phase 1 で動かすもの (受け入れ基準)
 
+Phase 1 は 1a / 1b に分割する。**1a が本 proposal の実装スコープ**、1b は provisioner 別 proposal の決着後に着地する。
+
+### Phase 1a (本 proposal でやり切る範囲)
+
 | # | 機能 | 検証方法 |
 |---|------|---------|
 | 1 | **SUC が動作** | `kubectl get pods -n system-upgrade` で controller Running、`kubectl get plans -A` で server-plan / agent-plan が見える |
 | 2 | **Renovate が `Plan` の `version` を検知して PR を出す** | server-plan の `version` を 1 つ古いパッチに戻し、Renovate dry-run で PR が立つこと |
-| 3 | **server → agent の順で進行** | `kubectl get jobs -n system-upgrade -w` で server-plan の Job が完了してから agent-plan の Job が起動 |
-| 4 | **concurrency=1 が効く** | 同一 Plan 内で複数ノード Job が同時に走らない |
-| 5 | **window が効く** | window 外で `Plan` を更新しても upgrade が走らず、次の window で開始 |
-| 6 | **`make prod/k3s/snapshot` が全 CP で snapshot を取る** | `/var/lib/rancher/k3s/server/db/snapshots/` に当日のスナップショットが 3 ノード分 |
-| 7 | **rollback runbook が手順通り動く** | 任意 1 worker で 1 つ古いパッチに戻す手順を実機で実行 |
-| 8 | **既存 `setup_node` / `bootstrap_cluster` が壊れていない** | `make prod/provision/lint` 通過、新規プロビジョン経路で同じ k3s 版が入る |
+| 3 | **テスト worker 1 台で patch upgrade が走る** | nodeSelector を `kubernetes.io/hostname: <test-worker>` に絞った状態で patch を 1 段上げ、当該 1 台で Job が走り完了 |
+| 4 | **concurrency=1 が効く** | テスト用に複数台向けにした場合でも、同一 Plan 内で複数ノード Job が同時に走らない (動作観察用に nodeSelector を一時的に広げて確認) |
+| 5 | **prepare による server → agent 待ち合わせが機能** | server-plan を進めた後に agent-plan の prepare Job が server-plan 完了を待っていることを `kubectl get jobs -n system-upgrade -w` で確認 |
+| 6 | **rollback runbook (snapshot 抜きの手順) が手順通り動く** | テスト worker 1 台で `Plan` の `version` を旧版に戻す経路 (k3s-upgrade image が downgrade を拒否することの確認 + Ansible 経由戻しの手順記述) |
+
+### Phase 1b (provisioner 別 proposal 決着後)
+
+| # | 機能 | 検証方法 |
+|---|------|---------|
+| 7 | **nodeSelector を本番並びに解放** | proposal 案 (control-plane / worker) の selector に切替、prod CP 3 台 + worker N 台で初回 upgrade |
+| 8 | **`window` を 02:00-05:00 JST に絞る** | window 外で `Plan` を更新しても upgrade が走らず、次の window で開始 |
+| 9 | **`make prod/k3s/snapshot` が全 CP で snapshot を取る** | `/var/lib/rancher/k3s/server/db/snapshots/` に当日のスナップショットが 3 ノード分 |
+| 10 | **rollback runbook (snapshot あり) が手順通り動く** | 事前 snapshot → upgrade → snapshot restore 経路を実機で 1 周 |
+| 11 | **既存 `setup_node` / `bootstrap_cluster` が壊れていない** | `make prod/provision/lint` 通過、新規プロビジョン経路で同じ k3s 版が入る |
 
 ## 段階導入計画
 
 | Phase | 内容 | 完了条件 |
 |-------|------|---------|
 | **Phase 0** | この proposal で合意 | レビュー approval |
-| **Phase 1** | SUC を Flux で導入 + `Plan` 2 本 + Renovate customManager + snapshot 用 Ansible playbook + runbook | 受け入れ基準 1〜8 |
+| **Phase 1a** | SUC を Flux で導入 + `Plan` 2 本 (テスト worker 限定 nodeSelector、`window` は動作確認のため広め) + Renovate customManager + 限定 runbook (snapshot 抜き) | 受け入れ基準 1〜6 |
+| **Phase 1b** | provisioner 別 proposal の snapshot 経路に乗せて、nodeSelector 本番並び + `window` 02:00-05:00 JST + runbook 完成 | 受け入れ基準 7〜11 |
 | **Phase 2** | 1〜2 回のパッチ更新を実機で回し、運用フォロー (実所要時間 / 障害有無 / window 設定の妥当性) | 別 PR (proposal 不要) |
 | **Phase 3** | minor 跨ぎを 1 回経験 → チェックリスト拡充。channel-based に切り替えるかの判断 | 別 PR or proposal |
 
@@ -152,25 +170,40 @@ Phase 1 を merge し、最初のパッチ更新を回してから 4 週間後�
 
 ### (A) Manifests: `manifests/platform/system-upgrade-controller/`
 
+本リポは `manifests/platform/<name>/{app,...}/overlays/{base,prod}` 構造 +
+`manifests/clusters/prod/platform/<name>-app.yaml` で Flux `Kustomization`
+を別ファイルに切る規約 (`manifests/platform/cert-manager/` および
+`manifests/clusters/prod/platform/cert-manager-app.yaml` 参照)。
+SUC もこれに揃える:
+
 ```text
 manifests/platform/system-upgrade-controller/
-├── kustomization.yaml
-├── namespace.yaml                        # system-upgrade
-├── controller.yaml                       # 公式 system-upgrade-controller.yaml を ref tag で取り込み
-├── crd.yaml                              # 公式 crd.yaml を ref tag で取り込み
-├── server-plan.yaml                      # control-plane 向け Plan
-└── agent-plan.yaml                       # worker 向け Plan
+└── app/
+    └── overlays/
+        ├── base/
+        │   ├── kustomization.yaml
+        │   ├── namespace.yaml            # system-upgrade
+        │   ├── controller.yaml           # 公式 system-upgrade-controller.yaml を URL + tag で取り込み
+        │   ├── crd.yaml                  # 公式 crd.yaml を URL + tag で取り込み
+        │   ├── server-plan.yaml          # control-plane 向け Plan
+        │   └── agent-plan.yaml           # worker 向け Plan
+        └── prod/
+            └── kustomization.yaml        # base を参照、prod 固有 patch があればここ
+
+manifests/clusters/prod/platform/
+└── system-upgrade-controller-app.yaml    # Flux Kustomization (path: ./manifests/platform/system-upgrade-controller/app/overlays/prod)
 ```
 
-`clusters/prod/platform/kustomization.yaml` にエントリ追加 (CLAUDE.md 規約)。
+`manifests/clusters/prod/platform/kustomization.yaml` に
+`system-upgrade-controller-app.yaml` を追加 (CLAUDE.md 規約)。
 
 #### controller / crd の取り込み方
 
-公式は Helm chart を提供していないため、kustomize の `resources:` で
+公式は Helm chart を提供していないため、`base/kustomization.yaml` の `resources:` で
 GitHub release の生 YAML を tag pin で参照する:
 
 ```yaml
-# kustomization.yaml
+# app/overlays/base/kustomization.yaml
 resources:
   - https://github.com/rancher/system-upgrade-controller/releases/download/v0.16.0/crd.yaml
   - https://github.com/rancher/system-upgrade-controller/releases/download/v0.16.0/system-upgrade-controller.yaml
@@ -239,6 +272,14 @@ spec:
 
 `prepare` で `server-plan` 完了を待つのが公式パターン。
 
+#### Phase 1a 段階での暫定値
+
+上記は Phase 1b の最終形。Phase 1a では以下に差し替えて導入する:
+
+- `nodeSelector` を `kubernetes.io/hostname: <test-worker>` に絞る (両 Plan、prod 影響を遮断)
+- `window` は **未指定 (24h いつでも)** にして手動 trigger で動作確認、Phase 1b で 02:00-05:00 JST に絞る
+- `version` は現行 `versions.k3s` と同値 (no-op) で初導入し、Plan が apply されること / SUC が skip 判定すること を確認してから patch を 1 段上げて実走
+
 ### (B) Renovate: `Plan` の `version` 用 customManager
 
 `renovate.json` に追記:
@@ -270,53 +311,25 @@ server-plan と agent-plan が **同じ version で同期** されるよう、Re
 }
 ```
 
-### (C) Ansible: snapshot 取得 playbook
+### (C) provisioner 領域 (別 proposal)
 
-```text
-provisioner/playbooks/k3s_snapshot.yaml         # 新規
-provisioner/roles/k3s/tasks/etcd_snapshot.yaml  # 新規
-```
+以下は **本 proposal のスコープ外** とし、別 proposal で扱う:
 
-`k3s_snapshot.yaml`:
+- Ansible snapshot playbook (`provisioner/playbooks/k3s_snapshot.yaml` / `roles/k3s/tasks/etcd_snapshot.yaml`)
+- `make prod/k3s/snapshot` ターゲット
+- `versions.yaml` の `versions.k3s` を「新規プロビジョン専用」に再定義し、`Plan` の `version` と Renovate `groupName: k3s` で同期させる調整
 
-```yaml
-- name: Take etcd snapshot on all CP nodes
-  hosts: master
-  serial: 1
-  become: true
-  tasks:
-    - name: k3s etcd-snapshot save
-      command: k3s etcd-snapshot save --name pre-upgrade-{{ ansible_date_time.iso8601_basic_short }}
-```
+Phase 1a の runbook では snapshot 取得ステップを「(別 proposal で実装予定)」のプレースホルダに留め、Phase 1b で実体化する。
 
-### (D) Make ターゲット
-
-`Makefile` に追加:
-
-```makefile
-prod/k3s/snapshot:
-	uv run cluster-forge ansible prod -- \
-	  ansible-playbook playbooks/k3s_snapshot.yaml
-```
-
-(既存 `make {env}/...` 規約に合わせる、CLAUDE.md)
-
-### (E) `versions.yaml` との関係
-
-- `versions.yaml` の `versions.k3s` は **新規プロビジョンのみ** で使われる扱いに変える
-- アップグレードの SoT は `manifests/platform/system-upgrade-controller/{server,agent}-plan.yaml` の `version`
-- 両者がズレないよう、`versions.yaml` の k3s 行も Renovate で同じ `groupName: k3s` に乗せる
-- どちらも更新する PR を Renovate がまとめて作る想定
-
-### (F) Runbook
+### (D) Runbook
 
 `docs/runbooks/k3s-upgrade.md` 新規:
 
 - 通常手順:
   1. Renovate PR (k3s グループ) のレビュー (release note を確認)
-  2. `make prod/k3s/snapshot` で事前 snapshot
+  2. `make prod/k3s/snapshot` で事前 snapshot **(Phase 1b で実体化、1a 時点では skip 注記)**
   3. PR merge → Flux が `Plan` を apply
-  4. window (02:00-05:00 JST) 内に SUC が server → agent の順で実行
+  4. window (02:00-05:00 JST、Phase 1b 適用) 内に SUC が server → agent の順で実行
   5. 翌朝に `kubectl get nodes` / `kubectl get pods -A` で post-check
 - minor upgrade チェックリスト (release note の breaking、CRD 変更、kubelet skew、Cilium 互換、Flux 互換、Longhorn 互換)
 - Rollback 手順:
@@ -352,28 +365,33 @@ prod/k3s/snapshot:
 | **SUC Job のセキュリティ** | host IPC/NET/PID + `CAP_SYS_BOOT` + `/host` rw。`system-upgrade` namespace を `policies/exceptions.rego` 等で隔離 (今は無いが Phase 2 で必要なら追加) |
 | **アップグレード中に Renovate が他の HelmRelease PR を merge** | 運用ルール: k3s upgrade window の前後 24h は他の PR を merge しない (runbook 明記) |
 
-## 作業範囲 (Phase 1)
+## 作業範囲
+
+### Phase 1a (本 proposal で実装)
 
 - Manifests
-  - `manifests/platform/system-upgrade-controller/` 新規 (上記 (A))
-  - `clusters/prod/platform/kustomization.yaml` にエントリ追加
+  - `manifests/platform/system-upgrade-controller/app/overlays/{base,prod}/` 新規 (上記 (A))
+  - `manifests/clusters/prod/platform/system-upgrade-controller-app.yaml` 新規 (Flux Kustomization)
+  - `manifests/clusters/prod/platform/kustomization.yaml` にエントリ追加
+  - `Plan` 2 本 — nodeSelector はテスト worker 1 台限定、window 未指定
 - Renovate
-  - `renovate.json` に customManager 追記 ((B))
-  - `versions.yaml` の `k3s:` 行も同じ `groupName` に乗せる調整
-- Ansible
-  - `provisioner/playbooks/k3s_snapshot.yaml` 新規
-  - `provisioner/roles/k3s/tasks/etcd_snapshot.yaml` 新規
-  - 既存 `install_master.yaml` / `install_worker.yaml` は触らない
-- Makefile
-  - `prod/k3s/snapshot` ターゲット追加
+  - `renovate.json` に customManager + `groupName: k3s` 追記 ((B))
 - 検証
-  - `make prod/provision/lint` / `make policy/test` 通過
-  - SUC を一旦 deploy → 任意 1 worker で patch upgrade を実機試行 (Phase 1 完了の必須条件)
-  - server-plan / agent-plan の順序、concurrency=1、window が効くことを実機確認
-- ドキュメント (実装後)
-  - `docs/runbooks/k3s-upgrade.md` 新規
+  - `make policy/test` 通過
+  - SUC を deploy → controller Running / CRD 認識を確認
+  - テスト worker 1 台で patch upgrade を実機試行 (Phase 1a 完了の必須条件)
+  - server-plan / agent-plan の prepare 待ち合わせ、concurrency=1 を実機確認
+- ドキュメント
+  - `docs/runbooks/k3s-upgrade.md` 新規 (snapshot 抜き、Phase 1b で補強する旨を注記)
   - `docs/README.md` の運用セクションにリンク追加
-  - `CLAUDE.md` の「非自明な設計判断」表に「k3s upgrade は SUC + window、snapshot は Ansible」を追記
+  - `CLAUDE.md` の「非自明な設計判断」表に「k3s upgrade は SUC + window (Phase 1b 以降)」を追記
+
+### Phase 1b (provisioner 別 proposal 決着後)
+
+- Plans の nodeSelector を control-plane / worker 本番並びに解放、window を 02:00-05:00 JST に
+- Renovate `groupName: k3s` に `versions.yaml` の `versions.k3s` 行も合流 (provisioner 別 proposal 側で実装)
+- runbook の snapshot 取得ステップを実体化、rollback 手順 (snapshot restore) を完成
+- `make prod/provision/lint` 通過確認
 
 ## 未決事項 / 要確認
 
@@ -388,4 +406,4 @@ prod/k3s/snapshot:
 
 ## 更新履歴
 
-- 2026-04-30 初版 (Ansible 自作 rolling 案で書き始めたが、k3s 公式 [Automated Upgrades](https://docs.k3s.io/upgrades/automated) を再評価し SUC 採用に切替)
+- 2026-04-30 初版 (Ansible 自作 rolling 案で書き始めたが、k3s 公式 [Automated Upgrades](https://docs.k3s.io/upgrades/automated) を再評価し SUC 採用に切替。provisioner (Ansible) 領域 — etcd snapshot playbook / Make ターゲット / `versions.yaml` 同期 — は別 proposal に切り出し、Phase 1 は 1a (本 proposal で実装) / 1b (provisioner 別 proposal 決着後) に分割する形で着地)
