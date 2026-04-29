@@ -92,6 +92,7 @@
 | Loki / Tempo | `br-external1` の Garage S3 (cluster-external) に保存 | [`docs/platform/observability.md`](docs/platform/observability.md) |
 | Longhorn nodeDownPodDeletionPolicy | `do-nothing` (rebuild storm 回避) | [`docs/platform/storage.md`](docs/platform/storage.md) |
 | `auth.b8m.app` 解決 | クラスタ内向けに **CoreDNS で Envoy VIP に rewrite** | [`docs/platform/identity.md`](docs/platform/identity.md) |
+| k3s upgrade | **system-upgrade-controller (SUC)** + `Plan` CRD 経由。Phase 1a は `br-node5` 限定 nodeSelector + `window` 未指定で稼働中、本番展開と etcd snapshot 連携は Phase 1b で対応 | [`docs/runbooks/k3s-upgrade.md`](docs/runbooks/k3s-upgrade.md) |
 
 ## ドキュメントの書き方
 
