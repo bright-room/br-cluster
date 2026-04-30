@@ -6,7 +6,7 @@
 
 ---
 
-## P2-B phase 2: 3 CP 全台展開 (本 PR で着手)
+## P2-B phase 2: 3 CP 全台展開 (観察期間中)
 
 ### Phase 1 観察結果 (2026-04-23 〜 2026-05-01)
 
@@ -22,11 +22,23 @@ br-node2 1 台限定の影モード (#170) を ~7 日稼働させた結果:
 
 br-node1 / br-node3 もメモリ余裕あり (8%/55%, 4%/51%)、+1 pod で押し出すリスクは低い。
 
-### Phase 2 内容
+### Phase 2 (#261, 2026-05-01 merged)
 
 - overlay の `nodeAffinity` (hostname pin) を削除し、`nodeSelector: node-role.kubernetes.io/control-plane=true` のみで 3 CP 全台に DaemonSet 展開
+- rollout 直後の確認:
+  - 3 pod 全て `Running 2/2` / restart 0
+  - memory: br-node1=47Mi, br-node2=102Mi, br-node3=47Mi (全て limit 192Mi の 53% 以下)
+  - 3 ノードとも `MemoryPressure=False` 継続
 - rollback: overlay に hostname pin を戻すのみ
-- 観察期間: 1〜2 週間。3 CP すべてで restart 安定 / Loki 到達 OK が確認できたら本ファイルの本セクションを削除
+
+### 観察期間中に確認すること (〜2026-05-15)
+
+- 3 CP すべてで restart 0 が継続しているか
+- memory 使用量が limit 192Mi の 70% を超えていないか (特に br-node2 は履歴ノードで startup 直後 102Mi だったので注視)
+- Loki に各 CP 由来のログが平坦に到達しているか (`{node="br-node1"}` / `{node="br-node3"}` の rate が安定)
+- CP の `MemoryPressure` / etcd 健全性に劣化が出ていないか
+
+問題なければ本セクションを削除 (この proposal doc は **全項目着地でファイルごと削除**)。問題が出たら overlay に hostname pin を戻して phase 1 に戻す。
 
 ---
 
