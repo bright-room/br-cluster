@@ -1,0 +1,111 @@
+---
+# Workflow 完了時の Discord 通知本体。Sensor が k8s create Workflow trigger
+# でこの WorkflowTemplate から Workflow を生成し、curl で Discord webhook
+# に POST する。
+#
+# HTTP trigger 直叩きから Workflow trigger 経由に切り替えた理由:
+#   - Discord embed の color は integer 必須で、argo-events HTTP trigger の
+#     payload 経由だと文字列としてエンコードされ Discord が 400 を返す
+#   - webhook URL を Sensor manifest に焼き込まずに済む
+#     (Pod env から runtime に読む、通常の Secret パターン)
+#   - 文言 / フォーマット を script で自由に組める
+#
+# notify.b8m.app/skip: "true" ラベルを workflowMetadata に付けて、Sensor の
+# expr filter で再帰トリガを防ぐ。
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: notify-discord
+  labels:
+    notify.b8m.app/skip: "true"
+spec:
+  workflowMetadata:
+    labels:
+      notify.b8m.app/skip: "true"
+  serviceAccountName: argo-workflow
+  ttlStrategy:
+    secondsAfterCompletion: 600
+    secondsAfterSuccess: 600
+    secondsAfterFailure: 3600
+  podGC:
+    strategy: OnWorkflowSuccess
+  arguments:
+    parameters:
+      - name: workflow-name
+      - name: workflow-namespace
+      - name: phase
+      - name: started-at
+      - name: finished-at
+      - name: progress
+      - name: message
+        value: ""
+  entrypoint: post
+  templates:
+    - name: post
+      inputs:
+        parameters:
+          - name: workflow-name
+          - name: workflow-namespace
+          - name: phase
+          - name: started-at
+          - name: finished-at
+          - name: progress
+          - name: message
+      script:
+        image: curlimages/curl:8.10.1
+        env:
+          - name: DISCORD_WEBHOOK_URL
+            valueFrom:
+              secretKeyRef:
+                name: argo-workflows-discord
+                key: webhook_url
+          - name: WORKFLOW_NAME
+            value: "{{inputs.parameters.workflow-name}}"
+          - name: WORKFLOW_NS
+            value: "{{inputs.parameters.workflow-namespace}}"
+          - name: PHASE
+            value: "{{inputs.parameters.phase}}"
+          - name: STARTED_AT
+            value: "{{inputs.parameters.started-at}}"
+          - name: FINISHED_AT
+            value: "{{inputs.parameters.finished-at}}"
+          - name: PROGRESS
+            value: "{{inputs.parameters.progress}}"
+          - name: MESSAGE
+            value: "{{inputs.parameters.message}}"
+        command: [sh]
+        source: |
+          set -eu
+          case "$PHASE" in
+            Succeeded) emoji="✅"; color=3066993 ;;
+            Failed)    emoji="❌"; color=15158332 ;;
+            Error)     emoji="⚠️";  color=16027660 ;;
+            *)         emoji="ℹ️"; color=10070709 ;;
+          esac
+          ui_url="https://argo-workflows.b8m.app/workflows/${WORKFLOW_NS}/${WORKFLOW_NAME}"
+          msg_field=""
+          if [ -n "${MESSAGE:-}" ]; then
+            esc_msg=$(printf '%s' "$MESSAGE" | sed 's/"/\\"/g')
+            msg_field=$(printf ',{"name":"Message","value":"%s","inline":false}' "$esc_msg")
+          fi
+          payload=$(cat <<EOF
+          {
+            "username": "Argo Workflows",
+            "embeds": [{
+              "title": "${emoji} ${WORKFLOW_NAME}",
+              "url": "${ui_url}",
+              "color": ${color},
+              "fields": [
+                {"name": "Namespace", "value": "${WORKFLOW_NS}", "inline": true},
+                {"name": "Status",    "value": "${PHASE}",      "inline": true},
+                {"name": "Progress",  "value": "${PROGRESS}",   "inline": true},
+                {"name": "Started",   "value": "${STARTED_AT}", "inline": true},
+                {"name": "Finished",  "value": "${FINISHED_AT}","inline": true}
+                ${msg_field}
+              ]
+            }]
+          }
+          EOF
+          )
+          curl -fsS -X POST -H "Content-Type: application/json" \
+            -d "$payload" "$DISCORD_WEBHOOK_URL"
