@@ -14,4 +14,9 @@ configs:
       - version: 2.10.10
         natsImage: nats:2.10.10-scratch
         configReloaderImage: natsio/nats-server-config-reloader:0.14.0
+        # JetStream StatefulSet の 3rd container (metrics exporter) image。
+        # 未指定だと "containers[2].image: Required value" で StatefulSet
+        # 作成が失敗し、EventBus が NotReady のまま EventSource / Sensor が
+        # 全て止まる。
+        metricsExporterImage: natsio/prometheus-nats-exporter:0.14.0
         startCommand: /nats-server
