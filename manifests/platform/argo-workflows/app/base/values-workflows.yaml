@@ -60,11 +60,34 @@ artifactRepository:
       key: secretKey
 
 server:
-  # UI は HTTPRoute で出すため LB は使わない。Step 4 までは ClusterIP のまま。
+  # UI は HTTPRoute (config/) で出すので LB は使わない。
   serviceType: ClusterIP
-  # Step 4 までは認証無効 (port-forward 専用、外部公開しない)。
-  # NOTE: --auth-mode=server は kubectl ServiceAccount token を要求する。
-  # 完全な no-auth は --auth-mode=client で実現するが、本番に open UI を出すと
-  # 危険なので Step 4 まで HTTPRoute を作らないことで遮断する。
+  baseHref: /
+  # Envoy Gateway で TLS termination するので argo-server 自体は plain HTTP。
+  # 自己署名 TLS を内部経路で挟む意味はない。
+  secure: false
   extraArgs:
-    - --auth-mode=server
+    - --auth-mode=sso
+
+  # Zitadel OIDC で argo-server に直接 SSO。Envoy SecurityPolicy には
+  # 乗せない (Grafana と同型 / 二重ダンス回避)。CF Access が外側で
+  # GitHub org + WARP を要求する。
+  #
+  # Phase 1 は単一オペレーター運用なので RBAC を有効化せず、
+  # SSO 認証された全ユーザに argo-server の admin 権限を付与する。
+  # 将来人が増えたら sso.rbac.enabled: true + ServiceAccount で
+  # group → role mapping を切る。
+  sso:
+    issuer: https://auth.b8m.app
+    clientId:
+      name: argo-workflows-sso
+      key: client-id
+    clientSecret:
+      name: argo-workflows-sso
+      key: client-secret
+    redirectUrl: https://argo-workflows.b8m.app/oauth2/callback
+    scopes:
+      - openid
+      - profile
+      - email
+    sessionExpiry: 24h
