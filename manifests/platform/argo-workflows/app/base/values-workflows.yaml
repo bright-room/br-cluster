@@ -78,6 +78,9 @@ server:
   # 将来人が増えたら sso.rbac.enabled: true + ServiceAccount で
   # group → role mapping を切る。
   sso:
+    # chart の default は enabled: false でこの block 自体が CM に出ない。
+    # --auth-mode=sso だけ立てると "issuer empty" で argo-server crash。
+    enabled: true
     issuer: https://auth.b8m.app
     clientId:
       name: argo-workflows-sso
@@ -91,3 +94,9 @@ server:
       - profile
       - email
     sessionExpiry: 24h
+    rbac:
+      # 単一オペレーター運用なので RBAC は無効化、認証された全ユーザに
+      # default SA (argo-server) の admin 権限を付与する。
+      # default の rbac.enabled: true だと SSO 認証しても ServiceAccount
+      # に紐付かず無権限になる。
+      enabled: false
