@@ -6,26 +6,27 @@
 
 ---
 
-## 影モード稼働中 (検証期間中)
+## P2-B phase 2: 3 CP 全台展開 (本 PR で着手)
 
-### P2-B phase 1: CP ノードに Alloy DaemonSet 展開
+### Phase 1 観察結果 (2026-04-23 〜 2026-05-01)
 
-- 現状: PR #170 で **br-node2 1 台限定** の影モード稼働中
-- 設計: 独立 HelmRelease `alloy-cp` (worker DS には一切手を入れず削除で完全 rollback 可能)
-  - resource: `64Mi req / 192Mi limit`
-  - `nodeAffinity` で br-node2 hostname 固定
-  - OTLP receiver は持たず pod log file tailing のみ
-- ノード選定理由:
-  - br-node1 (primary CP / etcd cluster-init) を避ける
-  - br-node3 (P2-C で NotReady 実績) を避ける
-- 観察項目: OOM / CP etcd 安定性 / Loki ログ到達
-- 観察期間: 1〜2 週間
+br-node2 1 台限定の影モード (#170) を ~7 日稼働させた結果:
 
-### → P2-B phase 2 (未着手)
+| 項目 | 結果 |
+|---|---|
+| restart | 0 (起動直後の config reload 1 回のみ) |
+| memory | 70Mi / limit 192Mi (36%) |
+| CPU | 38m / req 50m, limit 300m |
+| Alloy ログ error/warn | 直近 1000 行で 0 件 |
+| br-node2 MemoryPressure | False 継続 |
 
-- 影モードが安定したら `nodeAffinity` を外して **3 CP 全台に展開**
-- apply は他クラスタ変更と重ねず静かなタイミングで (2026-04-13 cascade 教訓)
-- リスク: 高 (Pi 4B 4GB CP のメモリ余裕が薄い)
+br-node1 / br-node3 もメモリ余裕あり (8%/55%, 4%/51%)、+1 pod で押し出すリスクは低い。
+
+### Phase 2 内容
+
+- overlay の `nodeAffinity` (hostname pin) を削除し、`nodeSelector: node-role.kubernetes.io/control-plane=true` のみで 3 CP 全台に DaemonSet 展開
+- rollback: overlay に hostname pin を戻すのみ
+- 観察期間: 1〜2 週間。3 CP すべてで restart 安定 / Loki 到達 OK が確認できたら本ファイルの本セクションを削除
 
 ---
 
@@ -52,14 +53,14 @@
 
 ## トポロジー情報の SSoT 化 (P2-D follow-up)
 
-P2-D で kubeEtcd endpoints は `cluster-forge generate-manifests` 経由で servers.yaml + 1Password に寄せたが、他 manifest には依然として IP / ホスト情報のハードコードあり。
+> 2026-04-25 PR #185 で P2-D の kubeEtcd endpoints 生成 (cluster-forge generate-manifests 経由) は revert 済。現状は `components/k3s/values.yaml` に IP ハードコードに戻っている。
 
 **方針**: per-consumer に YAML fragment 生成を増やすと「新 consumer ごとに cluster-forge Python 側に生成関数追加」コストが嵩むため、**個数固定のスカラー値は `cluster-settings.yaml` + Flux postBuild `${VAR}` に寄せる**路線で follow-up。
 
 想定する移行順:
 
 1. **kubeEtcd endpoints を postBuild 化**
-   - P2-D で per-consumer 生成にした `etcd-endpoints.yaml` を、`cluster-settings.yaml` の `BR_NODE{1,2,3}_IP` + `components/k3s/values.yaml` 内 `${BR_NODE1_IP}` に置換
+   - `cluster-settings.yaml` に `BR_NODE{1,2,3}_IP` を追加し、`components/k3s/values.yaml` の IP 直書きを `${BR_NODE1_IP}` 等に置換
    - CP 台数変更時は cluster-settings.yaml と values.yaml のリストを両方手で触ることになるが、変更頻度が低いので許容
 2. **`cluster-settings.yaml` を `cluster-forge generate-manifests` 生成に寄せる**
    - servers.yaml + 1Password から `BR_*_IP` / `CLOUDFLARED_TUNNEL_ID` 等を自動生成
@@ -82,5 +83,5 @@ P2-D で kubeEtcd endpoints は `cluster-forge generate-manifests` 経由で ser
 
 ## 次回着手時の推奨順序
 
-1. **P2-B phase 2 (3 CP 全台展開)** — br-node2 影モード (#170) が 1〜2 週間安定したら nodeAffinity を外す。他クラスタ変更と重ねない
+1. **P2-B phase 2 観察期間明け** — 3 CP 展開後 1〜2 週間問題なければ本ファイルから phase 1/2 セクションを削除
 2. **P2-F phase 3 (dashboard + PrometheusRule)** — NetworkPolicy を書き始めた後
