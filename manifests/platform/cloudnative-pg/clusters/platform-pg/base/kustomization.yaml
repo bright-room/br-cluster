@@ -4,4 +4,6 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - externalsecret.yaml
+  - externalsecret-argo-workflows.yaml
   - cluster.yaml
+  - database-argo-workflows.yaml

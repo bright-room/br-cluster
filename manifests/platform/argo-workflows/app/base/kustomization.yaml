@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - helm.yaml
+  - externalsecret-archive.yaml
 
 configMapGenerator:
   - name: argo-workflows-helm-values

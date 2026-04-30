@@ -10,6 +10,9 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
+  dependsOn:
+    - name: platform-pg-cluster
+    - name: external-secrets-config
   path: ./manifests/platform/argo-workflows/app/overlays/prod
   prune: true
   wait: true

@@ -24,6 +24,24 @@ controller:
         strategy: OnWorkflowSuccess
       activeDeadlineSeconds: 7200
 
+  # Workflow 履歴は etcd ではなく platform-pg (CNPG) に逃がす。
+  # ttlStrategy で k8s 上の Workflow CR は短命にする一方、archive 経由で
+  # UI から長期履歴を参照できる。
+  persistence:
+    archive: true
+    archiveTTL: 30d
+    postgresql:
+      host: platform-pg-rw.platform-pg.svc.cluster.local
+      port: 5432
+      database: argo_workflows
+      tableName: argo_workflows
+      userNameSecret:
+        name: argo-workflows-archive-db
+        key: username
+      passwordSecret:
+        name: argo-workflows-archive-db
+        key: password
+
 server:
   # UI は HTTPRoute で出すため LB は使わない。Step 4 までは ClusterIP のまま。
   serviceType: ClusterIP

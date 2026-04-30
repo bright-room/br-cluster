@@ -32,6 +32,16 @@ spec:
       secret:
         name: platform-pg-zitadel
 
+  # Additional login roles. Databases owned by these roles are declared
+  # via separate Database CRDs (operator v1.25+) — see database-*.yaml.
+  managed:
+    roles:
+      - name: argo_workflows
+        ensure: present
+        login: true
+        passwordSecret:
+          name: platform-pg-argo-workflows
+
   # Node affinity: worker pool, spread across hosts.
   affinity:
     nodeSelector:

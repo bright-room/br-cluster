@@ -1,0 +1,13 @@
+---
+# Workflow archive DB for Argo Workflows controller.
+# The argo_workflows role is declared in cluster.yaml (managed.roles);
+# this CRD just creates the database and assigns ownership.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: argo-workflows
+spec:
+  name: argo_workflows
+  owner: argo_workflows
+  cluster:
+    name: platform-pg
