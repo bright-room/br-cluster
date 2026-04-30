@@ -22,7 +22,10 @@ metadata:
   namespace: zitadel
 spec:
   interval: 10m
-  approvePlan: auto
+  # Temporarily set to manual approval for the module refactor (state mv via
+  # `moved` blocks). Revert to `auto` once the refactor PR has landed and the
+  # plan has been verified to show no resource changes.
+  approvePlan: ""
   path: ./terraform
   serviceAccountName: tf-runner
   sourceRef:
