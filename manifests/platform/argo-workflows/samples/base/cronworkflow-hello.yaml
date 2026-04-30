@@ -13,7 +13,10 @@ metadata:
   labels:
     sample.b8m.app/kind: cronworkflow
 spec:
-  schedule: "0 * * * *"
+  # argo-workflows v4 で spec.schedule (singular) は廃止、spec.schedules (array)
+  # に変更された。
+  schedules:
+    - "0 * * * *"
   timezone: Asia/Tokyo
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 60
