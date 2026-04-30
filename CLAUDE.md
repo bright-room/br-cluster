@@ -50,7 +50,7 @@
 - ブランチ命名: `feat/...` / `fix/...` / `docs/...` / `revert/...` (`git log` のパターン参照)
 - コミットメッセージ: 既存の Conventional Commits 風 (`feat(scope): ...` / `fix(scope): ...`)。日本語可
 - **PR 単位で 1 トピック**。bug fix と refactor を混ぜない
-- 大きな変更は **proposal** を `docs/proposals/` に書いて先に合意形成 (例: [`docs/proposals/argo-workflows.md`](docs/proposals/argo-workflows.md))
+- 大きな変更は **proposal** を `docs/proposals/` に書いて先に合意形成 (例: [`docs/proposals/policy-as-code.md`](docs/proposals/policy-as-code.md))
 - `docs/proposals/` 直下は **active なものだけ** を置く。着地 / close したら:
   - 仕様 doc に統合済み or 純粋な作業計画 → ファイル削除 (理由はコミットメッセージに残す)
   - "なぜ採用 / 不採用 / 別案を捨てたか" を後から参照したいもの → `docs/proposals-done/` に mv (このディレクトリは最初の done 発生時に作る)
