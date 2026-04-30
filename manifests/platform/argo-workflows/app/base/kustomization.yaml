@@ -5,6 +5,7 @@ resources:
   - namespace.yaml
   - helm.yaml
   - externalsecret-archive.yaml
+  - externalsecret-artifact.yaml
 
 configMapGenerator:
   - name: argo-workflows-helm-values

@@ -37,6 +37,7 @@ garage:
     buckets:
       - name: loki
       - name: tempo
+      - name: argo-workflows
     users:
       - name: loki
         bucket_acl:
@@ -44,3 +45,9 @@ garage:
       - name: tempo
         bucket_acl:
           bucket_name: tempo
+      # 1Password garage item の field label は <name>_access_key_id 形式。
+      # 既存の loki/tempo に合わせ underscore 付きで unique 化するため user.name
+      # は argo_workflows (S3 bucket は伝統的に hyphen で命名するので分離)。
+      - name: argo_workflows
+        bucket_acl:
+          bucket_name: argo-workflows

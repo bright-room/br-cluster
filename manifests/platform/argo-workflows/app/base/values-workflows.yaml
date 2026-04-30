@@ -42,6 +42,23 @@ controller:
         name: argo-workflows-archive-db
         key: password
 
+# Workflow 内で生成した artifact / log を Garage S3 に逃がす。
+# Loki / Tempo と同じバックエンドだが user / bucket は分離 (proposal §採用表)。
+artifactRepository:
+  archiveLogs: true
+  s3:
+    bucket: argo-workflows
+    endpoint: object-storage.cluster-internal.bright-room.net:3900
+    region: ap-northeast-1
+    insecure: false
+    keyFormat: "{{workflow.namespace}}/{{workflow.name}}/{{pod.name}}"
+    accessKeySecret:
+      name: argo-workflows-artifact-s3-secret
+      key: accessKey
+    secretKeySecret:
+      name: argo-workflows-artifact-s3-secret
+      key: secretKey
+
 server:
   # UI は HTTPRoute で出すため LB は使わない。Step 4 までは ClusterIP のまま。
   serviceType: ClusterIP
