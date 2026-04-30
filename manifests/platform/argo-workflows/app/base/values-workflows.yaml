@@ -11,11 +11,28 @@
 
 singleNamespace: false
 
+# 投入された Workflow Pod が使う SA + RBAC。chart default は
+# serviceAccount.create: false なので argo-workflow SA が存在せず、
+# rbac.create が SA-less の RoleBinding を作って意味をなさなかった。
+# artifactGC は S3 artifactRepository (Garage) を有効にしているので必須。
+workflow:
+  serviceAccount:
+    create: true
+    name: argo-workflow
+  rbac:
+    create: true
+    artifactGC: true
+
 controller:
   # Pi リソース圧迫を抑えるため parallelism を絞る (proposal §C)。
   parallelism: 6
   workflowDefaults:
     spec:
+      # 投入時に未指定なら argo-workflow SA を使う。chart の workflow.rbac
+      # が workflowtaskresults / pods/log 等への権限をこの SA に割り当てる。
+      # default SA は無権限なので明示しないと wait コンテナが
+      # "workflowtaskresults ... is forbidden" で死ぬ。
+      serviceAccountName: argo-workflow
       ttlStrategy:
         secondsAfterCompletion: 86400
         secondsAfterSuccess: 86400
