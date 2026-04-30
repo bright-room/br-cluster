@@ -1,0 +1,19 @@
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: argo-workflows-b8m
+  namespace: argo-workflows
+  annotations:
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
+spec:
+  parentRefs:
+    - name: cluster-gateway
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - "argo-workflows.${CLUSTER_DOMAIN}"
+  rules:
+    - backendRefs:
+        - name: argo-workflows-server
+          port: 2746
