@@ -1,11 +1,89 @@
 # 提案: Argo Workflows / Argo Events の導入
 
+> **ステータス: Phase 1 着地済 (2026-04-30)**
+>
+> 受け入れ基準 1〜6 達成、基準 7 (既存 CronJob 1 本置換) は対象不在で N/A。
+> 詳細は [Phase 1 着地まとめ](#phase-1-着地まとめ-2026-04-30) 参照。
+> 仕様 doc は [`docs/platform/workflows.md`](../platform/workflows.md) に集約。
+
 > **この提案の位置づけ**
 >
 > クラスタ内で「ジョブネット相当」(定期実行 + 外部トリガ + ジョブ間依存 +
 > 並列) を回すための基盤を Argo Workflows + Argo Events で整える。
 > CD は Flux 続投、Argo Workflows は **ジョブ実行レイヤ専用** として
 > 責務を分離する。
+
+## Phase 1 着地まとめ (2026-04-30)
+
+### 受け入れ基準の達成状況
+
+| # | 機能 | 達成 PR / 備考 |
+|---|---|---|
+| 1 | 定期実行 | #246 (`samples/cronworkflow-hello.yaml`) |
+| 2 | 外部トリガ | #246 (`samples/eventsource-webhook.yaml` + `samples/sensor-webhook.yaml`) |
+| 3 | DAG / 並列 | #246 (`samples/workflowtemplate-dag.yaml`) |
+| 4 | アーティファクト永続化 | #243 (Garage S3 `argo-workflows` bucket) |
+| 5 | Discord 通知 | #251 + #257 (Workflow trigger + embed カード) |
+| 6 | UI SSO | #244 (HTTPRoute + argo-server `--auth-mode=sso`) |
+| 7 | 既存 CronJob 1 本置換 | **N/A** — Phase 1 着手時点でクラスタに `CronJob` リソース 0 件、置換対象なし |
+
+### merged PR (Phase 1 全体)
+
+| PR | 内容 |
+|---|---|
+| #241 | step 1: argo-workflows + argo-events 最小導入 |
+| #242 | step 2: workflow archive (platform-pg) |
+| #243 | step 3: artifact repository (Garage S3) |
+| #244 | step 4: UI SSO (HTTPRoute + Zitadel) |
+| #245 | fix: `server.sso.enabled` 必須 |
+| #246 | step 5: sample 一式 + EventBus |
+| #247 | fix: `CronWorkflow.spec.schedules` (v4 syntax) |
+| #248 | chore: argo CLI を mise に追加 |
+| #249 | fix: Workflow Pod SA + RBAC |
+| #250 | fix: EventBus `metricsExporterImage` |
+| #251 | step 6: Discord 通知 (HTTP trigger) |
+| #252 / #253 | fix: substituteFrom Secret の ns (`flux-system`) |
+| #255 | fix: skip filter を一旦削除 |
+| #256 | fix: UI SSE timeout 延長 |
+| #257 | step 6 改修: embed カード化 (Workflow trigger 経由) |
+| #258 | fix: skip 除外を EventSource labelSelector に移動 |
+
+外部リポ並行 PR:
+
+- bright-room/br-cluster-zitadel-terraform#14 (OIDC application)
+- bright-room/br-cloudflare-terraform#17 (CF Access application)
+
+### 設計変更 (proposal からの逸脱)
+
+| 項目 | proposal | 実装 | 理由 |
+|---|---|---|---|
+| UI 認証層 | Envoy SecurityPolicy + argo-server SSO の二段重ね | argo-server SSO のみ (Envoy SecurityPolicy 無し) | Grafana の `app_grafana.tf` コメント (二重 OIDC ダンス回避) と同型に揃えた |
+| 通知トリガ | HTTP trigger 直叩き | k8s create Workflow trigger 経由で curl | Discord embed `color` が integer 必須 / argo-events HTTP trigger payload は文字列のみ。Workflow trigger なら curl で自由に JSON 整形 + webhook URL を Pod env (Secret) で持てる |
+| skip ラベル除外 | Sensor data filter | EventSource `filter.labels` (k8s label selector) | argo-events の data/expr filter は path 不在で event 全体 discard する仕様。k8s label selector は不在を「不一致」として扱うため使える |
+| EventBus | values-events.yaml に jetstream version のみ | `metricsExporterImage` も明示必須 | chart は受理するが controller が StatefulSet 生成時に `containers[2].image: Required value` で失敗 |
+| Workflow Pod SA | (proposal 未言及) | `workflow.serviceAccount.create: true` + `workflowDefaults.spec.serviceAccountName: argo-workflow` 強制 | chart default では SA 不在で wait コンテナが workflowtaskresults を作れず失敗 |
+
+### 学び (CI 強化に反映)
+
+Phase 1 の段階導入で **6 系統の hot-fix が連発** したため、CI 強化を別 proposal に切り出した: [`manifests-ci-hardening.md`](manifests-ci-hardening.md)。
+
+- 静的解析 (CRD schema / postBuild Secret) で防げる層は機械化 → Phase 1 で実装
+- chart 値マージ後 / controller 側生成で発覚する層は kind smoke test で受ける → Phase 2 で別 proposal 化
+
+### 運用フォロー (2026-05-25 目安)
+
+merge から 4 週間後に Phase 2 着手判断。確認項目は本 proposal の「[Phase 1 の運用フォロー](#phase-1-の運用フォロー-2026-05-25-目安)」参照。
+
+### Phase 2 以降のスコープ
+
+- **Phase 2**: 既存 CronJob 棚卸し → 個別 proposal で議論。Phase 1 着地時点では `CronJob` リソース 0 件のため、新規ジョブが追加された段階で発火する
+- **Phase 3**: 順次メンテナンス系ジョブ (例: 複数ノード跨ぎの段階処理) を Workflows DAG + semaphore で実装
+- **Phase 4**: バックアップ / DR 系ジョブの Workflows 化
+
+## 設計時の記録 (アーカイブ)
+
+以下は Phase 1 着手前の設計時の記録。コードと食い違った場合は
+[`docs/platform/workflows.md`](../platform/workflows.md) と manifest を正とする。
 
 ## 背景・動機
 
