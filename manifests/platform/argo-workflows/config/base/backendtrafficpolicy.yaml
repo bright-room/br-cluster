@@ -1,0 +1,26 @@
+---
+# argo-server の /api/v1/workflow-events/* と /api/v1/stream/* は SSE
+# (long-lived HTTP streaming) で、Envoy Gateway の default route timeout
+# (idle 5 分くらい?) でストリームが切られるとブラウザに
+# "Failed to connect ... workflow-events" が表示されて UI のリアルタイム
+# 更新が止まる。
+#
+# Argo UI は接続が切られると指数 backoff で再接続するので機能は壊れない
+# が、たびたびエラーが出るのが体験悪い。timeout を伸ばして実用上
+# 切られないようにする。
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: argo-workflows-server
+  namespace: argo-workflows
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: argo-workflows-b8m
+  timeout:
+    http:
+      # SSE ストリームを ~1 時間維持。Argo UI を開きっぱなしの想定上限
+      # を超えたら再接続する (実害は無し)。
+      requestTimeout: 1h
+      connectionIdleTimeout: 1h
