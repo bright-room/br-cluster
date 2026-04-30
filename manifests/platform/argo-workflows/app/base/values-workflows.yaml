@@ -1,0 +1,35 @@
+---
+# argo-workflows helm values (base)
+#
+# Phase 1 step 1: 最小構成で controller + server を起動するだけ。
+# - workflow archive (PG) は Step 2 で有効化
+# - artifact repository (Garage S3) は Step 3 で有効化
+# - UI 公開 + Zitadel SSO は Step 4 で有効化
+#
+# UI / SSO 未設定の間は server を立てつつ認証なしで kubectl port-forward 経由
+# でのみアクセスする想定。
+
+singleNamespace: false
+
+controller:
+  # Pi リソース圧迫を抑えるため parallelism を絞る (proposal §C)。
+  parallelism: 6
+  workflowDefaults:
+    spec:
+      ttlStrategy:
+        secondsAfterCompletion: 86400
+        secondsAfterSuccess: 86400
+        secondsAfterFailure: 259200
+      podGC:
+        strategy: OnWorkflowSuccess
+      activeDeadlineSeconds: 7200
+
+server:
+  # UI は HTTPRoute で出すため LB は使わない。Step 4 までは ClusterIP のまま。
+  serviceType: ClusterIP
+  # Step 4 までは認証無効 (port-forward 専用、外部公開しない)。
+  # NOTE: --auth-mode=server は kubectl ServiceAccount token を要求する。
+  # 完全な no-auth は --auth-mode=client で実現するが、本番に open UI を出すと
+  # 危険なので Step 4 まで HTTPRoute を作らないことで遮断する。
+  extraArgs:
+    - --auth-mode=server

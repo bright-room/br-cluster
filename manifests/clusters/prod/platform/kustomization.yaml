@@ -5,6 +5,7 @@ resources:
   - alloy-app.yaml
   - alloy-cp-app.yaml
   - alloy-events-app.yaml
+  - argo-workflows-app.yaml
   - cert-manager-app.yaml
   - cilium-app.yaml
   - cloudflared-app.yaml

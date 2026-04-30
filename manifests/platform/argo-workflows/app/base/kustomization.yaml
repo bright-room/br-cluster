@@ -1,0 +1,16 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - helm.yaml
+
+configMapGenerator:
+  - name: argo-workflows-helm-values
+    files:
+      - base-values.yaml=values-workflows.yaml
+  - name: argo-events-helm-values
+    files:
+      - base-values.yaml=values-events.yaml
+configurations:
+  - kustomizeconfig.yaml

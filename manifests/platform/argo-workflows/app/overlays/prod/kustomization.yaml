@@ -1,0 +1,29 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: argo-workflows
+
+resources:
+  - ../../base
+
+configMapGenerator:
+  - name: argo-workflows-helm-values
+    behavior: merge
+    files:
+      - overlay-values.yaml=values-workflows.yaml
+  - name: argo-events-helm-values
+    behavior: merge
+    files:
+      - overlay-values.yaml=values-events.yaml
+
+patches:
+  - target:
+      group: helm.toolkit.fluxcd.io
+      kind: HelmRelease
+      name: argo-workflows
+    path: helm-patch-workflows.yaml
+  - target:
+      group: helm.toolkit.fluxcd.io
+      kind: HelmRelease
+      name: argo-events
+    path: helm-patch-events.yaml

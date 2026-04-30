@@ -1,0 +1,26 @@
+---
+# argo-workflows helm values (prod overlay) — Pi リソース上限 (proposal §C)
+#
+# 実測で見直し前提。運用フォロー (2026-05-25) で kubectl top の平均を確認する。
+
+controller:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  nodeSelector:
+    node_type: worker
+
+server:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  nodeSelector:
+    node_type: worker
