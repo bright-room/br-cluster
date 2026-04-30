@@ -1,0 +1,22 @@
+---
+# argo-workflows ns の Workflow リソースの変化を全部購読する。
+# Sensor 側で status.phase によって絞り込む (filter は EventSource 側でも
+# 書けるが、ここで絞ると Sensor 側で「なぜ通知が来ない」のデバッグが
+# 困難になるので素通し)。
+#
+# proposal の (E) より「Workflow ごとの onExit を書かない、横断的に統一」。
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: notify-workflow
+spec:
+  template:
+    serviceAccountName: notify-eventsource
+  resource:
+    workflows:
+      namespace: argo-workflows
+      group: argoproj.io
+      version: v1alpha1
+      resource: workflows
+      eventTypes:
+        - UPDATE
