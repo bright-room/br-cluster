@@ -93,6 +93,7 @@
 | Longhorn nodeDownPodDeletionPolicy | `do-nothing` (rebuild storm 回避) | [`docs/platform/storage.md`](docs/platform/storage.md) |
 | `auth.b8m.app` 解決 | クラスタ内向けに **CoreDNS で Envoy VIP に rewrite** | [`docs/platform/identity.md`](docs/platform/identity.md) |
 | k3s upgrade | **system-upgrade-controller (SUC)** + `Plan` CRD 経由。Phase 1a は `br-node5` 限定 nodeSelector + `window` 未指定で稼働中、本番展開と etcd snapshot 連携は Phase 1b で対応 | [`docs/runbooks/k3s-upgrade.md`](docs/runbooks/k3s-upgrade.md) |
+| 定期ジョブ / ジョブネット | **Argo Workflows を優先**。`CronWorkflow` / `WorkflowTemplate` で書く。素の `CronJob` を新設する場合は理由を commit message と manifest コメントで明記 | [`docs/platform/workflows.md`](docs/platform/workflows.md) |
 
 ## ドキュメントの書き方
 
