@@ -1,0 +1,79 @@
+---
+# Workflow status.phase が Succeeded / Failed / Error に遷移したら Discord
+# webhook に POST する。EventSource 側では絞らず、Sensor の filter で:
+#   - terminal phase だけ通す
+#   - notify.b8m.app/skip: "true" ラベル付きはスキップ (proposal §E)
+#
+# webhook URL は Flux postBuild で ${DISCORD_WEBHOOK_URL} に substitute
+# (argo-workflows-discord Secret 経由)。
+#
+# Discord 側: { "content": "...." } の plain message。embed 形式は
+# argo-events の HTTP trigger payload で nested JSON を組むのが面倒な
+# 割に得る情報量が変わらないため見送り。チャンネルを専用にして文字色は
+# 受信側で見分けるか、運用しながら必要なら embed 化する。
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: notify-discord
+spec:
+  template:
+    serviceAccountName: notify-sensor-discord
+  dependencies:
+    - name: workflow-succeeded
+      eventSourceName: notify-workflow
+      eventName: workflows
+      filters:
+        data:
+          - path: body.status.phase
+            type: string
+            value:
+              - Succeeded
+          - path: "body.metadata.labels.notify\\.b8m\\.app/skip"
+            type: string
+            value:
+              - "true"
+            comparator: "!="
+    - name: workflow-failed
+      eventSourceName: notify-workflow
+      eventName: workflows
+      filters:
+        data:
+          - path: body.status.phase
+            type: string
+            value:
+              - Failed
+              - Error
+          - path: "body.metadata.labels.notify\\.b8m\\.app/skip"
+            type: string
+            value:
+              - "true"
+            comparator: "!="
+  triggers:
+    - template:
+        name: discord-succeeded
+        conditions: workflow-succeeded
+        http:
+          url: ${DISCORD_WEBHOOK_URL}
+          method: POST
+          headers:
+            Content-Type: application/json
+          payload:
+            - src:
+                dependencyName: workflow-succeeded
+                dataTemplate: |
+                  ✅ **{{ .Input.body.metadata.namespace }}/{{ .Input.body.metadata.name }}** Succeeded ({{ .Input.body.status.startedAt }} → {{ .Input.body.status.finishedAt }})
+              dest: content
+    - template:
+        name: discord-failed
+        conditions: workflow-failed
+        http:
+          url: ${DISCORD_WEBHOOK_URL}
+          method: POST
+          headers:
+            Content-Type: application/json
+          payload:
+            - src:
+                dependencyName: workflow-failed
+                dataTemplate: |
+                  ❌ **{{ .Input.body.metadata.namespace }}/{{ .Input.body.metadata.name }}** {{ .Input.body.status.phase }}: {{ .Input.body.status.message }}
+              dest: content

@@ -1,0 +1,37 @@
+---
+# resource EventSource は kube-apiserver を watch するため独自 SA + Role が
+# 必要 (argo-events controller が立てる events-source pod に attach される)。
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: notify-eventsource
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: notify-eventsource
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: notify-eventsource
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: notify-eventsource
+subjects:
+  - kind: ServiceAccount
+    name: notify-eventsource
+---
+# Discord 通知 Sensor は HTTP trigger だけ叩くので k8s 権限は不要。
+# argo-events の default を使うと暗黙の SA 依存ができるので明示的に独自
+# (空) SA を持たせる (権限分離 + 監査時に "なぜ何も持っていないか" が
+# manifest だけで読める)。
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: notify-sensor-discord
