@@ -1,0 +1,29 @@
+---
+# webhook EventSource からの event を受けて dag-sample WorkflowTemplate
+# を起動する Sensor。受け入れ基準 2 + 3 を 1 経路で検証する。
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: sample-webhook
+spec:
+  template:
+    serviceAccountName: sample-webhook-sensor
+  dependencies:
+    - name: webhook
+      eventSourceName: sample-webhook
+      eventName: sample
+  triggers:
+    - template:
+        name: trigger-dag-sample
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: dag-sample-via-webhook-
+              spec:
+                workflowTemplateRef:
+                  name: dag-sample
+                entrypoint: main

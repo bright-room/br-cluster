@@ -1,0 +1,114 @@
+---
+# 受け入れ基準 3 (DAG / 並列) と 4 (artifact 永続化) のリファレンス。
+#
+# 構成:
+#   gen-data            # A: 入力ファイルを生成し artifact 出力
+#       ├── transform-1 # B: A の artifact を加工 (B/C 並列)
+#       └── transform-2 # C: A の artifact を別変換
+#                merge  # D: B/C の出力をまとめる
+#
+# 実行:
+#   argo submit -n argo-workflows --from workflowtemplate/dag-sample \
+#     --watch
+# UI:
+#   https://argo-workflows.b8m.app から "Submit New Workflow" → dag-sample
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: dag-sample
+  labels:
+    sample.b8m.app/kind: workflowtemplate
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: gen-data
+            template: gen-data
+          - name: transform-1
+            template: transform
+            arguments:
+              parameters:
+                - name: suffix
+                  value: "1"
+              artifacts:
+                - name: input
+                  from: "{{tasks.gen-data.outputs.artifacts.payload}}"
+            depends: gen-data
+          - name: transform-2
+            template: transform
+            arguments:
+              parameters:
+                - name: suffix
+                  value: "2"
+              artifacts:
+                - name: input
+                  from: "{{tasks.gen-data.outputs.artifacts.payload}}"
+            depends: gen-data
+          - name: merge
+            template: merge
+            arguments:
+              artifacts:
+                - name: a
+                  from: "{{tasks.transform-1.outputs.artifacts.result}}"
+                - name: b
+                  from: "{{tasks.transform-2.outputs.artifacts.result}}"
+            depends: "transform-1 && transform-2"
+
+    - name: gen-data
+      container:
+        image: docker.io/library/alpine:3.20
+        command: [sh, -c]
+        args:
+          - |
+            mkdir -p /out
+            seq 1 5 > /out/payload.txt
+            echo "generated:"
+            cat /out/payload.txt
+      outputs:
+        artifacts:
+          - name: payload
+            path: /out/payload.txt
+
+    - name: transform
+      inputs:
+        parameters:
+          - name: suffix
+        artifacts:
+          - name: input
+            path: /in/payload.txt
+      container:
+        image: docker.io/library/alpine:3.20
+        command: [sh, -c]
+        args:
+          - |
+            mkdir -p /out
+            sed "s/$/-{{inputs.parameters.suffix}}/" /in/payload.txt > /out/result.txt
+            echo "transform-{{inputs.parameters.suffix}}:"
+            cat /out/result.txt
+      outputs:
+        artifacts:
+          - name: result
+            path: /out/result.txt
+
+    - name: merge
+      inputs:
+        artifacts:
+          - name: a
+            path: /in/a.txt
+          - name: b
+            path: /in/b.txt
+      container:
+        image: docker.io/library/alpine:3.20
+        command: [sh, -c]
+        args:
+          - |
+            mkdir -p /out
+            cat /in/a.txt /in/b.txt | sort -u > /out/merged.txt
+            echo "merged:"
+            cat /out/merged.txt
+      outputs:
+        artifacts:
+          - name: merged
+            path: /out/merged.txt
