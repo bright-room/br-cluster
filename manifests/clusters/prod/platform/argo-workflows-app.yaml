@@ -59,6 +59,24 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
+  name: argo-workflows-secrets
+  namespace: flux-system
+spec:
+  interval: 30m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  dependsOn:
+    - name: argo-workflows-app
+    - name: external-secrets-config
+  path: ./manifests/platform/argo-workflows/secrets/overlays/prod
+  prune: true
+  wait: true
+  timeout: 5m
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
   name: argo-workflows-notify
   namespace: flux-system
 spec:
@@ -69,16 +87,14 @@ spec:
     name: flux-system
   dependsOn:
     - name: argo-workflows-app
+    - name: argo-workflows-secrets
   path: ./manifests/platform/argo-workflows/notify/overlays/prod
   prune: true
   timeout: 5m
   postBuild:
-    # Sensor manifest の ${DISCORD_WEBHOOK_URL} を ExternalSecret 経由で
-    # 投影された argo-workflows-discord Secret から apply 時に埋め込む。
-    # Secret は ExternalSecret 自身が同じ Kustomization 内で先に作るため
-    # 初回 reconcile では substituteFrom が失敗する可能性がある。その場合
-    # 数十秒で next reconcile で解決する (Flux は postBuild が解決できる
-    # まで retry する)。
+    # Sensor manifest の ${DISCORD_WEBHOOK_URL} を flux-system ns に投影
+    # された argo-workflows-discord-substitution Secret から apply 時に
+    # 埋め込む (cert-manager-substitution と同パターン)。
     substituteFrom:
       - kind: Secret
-        name: argo-workflows-discord
+        name: argo-workflows-discord-substitution

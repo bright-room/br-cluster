@@ -7,7 +7,6 @@ resources:
   - externalsecret-archive.yaml
   - externalsecret-artifact.yaml
   - externalsecret-sso.yaml
-  - externalsecret-discord.yaml
   - eventbus.yaml
 
 configMapGenerator:
