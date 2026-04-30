@@ -1,0 +1,32 @@
+---
+# 受け入れ基準 1 (定期実行) のリファレンス。
+# 動作確認時のみ手動 resume (default で suspended、毎時走られると煩い)。
+#   kubectl patch -n argo-workflows cronworkflow hello \
+#     --type=merge -p '{"spec":{"suspend":false}}'
+# 観察し終わったら戻す:
+#   kubectl patch -n argo-workflows cronworkflow hello \
+#     --type=merge -p '{"spec":{"suspend":true}}'
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: hello
+  labels:
+    sample.b8m.app/kind: cronworkflow
+spec:
+  schedule: "0 * * * *"
+  timezone: Asia/Tokyo
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 60
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  suspend: true
+  workflowSpec:
+    entrypoint: main
+    templates:
+      - name: main
+        container:
+          image: docker.io/library/alpine:3.20
+          command: [sh, -c]
+          args:
+            - |
+              echo "[hello] $(date -Iseconds) from $(hostname)"
