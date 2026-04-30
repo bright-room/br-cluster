@@ -27,11 +27,30 @@ subjects:
   - kind: ServiceAccount
     name: notify-eventsource
 ---
-# Discord 通知 Sensor は HTTP trigger だけ叩くので k8s 権限は不要。
-# argo-events の default を使うと暗黙の SA 依存ができるので明示的に独自
-# (空) SA を持たせる (権限分離 + 監査時に "なぜ何も持っていないか" が
-# manifest だけで読める)。
+# Discord 通知 Sensor は notify-discord WorkflowTemplate を起動する
+# k8s create Workflow trigger を持つので Workflow create 権限が必要。
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: notify-sensor-discord
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: notify-sensor-discord
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows", "workflowtemplates"]
+    verbs: ["get", "list", "watch", "create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: notify-sensor-discord
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: notify-sensor-discord
+subjects:
+  - kind: ServiceAccount
+    name: notify-sensor-discord
