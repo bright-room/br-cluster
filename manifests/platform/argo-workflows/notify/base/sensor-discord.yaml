@@ -19,6 +19,15 @@ spec:
   template:
     serviceAccountName: notify-sensor-discord
   dependencies:
+    # NOTE: 当初 proposal §E では notify.b8m.app/skip: "true" ラベル付き
+    # Workflow を除外する filter を入れる予定だったが、argo-events の
+    # data filter は path 不在時に filter 全体が error → event discard
+    # するため、skip ラベルが付いていない大半の Workflow が 全部 discard
+    # される問題が発生した。
+    #
+    # Phase 1 の Sensor は http trigger 1 本だけで新 Workflow を作らない
+    # (再帰トリガのリスク無し) ので、skip 機構は実用上不要。skip 要件が
+    # 出た時点で expr filter (path 不在を空文字扱いできる) で再実装する。
     - name: workflow-succeeded
       eventSourceName: notify-workflow
       eventName: workflows
@@ -28,11 +37,6 @@ spec:
             type: string
             value:
               - Succeeded
-          - path: "body.metadata.labels.notify\\.b8m\\.app/skip"
-            type: string
-            value:
-              - "true"
-            comparator: "!="
     - name: workflow-failed
       eventSourceName: notify-workflow
       eventName: workflows
@@ -43,11 +47,6 @@ spec:
             value:
               - Failed
               - Error
-          - path: "body.metadata.labels.notify\\.b8m\\.app/skip"
-            type: string
-            value:
-              - "true"
-            comparator: "!="
   triggers:
     - template:
         name: discord-succeeded
