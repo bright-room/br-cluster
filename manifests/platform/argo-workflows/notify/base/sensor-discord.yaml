@@ -7,9 +7,10 @@
 # WorkflowTemplate 側に集約される。Discord embed の integer color や
 # 多フィールド構成も自由に書ける。
 #
-# 再帰トリガ防止: notify-discord Workflow には notify.b8m.app/skip: "true"
-# ラベルが付くので、Sensor の expr filter で除外する (data filter は
-# path 不在で event 全体を discard するため使えない)。
+# 再帰トリガ防止: notify.b8m.app/skip: "true" ラベル付き Workflow の
+# 除外は EventSource (notify-workflow) 側の labelSelector で実施する
+# (Sensor の data/expr filter は両方とも path 不在で event 全体を
+# discard する仕様のため、このレイヤでは扱えない)。
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
@@ -27,11 +28,6 @@ spec:
             type: string
             value:
               - Succeeded
-        exprs:
-          - expr: "skip != 'true'"
-            fields:
-              - name: skip
-                path: "body.metadata.labels.notify\\.b8m\\.app/skip"
     - name: workflow-failed
       eventSourceName: notify-workflow
       eventName: workflows
@@ -42,11 +38,6 @@ spec:
             value:
               - Failed
               - Error
-        exprs:
-          - expr: "skip != 'true'"
-            fields:
-              - name: skip
-                path: "body.metadata.labels.notify\\.b8m\\.app/skip"
   triggers:
     - template:
         name: discord-succeeded

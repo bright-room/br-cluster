@@ -20,3 +20,13 @@ spec:
       resource: workflows
       eventTypes:
         - UPDATE
+      # notify-discord 自身が再帰トリガしないよう EventSource レイヤで除外。
+      # k8s label selector の "!=" はラベル不在を「不一致」として扱う
+      # (matches) ため、ラベル付いてない普通の Workflow も通る。Sensor 側
+      # の expr/data filter は path 不在で event 全体が discard されて
+      # しまうので使えない。
+      filter:
+        labels:
+          - key: notify.b8m.app/skip
+            operation: "!="
+            value: "true"
