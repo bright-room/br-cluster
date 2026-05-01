@@ -17,4 +17,4 @@ versions:
   # renovate: datasource=github-releases depName=prometheus/node_exporter
   node_exporter: "1.11.0"
   # renovate: datasource=github-releases depName=grafana/alloy
-  alloy: "1.15.1"
+  alloy: "1.16.0"
