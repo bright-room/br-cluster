@@ -5,7 +5,7 @@ versions:
   # renovate: datasource=github-releases depName=kubernetes/kubernetes
   kubectl: "v1.35.0"
   # renovate: datasource=github-releases depName=helm/helm
-  helm: "v4.0.0"
+  helm: "v4.0.5"
   # renovate: datasource=github-releases depName=deuxfleurs-org/garage
   garage: "v2.2.0"
   # renovate: datasource=github-releases depName=etcd-io/etcd
