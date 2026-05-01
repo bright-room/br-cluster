@@ -14,13 +14,16 @@ argo-workflows Phase 1 の段階導入で 6 件の hot-fix PR が連発した:
 | PR | 内容 | 静的解析で防げたか |
 |---|---|---|
 | #245 | `server.sso.enabled` 未指定で chart が sso block を出さず argo-server crash | **不可** (chart が値を黙って捨てる、空 sso 出力でも YAML valid) |
-| #247 | `CronWorkflow.spec.schedule` (v3 syntax) → v4 で `schedules` 配列に変わっていた | **可能** (CRD schema 検証) |
+| #247 | `CronWorkflow.spec.schedule` (v3 syntax) → v4 で `schedules` 配列に変わっていた | **不可 (実装後に判明)** — catalog 上の CRD schema は v3/v4 両対応で `schedule` も valid 扱い。runtime smoke test (Phase 2) で受ける |
 | #249 | Workflow Pod の SA + RBAC 欠落で `workflowtaskresults` create 失敗 | **不可** (chart default が SA を作らない、Workflow 投入で発覚) |
 | #250 | EventBus `metricsExporterImage` 欠落で StatefulSet `containers[2].image: Required` | **不可** (chart は受理、controller 側生成で発覚) |
 | #251 | Discord substituteFrom Secret が同 Kustomization 内で chicken-and-egg | **可能** (postBuild Secret 解決) |
 | #252 / #253 | substituteFrom は `flux-system` ns でしか Secret を引かない | 同上 |
 
-**6 件中 2 件 (約 1/3) は静的解析で防げた**。残り 4 件は chart の値マージ後の挙動 / controller の reconcile ロジック依存で、manifest だけ眺めても発覚しない種類。
+当初は **6 件中 2 件 (#247, #251-253) は静的解析で防げる** と見立てたが、実装後に
+#247 は catalog schema が緩く検出不可と判明。実際に Phase 1 で確実に防げるのは
+**postBuild substituteFrom 系 (#252 / #253)** が中心。残りは chart の値マージ後の挙動
+/ controller の reconcile ロジック依存で、manifest だけ眺めても発覚しない種類。
 
 CI 強化を放置すると同じパターンの hot-fix が今後も発生する一方、すべてを静的解析で守るのは原理的に無理。**「防げる層は安いコストで全部塞ぐ」「防げない層は単発 runtime smoke で受ける」の二段構え** が必要。
 
@@ -52,69 +55,81 @@ CI 強化を放置すると同じパターンの hot-fix が今後も発生す�
 | CRD schema を kubeconform 既定の `kubernetes-json-schema` で代替 | 既定セットには argo-workflows / argo-events / Flux / cert-manager の CRD が無い。各 chart リポから抽出する必要があり、結局カスタム手当が要る |
 | flux-local を捨てて純 kustomize + helm template | flux-local は HelmRelease の inflate と Kustomize の `dependsOn` 順序を理解する。これを自前で再実装するのは現実的でない |
 
-## Phase 1 で実装するもの
+## Phase 1 で実装したもの (2026-05-01)
 
-### (A) CRD schema を kubeconform に渡す
+> 実装着手時に proposal の前提と現状の差分が見つかったため、軽量化した形で
+> 着地。差分の詳細は本節末尾の「実装と当初案の差分」を参照。
 
-#### 配置
+### (A) CRD schema を kubeconform で strict 検証
 
-```text
-scripts/
-└── fetch-crd-schemas.sh         # CRD .yaml → .json schema を生成
-.generated/crds/                 # gitignore 済 (生成物)
-└── *.json
-```
-
-#### 取得元 (例)
-
-| chart / source | CRD 群 | 備考 |
-|---|---|---|
-| argoproj/argo-workflows | Workflow / WorkflowTemplate / CronWorkflow / WorkflowTaskResult | Phase 1 で頻出 |
-| argoproj/argo-events | EventBus / EventSource / Sensor | 同上 |
-| flux-system | HelmRelease / Kustomization / GitRepository / HelmRepository | reconcile 経路全般 |
-| cert-manager | Certificate / Issuer / ClusterIssuer | 既に運用中 |
-| longhorn | Volume / Backup 等 | 必要に応じ |
-| cnpg | Cluster / Database / ScheduledBackup | 既に運用中 |
-
-`fetch-crd-schemas.sh` は git ref 固定で CRD YAML をダウンロード → `kubeconform/openapi2jsonschema.py` 等で .json に変換 → `.generated/crds/` に出す。Renovate で chart version を bump したら同時に CRD schema もリフレッシュ (renovate.json にルール追加)。
-
-#### kubeconform 呼び出し
-
-`scripts/manifests-build.sh` で:
+`scripts/manifests-build.sh` は次の通り:
 
 ```bash
 kubeconform \
-  -strict -ignore-missing-schemas=false \
+  -strict \
+  -summary \
+  -skip CustomResourceDefinition \
   -schema-location default \
-  -schema-location '.generated/crds/{{ .ResourceKind }}-{{ .ResourceAPIVersion }}.json' \
-  -summary -verbose \
-  build_output.yaml
+  -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+  -
 ```
 
-`-ignore-missing-schemas=false` で **CRD schema が無いリソースは fail** にする。今 `make manifests/build` が「Valid: N」を出してるが内部的に CRD は素通しになっているので、ここを締める。
+ポイント:
 
-期待される効果: #247 (`CronWorkflow.spec.schedule` → `schedules`) のような **CRD schema 違反が PR レベルで死ぬ**。
+- **`-ignore-missing-schemas` は付けない** → catalog に schema が無い CRD は fail。
+- **`-skip CustomResourceDefinition`** だけ例外。CRD 定義そのものは vendor の
+  chart から来る前提で本リポでは新設しない。yannh の standalone-strict にも
+  含まれていない (例: SUC `plans.upgrade.cattle.io`)。
+- **build 範囲を `manifests/clusters/**` から `manifests/platform/**/overlays/prod`
+  まで拡張**。CRD インスタンスはほとんど `platform/` 配下にあり、
+  cluster wrapper だけ build しても schema 検証が空振りしていた。
+- **Flux postBuild の `${VAR}`** は `scripts/manifests-postbuild-fixtures.env` を
+  envsubst の allow-list として渡し、dummy 値で展開してから kubeconform に流す。
+  Argo Workflow 内のシェル変数 (`${WORKFLOW_NAME}` 等) や Grafana テンプレ変数は
+  allow-list 外なので素通し。
+
+期待される効果: CRD schema 違反 (未知プロパティ、必須欠落、型不一致) が PR で fail。
+
+ただし **catalog 上の schema が緩い** ケースは検出できない。例えば PR #247 の
+`CronWorkflow.spec.schedule` は v3 で deprecated、v4 でも catalog schema に残っており
+「文法的には valid」と判定される。runtime smoke test (Phase 2) で受ける必要がある。
 
 ### (B) postBuild substituteFrom Secret の存在チェック
 
-flux-local 単体では `flux-system` ns 内の Secret 存在まで踏み込まない。**カスタムチェックスクリプト** を `scripts/manifests-substitute-check.sh` として追加:
+`scripts/manifests-substitute-check.sh` (bash + yq) を追加:
 
-```text
-スクリプトロジック (擬似コード):
-  1. 全 Flux Kustomization manifest を YAML parse
-  2. spec.postBuild.substituteFrom[*] を抽出
-  3. 各 entry が { kind: Secret|ConfigMap, name: <X> } を参照
-  4. リポジトリ全体で kind: <X> name: <Y> namespace: flux-system が
-     ExternalSecret の target.name = X か、ConfigMap (cluster-settings 等)
-     として作成されているか確認
-  5. なければ fail
-```
+1. リポ全体の `ConfigMap` / `Secret` / `ExternalSecret` を集めて
+   `<NS>/<KIND>/<NAME>` の集合 (= providers) を作る。ExternalSecret は
+   `target.name` (or `metadata.name`) を Secret として登録。
+2. 全 Flux Kustomization の `spec.postBuild.substituteFrom[*]` を抽出し、
+   `(Kustomization.metadata.namespace, sf.kind, sf.name)` が providers にあるか確認。
+3. 無ければ `::error file=...` で fail。
 
-期待される効果: #251 / #252 / #253 のような「postBuild が flux-system ns で Secret を見つけられない」をすべて事前検出。
+期待される効果: #252 / #253 のような「Secret が想定 namespace (flux-system) に
+存在しない」を事前検出。
 
-### (C) `make manifests/check` を CI 必須に追加
+**注意**: #251 (chicken-and-egg、Secret は同 Kustomization 内で作られるが
+substitute 時点ではまだ存在しない) は静的解析の射程外。Secret manifest は
+リポに存在しているため、`<NS>/<KIND>/<NAME>` cross-ref では検出できない。
+順序問題は dependsOn の組み方や別 Kustomization への切り出しで対処する
+必要があり、Phase 2 の runtime smoke test を待つ。
 
-`make check` は既に `manifests/build` + `manifests/flux-local` + `policy/test` を呼んでいるので、(A) (B) はそこに乗せる。CI 側 `manifests-ci.yaml` の `kustomize-build` job を `manifests-build` に rename して同じ内容を実行。
+### (C) Makefile / CI に組込
+
+- `Makefile`: `manifests/substitute-check` ターゲット追加、`check` に組込。
+- `.github/workflows/manifests-ci.yaml`: 既存 `kustomize-build` job に
+  `Check Flux postBuild substituteFrom references` ステップ追加。
+- `mise.toml`: `yq` を pin して mise install 配下に揃える。
+
+### 実装と当初案の差分
+
+| 当初案 | 実装 | 理由 |
+|---|---|---|
+| `scripts/fetch-crd-schemas.sh` で CRD YAML を取得 → openapi2jsonschema で .json 変換 → `.generated/crds/` に置く | `datreeio/CRDs-catalog` の URL を `-schema-location` で直参照 | 既存の `manifests-build.sh` が既に catalog URL を引いていた。catalog の coverage は本リポの CRD で十分 (62 platform overlay 中、URL 参照だけで全 valid) |
+| `.generated/crds/` を gitignore | (不要) | `.generated/` 全体が既に ignore 済 |
+| Renovate に CRD schema fetch ルール | (不要) | catalog 直参照で同期対象が無い |
+| build 範囲: `manifests/clusters/**` のみ | `manifests/clusters/**` + `manifests/platform/**/overlays/prod` | clusters 配下は Flux Kustomization wrapper のみで CRD インスタンスがほぼ無い。検査効果ゼロだった |
+| Flux postBuild `${VAR}` の扱い | envsubst + allow-list fixture | 当初案では言及なし。strict 化で HTTPRoute hostname 等が落ちるため必要になった |
 
 ## Phase 2 で実装するもの (別 proposal で詳細化)
 
@@ -145,8 +160,8 @@ PR ごとに 5-10 分追加。Renovate での chart bump も含めて全部こ�
 
 | Phase | 内容 | 完了条件 |
 |-------|------|---------|
-| **Phase 0** | この proposal で合意 | レビュー approval |
-| **Phase 1** | CRD schema + postBuild Secret check を CI に追加 | (A) (B) (C) を main に merge、過去の hot-fix PR を **意図的に revert して再 PR したら CI で死ぬ** ことを確認 |
+| **Phase 0** | この proposal で合意 | 完了 (initial review) |
+| **Phase 1** | CRD schema + postBuild Secret check を CI に追加 | **完了 (2026-05-01)** — strict kubeconform + substitute-check を main に merge |
 | **Phase 2** | kind smoke test 別 proposal で詳細化 | 別 proposal 起票 |
 | **Phase 3** | smoke test を Renovate PR にも適用 | (Phase 2 後に判断) |
 
@@ -168,24 +183,22 @@ Phase 2 以降は本 proposal のスコープ外。Phase 1 が安定してから
 | **Phase 2 の kind smoke test が遅い / flaky** | Phase 2 で別 proposal にして実証実験 → 採否判断 |
 | **CRD バージョンの drift** | mise / renovate.json に CRD schema fetch を組み込み、chart 更新と同期 |
 
-## 作業範囲 (Phase 1)
+## 作業範囲 (Phase 1) ※完了
 
-- `scripts/fetch-crd-schemas.sh` 新規作成
-- `.generated/crds/` を `.gitignore` に追加 (既に `.generated/` 配下は ignore 済の可能性、確認)
-- `scripts/manifests-build.sh` に kubeconform 呼び出し追加
-- `scripts/manifests-substitute-check.sh` 新規作成
-- `Makefile` に `manifests/substitute-check` ターゲット追加、`check` に組み込み
-- `.github/workflows/manifests-ci.yaml` に新ジョブ追加 (or 既存 `kustomize-build` job 内に組込)
-- `renovate.json` に CRD schema fetch ルール (chart version と同期) 追加
-- 既存違反があれば個別 PR で修正 (このスコープ外)
+- `scripts/manifests-build.sh` を strict kubeconform + envsubst 化、build 範囲を platform overlay まで拡張
+- `scripts/manifests-postbuild-fixtures.env` 新規作成 (envsubst allow-list)
+- `scripts/manifests-substitute-check.sh` 新規作成 (bash + yq)
+- `Makefile` に `manifests/substitute-check` ターゲット追加、`check` に組込
+- `.github/workflows/manifests-ci.yaml` の `kustomize-build` job に substitute-check ステップ追加
+- `mise.toml` に `yq` を追加
 
-## 未決事項 / 要確認
+## 未決事項 (Phase 2 以降)
 
-- CRD schema 取得元の正規化 (chart リポから直接取るか、`datreeio/CRDs-catalog` を使うか)
-- substituteFrom check の実装言語 (bash + yq か、Python か)
-- Phase 2 の kind 上で Garage / 1Password / Zitadel をどう mock するかの方針 (Phase 2 proposal で詳細)
+- Phase 2 の kind 上で Garage / 1Password / Zitadel をどう mock するかの方針
 - argo-workflows の WorkflowTaskResult のような **動的に生成される CRD インスタンス** をどこまで schema check するか
+- catalog 上で緩い CRD schema (CronWorkflow.spec.schedule 等) を runtime smoke test で受ける線引き
 
 ## 更新履歴
 
 - 2026-04-30 初版
+- 2026-05-01 Phase 1 実装完了。当初案の重い fetch 機構を URL 直参照に置換、build 範囲を platform overlay まで拡張、envsubst による postBuild 変数展開を追加

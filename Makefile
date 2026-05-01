@@ -2,7 +2,7 @@
         lint format test \
         yaml/lint actions/lint ansible/lint \
         packer/fmt \
-        manifests/build manifests/flux-local \
+        manifests/build manifests/flux-local manifests/substitute-check \
         policy/test policy/verify \
         check
 
@@ -47,11 +47,14 @@ packer/fmt: ## packer fmt -check (validate は --privileged 必須なので fmt 
 
 # === Manifests / Policy ===
 
-manifests/build: ## kustomize build + kubeconform on all cluster overlays
+manifests/build: ## kustomize build + kubeconform (strict, CRD schemas via datreeio/CRDs-catalog)
 	mise exec -- ./scripts/manifests-build.sh
 
 manifests/flux-local: ## flux-local test (HelmRelease offline render)
 	uv run flux-local test --enable-helm --path manifests/clusters/prod -v
+
+manifests/substitute-check: ## Flux Kustomization の substituteFrom 参照先 Secret/CM の存在チェック
+	mise exec -- ./scripts/manifests-substitute-check.sh
 
 policy/verify: ## Rego ポリシーの単体テスト
 	mise exec -- conftest verify --policy policies/
@@ -61,7 +64,7 @@ policy/test: policy/verify ## manifests/platform/ をポリシーで検査
 
 # === Aggregate ===
 
-check: lint test yaml/lint actions/lint ansible/lint packer/fmt manifests/build manifests/flux-local policy/test ## CI 等価チェック一式
+check: lint test yaml/lint actions/lint ansible/lint packer/fmt manifests/build manifests/substitute-check manifests/flux-local policy/test ## CI 等価チェック一式
 
 # === Cluster Operations ===
 

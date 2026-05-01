@@ -7,6 +7,8 @@ on:
       - 'manifests/**'
       - 'policies/**'
       - 'scripts/manifests-build.sh'
+      - 'scripts/manifests-substitute-check.sh'
+      - 'scripts/manifests-postbuild-fixtures.env'
       - 'Makefile'
       - 'pyproject.toml'
       - 'uv.lock'
@@ -32,6 +34,8 @@ jobs:
           cache: true
       - name: Build & validate cluster overlays
         run: make manifests/build
+      - name: Check Flux postBuild substituteFrom references
+        run: make manifests/substitute-check
 
   flux-local:
     name: flux-local-test
