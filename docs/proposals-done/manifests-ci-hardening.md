@@ -162,10 +162,14 @@ PR ごとに 5-10 分追加。Renovate での chart bump も含めて全部こ�
 |-------|------|---------|
 | **Phase 0** | この proposal で合意 | 完了 (initial review) |
 | **Phase 1** | CRD schema + postBuild Secret check を CI に追加 | **完了 (2026-05-01)** — strict kubeconform + substitute-check を main に merge |
-| **Phase 2** | kind smoke test 別 proposal で詳細化 | 別 proposal 起票 |
+| **Phase 2** | kind smoke test 別 proposal で詳細化 | **保留** (下記参照) |
 | **Phase 3** | smoke test を Renovate PR にも適用 | (Phase 2 後に判断) |
 
-Phase 2 以降は本 proposal のスコープ外。Phase 1 が安定してから別 proposal を起こす。
+**Phase 2 以降は当面保留 (2026-05-01 判断)**。6 連発 hot-fix の主因 (argo-workflows
+段階導入) は一回性のイベントで、平常運用での再発頻度は低い見立て。kind 上で
+CF Tunnel / Garage / 1Password / Zitadel を mock する複雑度に対して、homelab で
+Flux reconcile が 30 分待たされる程度の failure cost は割に合わない。同種の
+hot-fix burst が再発したら proposal を起こし直す。
 
 ## 期待効果
 
