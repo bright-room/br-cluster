@@ -11,7 +11,7 @@ versions:
   # renovate: datasource=github-releases depName=etcd-io/etcd
   etcd: "v3.6.0"
   # renovate: datasource=github-releases depName=coredns/coredns
-  coredns: "1.14.2"
+  coredns: "1.14.3"
   # renovate: datasource=pypi depName=certbot
   certbot: "5.4.0"
   # renovate: datasource=github-releases depName=prometheus/node_exporter
