@@ -15,6 +15,7 @@
 | ストレージ    | [B5 Longhorn ボリューム拡張](#b5-longhorn-ボリューム拡張) |
 | Secret        | [B6 GitHub App / 1Password Connect token のローテーション](#b6-github-app--1password-connect-token-のローテーション) |
 | アップグレード | [k3s クラスタアップグレード](runbooks/k3s-upgrade.md) — SUC 経由の通常手順 / minor チェックリスト / rollback / 個別ノード復旧 |
+| 依存更新       | [Renovate 運用ガイド](runbooks/renovate.md) — 追跡対象 / Dashboard の見方 / 新依存の追加方法 |
 
 ---
 

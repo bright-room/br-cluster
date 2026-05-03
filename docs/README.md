@@ -13,7 +13,7 @@ br-cluster のドキュメント目次。読みたい目的から該当ファイ
 | k3s クラスタ全体像、ブート順、cluster-settings              | [`kubernetes.md`](kubernetes.md) |
 | 設計判断の "なぜ" を一望、外部公開フロー、認証 2 層、管理境界 | [`architecture.md`](architecture.md) |
 | 運用の手順 (シャットダウン / 起動 / k3s リセット 等)         | [`operations.md`](operations.md) |
-| トピック別の長文 runbook (k3s アップグレード 等)              | [`runbooks/`](runbooks/) |
+| トピック別の長文 runbook (k3s アップグレード / Renovate 等)   | [`runbooks/`](runbooks/) |
 | プラットフォームコンポーネントの詳細 (グループ別)             | [`platform/`](platform/) |
 | 過去のインシデント記録                                        | [`incidents/`](incidents/) |
 | 検討中・未実装の改善案                                        | [`proposals/`](proposals/) |

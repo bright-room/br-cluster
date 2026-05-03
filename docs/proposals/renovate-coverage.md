@@ -1,18 +1,78 @@
 # 提案: Renovate カバレッジの拡充
 
-> **この提案の位置づけ**
+> **ステータス: ✅ Phase 1 ほぼ着地 (2026-04-30)。残は Dashboard の Repository Problem 調査のみ。**
 >
-> 現状 Renovate は Helm / kustomize / mise / Dockerfile / GitHub Actions /
-> Ansible Galaxy / pep621 (Python) / Packer の `ubuntu_version` を追跡している。
-> 一方で **`provisioner/inventories/base/group_vars/all/versions.yaml`** に
-> 列挙されている k3s / kubectl / helm / garage / restic / etcd / coredns /
-> certbot / node_exporter / alloy のバイナリ群は **完全に追跡対象外**。
-> ここを customManager で乗せて、新版検知 → PR レビュー → Ansible/SUC 経由で
-> 適用、の流れに統一する。
->
-> 関連 proposal:
-> - `k3s-upgrade.md` (SUC 経由の k3s 更新) — 本 proposal の `versions.yaml` 追跡が前提
-> - `ubuntu-auto-update.md` (OS パッケージ) — スコープ別
+> 新規セッションでこの doc を開く場合は **「Phase 1 着地まとめ」** と **「残課題」**
+> だけ読めば現状把握できる。後段の "設計時の記録" セクションは Phase 1 着手前の
+> 検討資料 (なぜ customManager 経由にしたか等) で、再着手は不要。
+
+## Phase 1 着地まとめ (2026-04-30)
+
+### 完了状況
+
+| 受け入れ基準 | 状態 | 証跡 |
+|---|---|---|
+| 1. `versions.yaml` 全エントリに `# renovate:` 注釈 | ✅ | 9 エントリ全行に注釈付与済 (commit `c0cbf03`)。`restic` は `secrets` role が credentials のみ扱いバイナリ install 経路がないため対象外と確定 |
+| 2. customManager が動作 | ✅ | Dependency Dashboard の `regex` セクションに versions.yaml 8 件 + SUC 3 件が並ぶ。`coredns` は install 経路に合わせて `github-releases` に着地、`extractVersion` で `v` prefix を剥ぐ packageRule 追加 |
+| 3. `versioning=loose` で `+k3sN` | ✅ | Pending PR `update dependency k3s-io/k3s to v1.35.4+k3s1` が起票され version 比較が正しく動いている |
+| 4. `groupName: k3s` で 1 PR に集約 | ✅ | `packageRules` で `k3s-io/k3s` → `k3s`、`rancher/system-upgrade-controller` → `system-upgrade-controller` を設定 |
+| 5. `pipx:ansible-lint` の追跡可否 | ✅ | **mise manager が捕捉済** (Dashboard の mise セクションに `pipx:ansible-lint 26.4.0` が並ぶ)。proposal 着手前に懸念した「未追跡」は杞憂で、置換不要 |
+| 6. `requirements.yaml` の roles | ✅ | `ansible-galaxy` manager が `ipr-cnrs.nftables v2.2.6` を捕捉 (commit `2ba9b74` で当初追加した customManager を削除し galaxy manager に一本化) |
+| 7. 既存追跡が壊れていない | ✅ | flux 29 / GHA 7 / dockerfile / docker-compose / pep621 / mise / galaxy が引き続き機能 |
+
+### 実装サマリ (commit)
+
+- `0ffbbb3` SUC controller / Plan version の customManager
+- `c0cbf03` versions.yaml + requirements.yaml roles の customManager
+- `2ba9b74` requirements.yaml roles 用 customManager は galaxy manager と重複のため削除
+- 受け入れ基準 1〜7 を満たした後の運用 doc: [`docs/runbooks/renovate.md`](../runbooks/renovate.md)
+  (proposal 当初は `docs/operations/renovate.md` を予定したが、実態の doc 構造に合わせて runbooks 配下に着地)
+
+### proposal 着手前との差分メモ
+
+| 項目 | 当初想定 | 実装結果 |
+|------|---------|---------|
+| `versions.yaml` のエントリ数 | 10 (`restic` 含む) | 9 (`restic` はバイナリ install 経路なし、`secrets` role が credentials だけ扱う) |
+| `pipx:ansible-lint` | 未追跡なら素の `ansible-lint` に置換 | mise manager が pipx backend も捕捉していた → そのまま維持 |
+| `requirements.yaml` roles | 別 customManager 追加を想定 | `ansible-galaxy` manager がそのまま捕捉 → customManager 不要 |
+| `coredns` の datasource | proposal 案では `docker` | install 経路に合わせて `github-releases (coredns/coredns)` に変更、`extractVersion` で `v` 剥がし |
+
+---
+
+## 残課題
+
+### Repository Problem の調査
+
+Dependency Dashboard (Issue #65) の冒頭に下記 WARN が出ている:
+
+```
+⚠️ WARN: Excess registryUrls found for datasource lookup - using first configured only
+```
+
+実害 (PR 起票漏れ) は出ていないが、どの依存に対して余分な `registryUrls` が
+設定されているかを Mend.io Web Portal の log で特定し、`renovate.json` から
+余分な registryUrl を削る (or `extends` で来ているものなら override する)。
+
+調査着手の目安: 次回 Renovate run (土曜 09:00 JST 前) の log を見るタイミング。
+別 PR で対応 (proposal 不要)。
+
+### Phase 2 (運用フォロー)
+
+- 1〜2 サイクル PR を観察し、`groupName` の調整余地を確認
+- datasource 誤りで拾えていない依存があれば追加
+
+---
+
+## 設計時の記録 (アーカイブ)
+
+> 以下は Phase 1 着手前の検討資料。**新規セッションで再着手する必要はない**。
+> 既に着地済の設計判断 (なぜ customManager 経由にしたか、なぜ `groupName: k3s`
+> でまとめるか等) を後から参照したいときのために残す。
+
+### 関連 proposal
+
+- `k3s-upgrade.md` (SUC 経由の k3s 更新) — 本 proposal の `versions.yaml` 追跡が前提
+- `ubuntu-auto-update.md` (OS パッケージ) — スコープ別
 
 ## 背景・動機
 
@@ -274,3 +334,5 @@ versions:
 ## 更新履歴
 
 - 2026-04-30 初版
+- 2026-04-30 Phase 1 着地 (commits `0ffbbb3` / `c0cbf03` / `2ba9b74`)。proposal を「Phase 1 着地まとめ」「残課題」「設計時の記録 (アーカイブ)」の 3 段構造に再編
+- 2026-05-03 運用 doc を [`docs/runbooks/renovate.md`](../runbooks/renovate.md) として追加。proposal 当初の `docs/operations/renovate.md` ではなく、実態の doc 構造 (operations.md は flat index、procedural は runbooks/) に合わせた
