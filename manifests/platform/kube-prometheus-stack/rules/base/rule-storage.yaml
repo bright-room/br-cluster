@@ -67,6 +67,22 @@ spec:
             description: |
               longhorn_volume_robustness = {{ $value }} (3=faulted, 2=degraded).
 
+        # robustness=2 (degraded) は replica rebuild 中も含む短期状態。
+        # kured が `--alert-filter-regexp` でこの alert を見て、rebuild 進行中
+        # は reboot を抑止する。severity=info にして通知は飛ばさない
+        # (Alertmanager 側の routing で warning 以上のみ Discord へ流れる)。
+        - alert: LonghornVolumeRebuilding
+          expr: longhorn_volume_robustness == 2
+          for: 30s
+          labels:
+            severity: info
+          annotations:
+            summary: Longhorn volume {{ $labels.volume }} is degraded / rebuilding
+            description: |
+              longhorn_volume_robustness = 2 (degraded). Replica rebuild may
+              be in progress; kured will defer node reboot while this alert
+              is firing.
+
         - alert: LonghornNodeStorageWarning
           expr: |
             longhorn_node_storage_usage_bytes
