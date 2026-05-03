@@ -6,7 +6,7 @@
 > だけ読めば現状把握できる。後段の "設計時の記録" セクションは Phase 1 着手前の
 > 検討資料 (なぜ customManager 経由にしたか等) で、再着手は不要。
 
-## Phase 1 着地まとめ (2026-04-30)
+## Phase 1 着地まとめ (2026-04-30、ドキュメント整備 2026-05-03、WARN 受容判断 2026-05-03)
 
 ### 完了状況
 
@@ -41,20 +41,37 @@
 
 ## 残課題
 
-### Repository Problem の調査
+### Repository Problem の WARN は受容 (2026-05-03 判断)
 
-Dependency Dashboard (Issue #65) の冒頭に下記 WARN が出ている:
+Dependency Dashboard (Issue #65) 冒頭の下記 WARN は **benign として受容**する:
 
 ```
 ⚠️ WARN: Excess registryUrls found for datasource lookup - using first configured only
 ```
 
-実害 (PR 起票漏れ) は出ていないが、どの依存に対して余分な `registryUrls` が
-設定されているかを Mend.io Web Portal の log で特定し、`renovate.json` から
-余分な registryUrl を削る (or `extends` で来ているものなら override する)。
+**原因**: 同名 `HelmRepository` が複数ファイルで重複定義されており、flux manager が
+chart 名で datasource lookup する際に複数の registryUrl を集める。
 
-調査着手の目安: 次回 Renovate run (土曜 09:00 JST 前) の log を見るタイミング。
-別 PR で対応 (proposal 不要)。
+| 重複名 | 場所 | URL |
+|---|---|---|
+| `alloy` ×3 | `alloy/`, `alloy-cp/`, `alloy-events/` | `https://grafana.github.io/helm-charts` |
+| `external-dns` ×2 | `external-dns-cloudflare/`, `external-dns-coredns/` | `https://kubernetes-sigs.github.io/external-dns/` |
+
+各 HelmRelease は同 namespace の HelmRepository を参照する設計
+(cross-namespace ref を避けるため) のため、各コンポーネントが自前で同名 / 同 URL の
+HelmRepository を持っている。
+
+**受容理由**:
+
+- URL は全コピーで同一 → first-wins で結果は正しく、PR 起票も実際に機能している
+  (Dashboard の Open / Pending セクションで alloy / external-dns の bump PR 確認済)
+- 修正案 A (リネーム) は manifests 6 箇所改名 + sourceRef 連動が必要、
+  既存パターン (chart 単位で source 名 = chart 名) から外れる
+- 修正案 B (cross-namespace 共通化) は `policies/` の sourceRef 制約改修が必要
+- ノイズ警告のために本構成を崩す価値は低い
+
+**再検討トリガ**: 同名 HelmRepository が異なる URL を指す状況が発生したら
+(例: 一部コンポーネントで chart fork に切替) 案 A を検討する。
 
 ### Phase 2 (運用フォロー)
 
@@ -336,3 +353,4 @@ versions:
 - 2026-04-30 初版
 - 2026-04-30 Phase 1 着地 (commits `0ffbbb3` / `c0cbf03` / `2ba9b74`)。proposal を「Phase 1 着地まとめ」「残課題」「設計時の記録 (アーカイブ)」の 3 段構造に再編
 - 2026-05-03 運用 doc を [`docs/runbooks/renovate.md`](../runbooks/renovate.md) として追加。proposal 当初の `docs/operations/renovate.md` ではなく、実態の doc 構造 (operations.md は flat index、procedural は runbooks/) に合わせた
+- 2026-05-03 Repository Problem WARN (`Excess registryUrls`) の発生源を特定。同名 HelmRepository (`alloy` ×3 / `external-dns` ×2) の重複定義が原因。URL は全コピー同一で実害なしのため benign として受容する判断、本 proposal の残課題から外す

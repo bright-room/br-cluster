@@ -125,4 +125,4 @@ GitHub release URL 直参照、HCL 変数、shell スクリプト内の version 
 - [`renovate.json`](../../renovate.json) — 設定の SoT
 - [Dependency Dashboard (Issue #65)](https://github.com/bright-room/br-cluster/issues/65)
 - [`docs/runbooks/k3s-upgrade.md`](k3s-upgrade.md) — k3s upgrade は Renovate PR のレビューが起点
-- [`docs/proposals/renovate-coverage.md`](../proposals/renovate-coverage.md) — Phase 1 設計判断 (着地後に proposals-done へ移管予定)
+- [`docs/proposals-done/renovate-coverage.md`](../proposals-done/renovate-coverage.md) — Phase 1 設計判断
