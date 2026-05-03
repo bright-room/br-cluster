@@ -58,8 +58,13 @@ br-node1 / br-node3 もメモリ余裕あり (8%/55%, 4%/51%)、+1 pod で押し
 
 | 項目 | 内容 |
 |---|---|
-| Cilium socketLB で LB IP hairpin 解決 | `bpf.hostRouting: true` or `loadBalancer.acceleration` 調整で lease holder 自身から LB IP 到達可能にする。成功すれば P2-C (6) の per-group push URL 分岐 (k3s=localhost NodePort / 非 k3s=ドメイン) を削除できる |
 | Provisioner playbook に `serial: 1` | #154 で `setup_monitoring_agent` のみ対応済。他 playbook は未対応 |
+
+### やらないことに決めたもの
+
+| 項目 | 理由 |
+|---|---|
+| Cilium socketLB で LB IP hairpin 解決 (`bpf.hostRouting: true` 等) | 現状の per-group push URL 分岐 (k3s=`localhost:30800` NodePort / 非 k3s=`internal-gateway` LB IP) は安定稼働中。`bpf.hostRouting` 等は masquerade や Istio ambient 同居挙動に波及するため、URL 分岐 1 箇所を消すための単独検証としては割に合わない。Istio ambient proposal の Phase 0 で同居検証する際にまとめて触る方が筋が良い |
 
 ---
 
@@ -67,16 +72,12 @@ br-node1 / br-node3 もメモリ余裕あり (8%/55%, 4%/51%)、+1 pod で押し
 
 > 2026-04-25 PR #185 で P2-D の kubeEtcd endpoints 生成 (cluster-forge generate-manifests 経由) は revert 済。現状は `components/k3s/values.yaml` に IP ハードコードに戻っている。
 
-**方針**: per-consumer に YAML fragment 生成を増やすと「新 consumer ごとに cluster-forge Python 側に生成関数追加」コストが嵩むため、**個数固定のスカラー値は `cluster-settings.yaml` + Flux postBuild `${VAR}` に寄せる**路線で follow-up。
+### やらないことに決めたもの
 
-想定する移行順:
-
-1. **kubeEtcd endpoints を postBuild 化**
-   - `cluster-settings.yaml` に `BR_NODE{1,2,3}_IP` を追加し、`components/k3s/values.yaml` の IP 直書きを `${BR_NODE1_IP}` 等に置換
-   - CP 台数変更時は cluster-settings.yaml と values.yaml のリストを両方手で触ることになるが、変更頻度が低いので許容
-2. **`cluster-settings.yaml` を `cluster-forge generate-manifests` 生成に寄せる**
-   - servers.yaml + 1Password から `BR_*_IP` / `CLOUDFLARED_TUNNEL_ID` 等を自動生成
-   - 既存の固定値 (`CLUSTER_DOMAIN` / `TRUSTED_INTERNAL_POD_CIDR` 等) をどこに書くかは要設計 (servers.yaml か専用の `cluster-config.yaml` か)
+| 項目 | 理由 |
+|---|---|
+| kubeEtcd endpoints を postBuild `${BR_NODE*_IP}` 化 | `components/k3s/values.yaml` は Ansible bootstrap (cluster-forge 経由) でクラスタに反映するパスがあり、Flux postBuild の `${VAR}` はそこでは展開されない。postBuild 化すると bootstrap 経路で値が解決できず壊れる |
+| `cluster-settings.yaml` を `cluster-forge generate-manifests` 生成に寄せる | 上記が前提だったため連動して取り下げ。SSoT 化の方針自体は再検討余地あり、必要が出たら別 proposal で再起票 |
 
 ---
 
