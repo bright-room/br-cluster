@@ -26,9 +26,15 @@ nft_input_rules:
     - iifname $lan_interface udp dport @in_udp_accept ct state new accept
   215 input tcp from k8s pods:
     - ip saddr $pod_cidr tcp dport @in_pod_tcp_accept ct state new accept
-  220 input tcp from wan:
-    - iifname $wan_interface tcp dport @in_wan_tcp_accept ct state new accept
-  221 input udp from wan:
+  # ssh は CF WARP private network 経路 (br-infra Tunnel) でアクセスする運用に
+  # 移行済。WAN 直の ssh は CF/WARP 障害時の家 LAN フォールバック専用とし、
+  # source を home_lan_network に制限して外部からの port-scan を遮断する。
+  # 詳細: docs/runbooks/cloudflare-tunnel-warp-access.md
+  220 input tcp from wan (home lan only):
+    - iifname $wan_interface ip saddr $home_lan_network tcp dport @in_wan_tcp_accept_home ct state new accept
+  221 input tcp from wan (open):
+    - iifname $wan_interface tcp dport @in_wan_tcp_accept_open ct state new accept
+  222 input udp from wan:
     - iifname $wan_interface udp dport @in_wan_udp_accept ct state new accept
 
 nft_output_default_rules: {}
@@ -47,10 +53,12 @@ nft_forward_rules:
     - iifname $lan_interface ip saddr $lan_network oifname $wan_interface tcp dport @forward_tcp_accept ct state new accept
   210 lan to wan udp:
     - iifname $lan_interface ip saddr $lan_network oifname $wan_interface udp dport @forward_udp_accept ct state new accept
-  220 ssh from wan:
-    - iifname $wan_interface oifname $lan_interface ip daddr $lan_network tcp dport ssh ct state new accept
-  250 k8s api from wan:
-    - iifname $wan_interface oifname $lan_interface ip daddr {{ (cluster_vips | selectattr('name', 'equalto', 'k8s-api') | first).ip }} tcp dport 6443 ct state new accept
+  # WAN 直経路は CF/WARP 障害時の家 LAN フォールバック専用 (上記 input ルール参照)。
+  # forward 段でも source を home_lan_network に絞り、外部から DNAT 経路に到達しないようにする。
+  220 ssh from wan (home lan only):
+    - iifname $wan_interface ip saddr $home_lan_network oifname $lan_interface ip daddr $lan_network tcp dport ssh ct state new accept
+  250 k8s api from wan (home lan only):
+    - iifname $wan_interface ip saddr $home_lan_network oifname $lan_interface ip daddr {{ (cluster_vips | selectattr('name', 'equalto', 'k8s-api') | first).ip }} tcp dport 6443 ct state new accept
 
 nft__nat_table_manage: true
 nft__nat_default_prerouting_rules: {}
@@ -86,9 +94,14 @@ nft_define:
   input udp accepted from lan:
     name: in_udp_accept
     value: "{ domain, ntp, bootps }"
-  input tcp accepted from wan:
-    name: in_wan_tcp_accept
-    value: "{ ssh, domain }"
+  # ssh は home_lan_network からのみ accept (フォールバック専用)
+  input tcp accepted from wan (home lan only):
+    name: in_wan_tcp_accept_home
+    value: "{ ssh }"
+  # domain (53) は WAN 上の家 LAN クライアントが gateway1 を DNS として参照するため open
+  input tcp accepted from wan (open):
+    name: in_wan_tcp_accept_open
+    value: "{ domain }"
   input udp accepted from wan:
     name: in_wan_udp_accept
     value: "{ domain }"
@@ -104,6 +117,11 @@ nft_define:
   wan network:
     name: wan_network
     value: "0.0.0.0/0"
+  # 自宅 LAN (br-gateway1 wlan0 が join している家庭用 Wi-Fi の subnet)。
+  # WAN 直の ssh / k8s-api 受け入れを家 LAN からのみに制限するため使用。
+  home lan network:
+    name: home_lan_network
+    value: "192.168.2.0/24"
   pod cidr:
     name: pod_cidr
     value: "10.42.0.0/16"
@@ -132,9 +150,12 @@ nft_set:
   in_udp_accept:
     - type inet_service; flags interval;
     - elements = $in_udp_accept
-  in_wan_tcp_accept:
+  in_wan_tcp_accept_home:
     - type inet_service; flags interval;
-    - elements = $in_wan_tcp_accept
+    - elements = $in_wan_tcp_accept_home
+  in_wan_tcp_accept_open:
+    - type inet_service; flags interval;
+    - elements = $in_wan_tcp_accept_open
   in_wan_udp_accept:
     - type inet_service; flags interval;
     - elements = $in_wan_udp_accept
