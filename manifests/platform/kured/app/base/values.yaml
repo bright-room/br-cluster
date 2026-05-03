@@ -15,9 +15,13 @@ configuration:
   # blockingPodSelector は空にして drain は Longhorn 側の挙動に任せる。
   # instance-manager は DaemonSet で常駐するため `longhorn.io/component=instance-manager`
   # を入れると永続的にブロックされて reboot が一切走らなくなる。
-  # rebuild 中だけ止める仕組みは Phase 2 で alert ベース (--alert-filter-regexp)
-  # に置き換える方針。
+  # rebuild 中の reboot は alertFilterRegexp (下) で Prometheus alert ベースに抑止する。
   blockingPodSelector: []
+  # rebuild 中の reboot 抑止は Prometheus alert を経由する。
+  # `LonghornVolumeRebuilding` (rule-storage.yaml: longhorn_volume_robustness == 2 for 30s)
+  # が firing 中は kured が reboot を skip する。
+  prometheusUrl: "http://kube-prometheus-stack-prometheus.kube-prom-stack.svc.cluster.local:9090"
+  alertFilterRegexp: "^(LonghornVolumeRebuilding)$"
   # notifyUrl は KURED_NOTIFY_URL env var で上書きする (chart の挙動)。
   # ExternalSecret から injected された Secret を参照するため values 側は空。
   notifyUrl: ""

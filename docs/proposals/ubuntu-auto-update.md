@@ -1,6 +1,6 @@
 # 提案: Ubuntu パッケージ更新の自動化
 
-> **ステータス: ✅ Phase 1 完了 (2026-04-30)。次は Phase 2 (4 週間 soak → 観察結果に基づく改善)。**
+> **ステータス: ✅ Phase 1 完了 (2026-04-30) / Phase 2 タスク #1, #5 着地 (2026-05-03)。残りは 4 週間 soak (5/28 目安) → 観察結果に基づく改善。**
 >
 > 新規セッションでこの doc を開く場合は **「Phase 1 着地まとめ」** と **「Phase 2 残課題」** だけ読めば現状把握できる。
 > 後段の "設計時の記録" セクションは Phase 1 着手前の検討資料 (なぜ kured を採用したか等) で、再着手は不要。
@@ -31,7 +31,7 @@ PR-2 実機検証中に **`--blocking-pod-selector longhorn.io/component=instanc
 
 - 原因: Longhorn の `instance-manager` は DaemonSet で全 k3s ノードに常駐するため、このセレクタは **常にマッチ** → kured が一切 reboot を走らせない状態になる
 - 修正 (PR #239): `blockingPodSelector: []` (空) にし、drain 安全性は Longhorn 側の PDB / drain 挙動に委ねる
-- Phase 2 で **alert ベース抑止** (`--alert-filter-regexp` + Prometheus alert `LonghornVolumeRebuilding` 等) に再設計する
+- 後続: 2026-05-03 に **alert ベース抑止** (`--alert-filter-regexp` + Prometheus alert `LonghornVolumeRebuilding` = robustness==2 短期検知) を追加し、rebuild 中の reboot を防ぐ仕組みを復元
 
 ---
 
@@ -55,11 +55,11 @@ PR-2 実機検証中に **`--blocking-pod-selector longhorn.io/component=instanc
 
 | # | タスク | 起票条件 |
 |---|------|---------|
-| 1 | **alert ベース抑止の実装** (`--alert-filter-regexp` + Prometheus alert `LonghornVolumeRebuilding` 等) | 必須 (Phase 1 では blockingPodSelector が空、rebuild 中の reboot を防ぐ仕組みが現状ない) |
+| 1 | ~~**alert ベース抑止の実装** (`--alert-filter-regexp` + Prometheus alert `LonghornVolumeRebuilding`)~~ ✅ **2026-05-03 着地** | — |
 | 2 | **PDB 整備** (drain で詰まるアプリの洗い出し → PodDisruptionBudget 追加) | 観察で Pod eviction 起因の障害が出たら |
 | 3 | **uu 通知の頻度見直し** (毎日 → 週次サマリ等) | Discord 通知ノイズが多ければ |
 | 4 | **`k3s-leader-restart` の safety net 観察結果反映** | 30 日 uptime 発火が 0 件継続なら頻度ダウン or 撤去 |
-| 5 | **rollback 手順の runbook 化** (`docs/runbooks/auto-update-rollback.md`) | 1 件でも regression を踏んだら |
+| 5 | ~~**rollback 手順の runbook 化** ([`docs/runbooks/auto-update-rollback.md`](../runbooks/auto-update-rollback.md))~~ ✅ **2026-05-03 着地** (regression 発生前に予防的に整備) | — |
 | 6 | **`tasks/update.yaml` の整理** (unattended-upgrades と役割重複している部分の刈り込み) | Phase 2 後半で別 PR |
 | 7 | **ドキュメント整備** (`docs/operations/auto-update.md` 新規 / `CLAUDE.md` 「非自明な設計判断」表に kured / uu 追記) | 観察期間が落ち着いたら |
 
@@ -255,3 +255,4 @@ manifests/platform/kured/app/
 - 2026-04-30 Discord 通知を `#br-cluster-prod-maintenance` (新規) に集約、webhook 共有、uu は「変更があった日のみ」、ESM origin は allowlist に含めたまま、blocking-pod-selector 初期値を Longhorn instance-manager のみで確定
 - 2026-04-30 PR-2 実機検証で `blocking-pod-selector: longhorn.io/component=instance-manager` が DaemonSet 常駐により永続ブロックを引き起こすと判明 → 空に変更。Phase 2 で alert ベース抑止に再設計予定
 - 2026-04-30 Phase 1 完了 (#237, #238, #239 merge)。proposal を「Phase 1 着地まとめ」「Phase 2 残課題」「設計時の記録 (アーカイブ)」の 3 段構造に再編
+- 2026-05-03 Phase 2 タスク #1 (alert ベース抑止: `LonghornVolumeRebuilding` + kured `alertFilterRegexp`) と #5 (rollback runbook) を soak 待たずに先行着地
