@@ -32,6 +32,7 @@
           - garage_rpc_secret
           - garage_operators
           - discord_webhook
+          - cloudflared_br_infra
       tags: [always]
 
     - name: Common system configuration

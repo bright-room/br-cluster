@@ -1,0 +1,7 @@
+tunnel: {{ secrets_cloudflared_br_infra.tunnel_id }}
+credentials-file: /etc/cloudflared/credentials.json
+protocol: quic
+metrics: 127.0.0.1:2000
+no-autoupdate: true
+warp-routing:
+  enabled: true

@@ -14,3 +14,7 @@
 - name: Caddy reverse proxy configuration
   include_tasks: caddy.yaml
   tags: [caddy]
+
+- name: Cloudflared (br-infra Tunnel) configuration
+  include_tasks: cloudflared.yaml
+  tags: [cloudflared]
