@@ -17,11 +17,13 @@ configuration:
   # を入れると永続的にブロックされて reboot が一切走らなくなる。
   # rebuild 中の reboot は alertFilterRegexp (下) で Prometheus alert ベースに抑止する。
   blockingPodSelector: []
-  # rebuild 中の reboot 抑止は Prometheus alert を経由する。
-  # `LonghornVolumeRebuilding` (rule-storage.yaml: longhorn_volume_robustness == 2 for 30s)
-  # が firing 中は kured が reboot を skip する。
+  # alertFilterRegexp は「無視するアラート名」の regex (match したものは block 判定から除外)。
+  # kube-prometheus-stack の `Watchdog` は alerting pipeline 死活監視で常時 firing なので
+  # ここで除外しないと kured が永久に reboot を skip する。`InfoInhibitor` も常駐 info 系。
+  # 無視リスト外 (例: `LonghornVolumeRebuilding` — rule-storage.yaml で
+  # longhorn_volume_robustness == 2 for 30s) が firing 中は kured が reboot を skip する。
   prometheusUrl: "http://kube-prometheus-stack-prometheus.kube-prom-stack.svc.cluster.local:9090"
-  alertFilterRegexp: "^(LonghornVolumeRebuilding)$"
+  alertFilterRegexp: "^(Watchdog|InfoInhibitor)$"
   # notifyUrl は KURED_NOTIFY_URL env var で上書きする (chart の挙動)。
   # ExternalSecret から injected された Secret を参照するため values 側は空。
   notifyUrl: ""
