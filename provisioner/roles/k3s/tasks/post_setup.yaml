@@ -14,9 +14,46 @@
     src: "{{ k3s.config_dir }}/k3s.yaml"
   register: kube_config_base64
 
-- name: Write Kubernetes config file with the correct cluster address
+- name: Parse upstream k3s kubeconfig
+  set_fact:
+    _k3s_kubeconfig: "{{ kube_config_base64.content | b64decode | from_yaml }}"
+  run_once: true
+  delegate_to: localhost
+
+- name: Build kubeconfig with primary + wan fallback contexts
+  set_fact:
+    _kubeconfig_dual:
+      apiVersion: v1
+      kind: Config
+      clusters:
+        - name: default
+          cluster:
+            server: "https://{{ k3s_api_vip_domain }}:6443"
+            certificate-authority-data: "{{ _k3s_kubeconfig.clusters[0].cluster['certificate-authority-data'] }}"
+        - name: default-wan
+          cluster:
+            server: "https://{{ hostvars['br-gateway1'].wan_ip }}:6443"
+            tls-server-name: "{{ k3s_api_vip_domain }}"
+            certificate-authority-data: "{{ _k3s_kubeconfig.clusters[0].cluster['certificate-authority-data'] }}"
+      users:
+        - name: default
+          user: "{{ _k3s_kubeconfig.users[0].user }}"
+      contexts:
+        - name: default
+          context:
+            cluster: default
+            user: default
+        - name: default-wan
+          context:
+            cluster: default-wan
+            user: default
+      current-context: default
+  run_once: true
+  delegate_to: localhost
+
+- name: Write kubeconfig with primary + wan fallback contexts
   copy:
-    content: "{{ kube_config_base64.content | b64decode | replace('127.0.0.1', k3s_api_vip_domain) }}"
+    content: "{{ _kubeconfig_dual | to_nice_yaml(indent=2) }}"
     dest: "/.secret/config"
     mode: "0644"
   delegate_to: localhost
