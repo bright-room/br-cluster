@@ -17,7 +17,7 @@
     state: present
     persistent: present
 
-- name: Set bridge-nf-call-iptables
+- name: Set kernel sysctl for k3s
   sysctl:
     name: "{{ item.name }}"
     value: "{{ item.value }}"
@@ -29,6 +29,13 @@
       value: 1
     - name: net.bridge.bridge-nf-call-ip6tables
       value: 1
+    # Ubuntu default (128) is too low for a k3s worker; kured-driven reboots
+    # can consolidate root-uid pods on a single node and exhaust inotify
+    # instances, breaking nats-server-config-reloader / argo-events sensors etc.
+    - name: fs.inotify.max_user_instances
+      value: 8192
+    - name: fs.inotify.max_user_watches
+      value: 524288
 
 # Swap is intentionally left enabled; kubelet is configured with
 # failSwapOn=false + memorySwap.swapBehavior=LimitedSwap in kubelet.config.j2.
