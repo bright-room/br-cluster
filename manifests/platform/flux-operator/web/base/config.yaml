@@ -15,9 +15,11 @@ apiVersion: web.fluxcd.controlplane.io/v1
 kind: Config
 spec:
   baseURL: https://flux.b8m.app
-  # web ClusterRole の権限モード (values の web.userActions.access) と揃える。
-  userActions:
-    access: Impersonated
+  # NOTE: userActions.access は flux-operator 0.45.1 の Web Config API スキーマに
+  # まだ無く、configSecretName 経由の strict な config ローダーが unknown field と
+  # して弾く ("unknown fields: .spec.userActions.access")。0.45.1 はそもそも
+  # impersonation のみなので config 側には書かない。権限モード (Impersonated) は
+  # helm value の web.userActions.access が web ClusterRole 生成に使う。
   authentication:
     type: OAuth2
     oauth2:
