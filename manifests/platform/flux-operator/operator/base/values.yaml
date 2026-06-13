@@ -1,2 +1,6 @@
 ---
 # flux-operator helm values (base)
+# Web UI は別チャートリリース (web/) で standalone モードとして動かすので
+# operator 本体には乗せない (https://fluxoperator.dev/docs/web-ui/standalone-install/)
+web:
+  enabled: false

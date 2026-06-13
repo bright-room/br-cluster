@@ -1,0 +1,54 @@
+---
+# flux-web helm values (base)
+#
+# 同じ flux-operator チャートを Web UI 専用モード (web.serverOnly) で再利用する。
+# https://fluxoperator.dev/docs/web-ui/standalone-install/
+#
+# Authentication:
+#   - Zitadel OIDC を Web UI ネイティブの OAuth2 認証で利用する (Grafana と同じ
+#     スタンス。Envoy SecurityPolicy を重ねると二重ログインになるため flux.b8m.app
+#     はゲートウェイの SecurityPolicy 対象から外している)。
+#   - clientID / clientSecret は flux-web-oidc Secret 経由で HelmRelease の
+#     valuesFrom + targetPath で注入する (helm.yaml / externalsecret-oidc.yaml)。
+#   - flux-operator は ID トークンの claims のみを参照し userinfo を引かないため、
+#     Zitadel 側の OIDC アプリは id_token_userinfo_assertion = true にして email を
+#     ID トークンへ埋め込む必要がある (br-cluster-zitadel-terraform 側)。
+#   - 認可は認証ユーザーを impersonate した上で Kubernetes RBAC で行う。chart が
+#     生成する flux-web-admin ClusterRole を rbac.yaml で管理者ユーザーへ束ねる。
+#     Zitadel は groups assertion を無効にしているため groups は空のまま、email で
+#     束ねる。
+fullnameOverride: flux-web
+installCRDs: false
+web:
+  serverOnly: true
+  # 認証ユーザーを impersonate して Kubernetes API を叩く (RBAC で認可)。
+  userActions:
+    access: Impersonated
+  # flux-web-user / flux-web-admin ClusterRole を生成する。
+  rbac:
+    createRoles: true
+  config:
+    baseURL: https://flux.b8m.app
+    authentication:
+      type: OAuth2
+      oauth2:
+        provider: OIDC
+        issuerURL: https://auth.b8m.app
+        # clientID / clientSecret は valuesFrom (Secret) で注入される。
+        impersonation:
+          username: "claims.email"
+          # Zitadel は groups を返さないので空スライスにフォールバックする。
+          groups: "has(claims.groups) ? claims.groups : []"
+  # Gateway API HTTPRoute をチャートに生成させ、Envoy Gateway 経由で公開する。
+  # external-dns が Cloudflare に CNAME を張り、cloudflared の *.b8m.app
+  # ワイルドカード ingress 経由でトンネルに乗る。
+  httpRoute:
+    enabled: true
+    annotations:
+      external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
+    parentRefs:
+      - name: cluster-gateway
+        namespace: envoy-gateway-system
+        sectionName: https
+    hostnames:
+      - flux.b8m.app

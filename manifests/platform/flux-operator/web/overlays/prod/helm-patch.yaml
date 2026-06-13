@@ -1,0 +1,7 @@
+---
+- op: add
+  path: /spec/valuesFrom/-
+  value:
+    kind: ConfigMap
+    name: flux-web-helm-values
+    valuesKey: overlay-values.yaml
