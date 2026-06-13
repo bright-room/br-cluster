@@ -1,0 +1,43 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: flux-operator-web
+spec:
+  interval: 1h
+  url: oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator
+  ref:
+    tag: 0.45.1
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: flux-web
+spec:
+  interval: 30m
+  chartRef:
+    kind: OCIRepository
+    name: flux-operator-web
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: flux-web-helm-values
+      valuesKey: base-values.yaml
+    - kind: Secret
+      name: flux-web-oidc
+      valuesKey: client-id
+      targetPath: web.config.authentication.oauth2.clientID
+    - kind: Secret
+      name: flux-web-oidc
+      valuesKey: client-secret
+      targetPath: web.config.authentication.oauth2.clientSecret
