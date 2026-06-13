@@ -1,0 +1,31 @@
+---
+# flux-web の Web Config API テンプレート。
+#
+# clientID / clientSecret のプレースホルダは ExternalSecret
+# (externalsecret-config.yaml) が templateFrom でこのファイルを読み込み、
+# tf-zitadel-output の値で埋めて flux-web-config Secret を生成する。
+# chart には web.configSecretName で渡す。
+# 注意: このファイルは ESO のテンプレートとしてそのまま評価されるので、
+# コメントを含め client_id / client_secret のテンプレート構文を本文以外に書かない。
+#
+# 機密を HelmRelease の valuesFrom (Secret) で helm values に注入すると
+# helm-controller が release を observe できず無限 upgrade ループに陥るため、
+# config 全体を Secret 側に閉じ込め helm values は static に保つ。
+apiVersion: web.fluxcd.controlplane.io/v1
+kind: Config
+spec:
+  baseURL: https://flux.b8m.app
+  # web ClusterRole の権限モード (values の web.userActions.access) と揃える。
+  userActions:
+    access: Impersonated
+  authentication:
+    type: OAuth2
+    oauth2:
+      provider: OIDC
+      issuerURL: https://auth.b8m.app
+      clientID: "{{ .client_id }}"
+      clientSecret: "{{ .client_secret }}"
+      impersonation:
+        username: "claims.email"
+        # Zitadel は groups を返さないので空スライスにフォールバックする。
+        groups: "has(claims.groups) ? claims.groups : []"

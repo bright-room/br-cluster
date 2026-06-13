@@ -33,11 +33,3 @@ spec:
     - kind: ConfigMap
       name: flux-web-helm-values
       valuesKey: base-values.yaml
-    - kind: Secret
-      name: flux-web-oidc
-      valuesKey: client-id
-      targetPath: web.config.authentication.oauth2.clientID
-    - kind: Secret
-      name: flux-web-oidc
-      valuesKey: client-secret
-      targetPath: web.config.authentication.oauth2.clientSecret
