@@ -1,0 +1,75 @@
+---
+# Zitadel role → argo ServiceAccount マッピング（SSO RBAC）。
+# rbac-rule は argo が customGroupClaimName(roles) を groups として評価する。
+# precedence が高い（数字が大きい）ルールが優先。
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-admin
+  namespace: argo-workflows
+  annotations:
+    workflows.argoproj.io/rbac-rule: "'admin' in groups"
+    workflows.argoproj.io/rbac-rule-precedence: "3"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-edit
+  namespace: argo-workflows
+  annotations:
+    workflows.argoproj.io/rbac-rule: "'maintainer' in groups || 'developer' in groups"
+    workflows.argoproj.io/rbac-rule-precedence: "2"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-view
+  namespace: argo-workflows
+  annotations:
+    workflows.argoproj.io/rbac-rule: "'viewer' in groups"
+    workflows.argoproj.io/rbac-rule-precedence: "1"
+---
+# admin: workflow の full 管理
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-admin
+  namespace: argo-workflows
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argo-workflows-admin
+subjects:
+  - kind: ServiceAccount
+    name: argo-admin
+    namespace: argo-workflows
+---
+# edit: workflow の submit/編集
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-edit
+  namespace: argo-workflows
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argo-workflows-edit
+subjects:
+  - kind: ServiceAccount
+    name: argo-edit
+    namespace: argo-workflows
+---
+# view: 読み取り専用
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-view
+  namespace: argo-workflows
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argo-workflows-view
+subjects:
+  - kind: ServiceAccount
+    name: argo-view
+    namespace: argo-workflows

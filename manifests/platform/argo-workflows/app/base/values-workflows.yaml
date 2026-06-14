@@ -90,10 +90,9 @@ server:
   # 乗せない (Grafana と同型 / 二重ダンス回避)。CF Access が外側で
   # GitHub org + WARP を要求する。
   #
-  # Phase 1 は単一オペレーター運用なので RBAC を有効化せず、
-  # SSO 認証された全ユーザに argo-server の admin 権限を付与する。
-  # 将来人が増えたら sso.rbac.enabled: true + ServiceAccount で
-  # group → role mapping を切る。
+  # sso.rbac.enabled + customGroupClaimName: roles で Zitadel の roles claim を
+  # groups 扱いし、rbac-sso.yaml の ServiceAccount (rbac-rule annotation) に
+  # ロールをマップする。
   sso:
     # chart の default は enabled: false でこの block 自体が CM に出ない。
     # --auth-mode=sso だけ立てると "issuer empty" で argo-server crash。
@@ -111,9 +110,7 @@ server:
       - profile
       - email
     sessionExpiry: 24h
+    # roles claim を argo の "groups" として読み、rbac-rule で SA にマップ。
+    customGroupClaimName: roles
     rbac:
-      # 単一オペレーター運用なので RBAC は無効化、認証された全ユーザに
-      # default SA (argo-server) の admin 権限を付与する。
-      # default の rbac.enabled: true だと SSO 認証しても ServiceAccount
-      # に紐付かず無権限になる。
-      enabled: false
+      enabled: true

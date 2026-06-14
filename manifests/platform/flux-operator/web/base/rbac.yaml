@@ -1,21 +1,41 @@
 ---
-# flux-web は OAuth2 認証後、認証ユーザー (impersonation.username = claims.email)
-# を impersonate して Kubernetes API を呼ぶ。flux-web-admin は chart が
-# web.rbac.createRoles で生成する ClusterRole で、Flux リソースへのフルアクセス
-# (reconcile / suspend / resume などのアクション含む) を持つ。
+# Zitadel role(group) → k8s RBAC。flux-web は claims.roles を group として
+# impersonate するので、Group 名 = role_key。
+#   admin / maintainer → flux-web-admin（Flux リソース full）
+#   developer          → flux-web-admin（sync 可。粒度を分けるなら別 ClusterRole）
+#   viewer             → view（読み取り）
 #
-# 現状の運用者は kukv (普段使い管理者) ひとりなので email で直接束ねる。複数人
-# 運用に広げる際は Zitadel 側で groups assertion を有効化し Group バインドへ
-# 切り替える。
+# flux-web-admin は chart が web.rbac.createRoles で生成する ClusterRole で、
+# Flux リソースへのフルアクセス (reconcile / suspend / resume などのアクション
+# 含む) を持つ。
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: flux-web-admin-kukv
-subjects:
-  - kind: User
-    name: koki-nonaka@outlook.jp
-    apiGroup: rbac.authorization.k8s.io
+  name: flux-web-admin
 roleRef:
   kind: ClusterRole
   name: flux-web-admin
   apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: Group
+    name: admin
+    apiGroup: rbac.authorization.k8s.io
+  - kind: Group
+    name: maintainer
+    apiGroup: rbac.authorization.k8s.io
+  - kind: Group
+    name: developer
+    apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: flux-web-view
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: Group
+    name: viewer
+    apiGroup: rbac.authorization.k8s.io
