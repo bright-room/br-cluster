@@ -29,5 +29,6 @@ spec:
       clientSecret: "{{ .client_secret }}"
       impersonation:
         username: "claims.email"
-        # Zitadel は groups を返さないので空スライスにフォールバックする。
-        groups: "has(claims.groups) ? claims.groups : []"
+        # Zitadel Action が注入する roles claim を k8s group として impersonate。
+        # k8s RBAC は Group("admin"/"maintainer"/... ) に対して認可する。
+        groups: "has(claims.roles) ? claims.roles : []"
