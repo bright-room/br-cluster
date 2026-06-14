@@ -29,12 +29,15 @@ metadata:
     workflows.argoproj.io/rbac-rule: "'viewer' in groups"
     workflows.argoproj.io/rbac-rule-precedence: "1"
 ---
+# argo-server はクラスタスコープ（argo-workflows-server が ClusterRoleBinding /
+# --managed-namespace 無し）で全 namespace の workflow をリストする。よって SSO
+# SA の権限も ClusterRoleBinding でクラスタ全体に効かせる必要がある（namespace
+# 限定の RoleBinding だと namespace "" のリストが Permission denied になる）。
 # admin: workflow の full 管理
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
-  name: argo-admin
-  namespace: argo-workflows
+  name: argo-sso-admin
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -46,10 +49,9 @@ subjects:
 ---
 # edit: workflow の submit/編集
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
-  name: argo-edit
-  namespace: argo-workflows
+  name: argo-sso-edit
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -61,10 +63,9 @@ subjects:
 ---
 # view: 読み取り専用
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
-  name: argo-view
-  namespace: argo-workflows
+  name: argo-sso-view
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
