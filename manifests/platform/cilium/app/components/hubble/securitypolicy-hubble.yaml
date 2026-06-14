@@ -29,3 +29,36 @@ spec:
       - openid
       - profile
       - email
+    # access token を named cookie に保存し、下の jwt provider が読む。
+    cookieNames:
+      accessToken: hubble-access-token
+  jwt:
+    providers:
+      - name: zitadel
+        issuer: https://auth.b8m.app
+        remoteJWKS:
+          uri: https://auth.b8m.app/oauth/v2/keys
+          backendRefs:
+            - group: ""
+              kind: Service
+              name: zitadel
+              namespace: zitadel
+              port: 8080
+        extractFrom:
+          cookies:
+            - hubble-access-token
+  authorization:
+    defaultAction: Deny
+    rules:
+      - name: allow-admin-maintainer-developer
+        action: Allow
+        principal:
+          jwt:
+            provider: zitadel
+            claims:
+              - name: roles
+                valueType: StringArray
+                values:
+                  - admin
+                  - maintainer
+                  - developer
