@@ -8,6 +8,7 @@ resources:
   - externalsecret-artifact.yaml
   - externalsecret-sso.yaml
   - eventbus.yaml
+  - rbac-sso.yaml
 
 configMapGenerator:
   - name: argo-workflows-helm-values
