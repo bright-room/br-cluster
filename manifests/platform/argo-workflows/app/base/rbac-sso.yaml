@@ -29,12 +29,15 @@ metadata:
     workflows.argoproj.io/rbac-rule: "'viewer' in groups"
     workflows.argoproj.io/rbac-rule-precedence: "1"
 ---
+# argo-server はクラスタスコープ（argo-workflows-server が ClusterRoleBinding /
+# --managed-namespace 無し）で全 namespace の workflow をリストする。よって SSO
+# SA の権限も ClusterRoleBinding でクラスタ全体に効かせる必要がある（namespace
+# 限定の RoleBinding だと namespace "" のリストが Permission denied になる）。
 # admin: workflow の full 管理
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
-  name: argo-admin
-  namespace: argo-workflows
+  name: argo-sso-admin
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -46,10 +49,9 @@ subjects:
 ---
 # edit: workflow の submit/編集
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
-  name: argo-edit
-  namespace: argo-workflows
+  name: argo-sso-edit
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -61,10 +63,9 @@ subjects:
 ---
 # view: 読み取り専用
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
-  name: argo-view
-  namespace: argo-workflows
+  name: argo-sso-view
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -73,3 +74,36 @@ subjects:
   - kind: ServiceAccount
     name: argo-view
     namespace: argo-workflows
+---
+# k8s 1.24+ は SA のトークン secret を自動生成しないため、argo の SSO RBAC が
+# 期待する `<sa>.service-account-token` を明示的に作る。argo-server は選定した
+# SA のこの secret からトークンを取り出して API 呼び出しを代行する。無いと
+# "failed to get service account secret" → PERMISSION_DENIED になる。
+# data は空のまま（token controller が populate する）なので平文 Secret 禁止
+# policy には抵触しない。
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argo-admin.service-account-token
+  namespace: argo-workflows
+  annotations:
+    kubernetes.io/service-account.name: argo-admin
+type: kubernetes.io/service-account-token
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argo-edit.service-account-token
+  namespace: argo-workflows
+  annotations:
+    kubernetes.io/service-account.name: argo-edit
+type: kubernetes.io/service-account-token
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argo-view.service-account-token
+  namespace: argo-workflows
+  annotations:
+    kubernetes.io/service-account.name: argo-view
+type: kubernetes.io/service-account-token
