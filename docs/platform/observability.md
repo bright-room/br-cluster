@@ -153,7 +153,7 @@ systemd 版 `node_exporter` (`:9101`) と `alloy` (`:12345`) を **k3s 外から
 ### ソース
 
 - Helm: [`manifests/platform/loki/app/`](../../manifests/platform/loki/app/)
-  - chart `loki` v6.55.0
+  - chart `loki` v17.4.0
 
 ### 設定の要点
 
