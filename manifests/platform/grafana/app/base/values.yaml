@@ -10,8 +10,9 @@
 #     _SECRET) through the grafana-oidc Secret (see externalsecret-oidc.yaml).
 #   - Break-glass local admin stays enabled (reachable via kubectl port-forward)
 #     as a last-resort recovery path if OIDC goes sideways.
-#   - Every OIDC-signed-in user becomes Org Admin because the cluster has a
-#     single operator; tighten this once there's anyone to tighten against.
+#   - Org role is derived from the Zitadel `roles` claim via role_attribute_path
+#     (admin→Admin / maintainer・developer→Editor / viewer→Viewer); users
+#     without a matching role are denied login (role_attribute_strict).
 
 admin:
   existingSecret: grafana-admin-secret
@@ -45,8 +46,6 @@ sidecar:
 grafana.ini:
   server:
     root_url: https://grafana.b8m.app
-  users:
-    auto_assign_org_role: Admin
   auth.generic_oauth:
     enabled: true
     name: Zitadel
@@ -55,6 +54,15 @@ grafana.ini:
     token_url: https://auth.b8m.app/oauth/v2/token
     api_url: https://auth.b8m.app/oidc/v1/userinfo
     allow_sign_up: true
+    # roles claim（Zitadel Action が注入する文字列配列）を Grafana role に
+    # マップ。admin→Admin / maintainer・developer→Editor / viewer→Viewer。
+    # 一致が無ければアクセス拒否（role_attribute_strict）。
+    role_attribute_path: >-
+      contains(roles[*], 'admin') && 'Admin'
+      || contains(roles[*], 'maintainer') && 'Editor'
+      || contains(roles[*], 'developer') && 'Editor'
+      || contains(roles[*], 'viewer') && 'Viewer'
+    role_attribute_strict: true
 
 # RWO PVC requires Recreate strategy — RollingUpdate causes Multi-Attach errors
 # because the new pod tries to claim the volume before the old one releases it.
