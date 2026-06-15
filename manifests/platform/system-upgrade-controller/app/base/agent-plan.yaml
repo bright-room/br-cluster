@@ -25,5 +25,5 @@ spec:
   window:
     days: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
     startTime: "02:00"
-    endTime:   "05:00"
-    timeZone:  "Asia/Tokyo"
+    endTime: "05:00"
+    timeZone: "Asia/Tokyo"
