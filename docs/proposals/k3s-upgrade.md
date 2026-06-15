@@ -123,15 +123,15 @@ Phase 1 は 1a / 1b に分割する。**1a が本 proposal の実装スコープ
 | 5 | **prepare による server → agent 待ち合わせが機能** | server-plan の Job 完了後に agent-plan の prepare Job が走ることを `kubectl get jobs -n system-upgrade -w` で確認 | ✅ PR2 reconcile 時に server 完了 17:42:05 → agent 完了 17:42:16 で順序確認 |
 | 6 | **rollback runbook (snapshot 抜きの手順) が手順通り動く** | k3s-upgrade image が downgrade を拒否することの記述 + Ansible 経由戻しの手順記述 | ✅ PR4 で記述 |
 
-### Phase 1b (provisioner 別 proposal 決着後)
+### Phase 1b (manifests 側を本 PR で着地、provisioner 側は別 proposal 継続)
 
-| # | 機能 | 検証方法 |
-|---|------|---------|
-| 7 | **nodeSelector を本番並びに解放** | proposal 案 (control-plane / worker) の selector に切替、prod CP 3 台 + worker N 台で初回 upgrade |
-| 8 | **`window` を 02:00-05:00 JST に絞る** | window 外で `Plan` を更新しても upgrade が走らず、次の window で開始 |
-| 9 | **`make prod/k3s/snapshot` が全 CP で snapshot を取る** | `/var/lib/rancher/k3s/server/db/snapshots/` に当日のスナップショットが 3 ノード分 |
-| 10 | **rollback runbook (snapshot あり) が手順通り動く** | 事前 snapshot → upgrade → snapshot restore 経路を実機で 1 周 |
-| 11 | **既存 `setup_node` / `bootstrap_cluster` が壊れていない** | `make prod/provision/lint` 通過、新規プロビジョン経路で同じ k3s 版が入る |
+| # | 機能 | 検証方法 | 状況 |
+|---|------|---------|------|
+| 7 | **nodeSelector を本番並びに解放** | server-plan = `node-role.kubernetes.io/control-plane In ["true"]`、agent-plan = 同 `DoesNotExist` に切替、prod CP 3 台 + worker 3 台で初回 upgrade | ✅ manifest 着地 (実 upgrade は人間判断で別途) |
+| 8 | **`window` を 02:00-05:00 JST に絞る** | window 外で `Plan` を更新しても upgrade が走らず、次の window で開始 | ✅ manifest 着地 |
+| 9 | **`make prod/k3s/snapshot` が全 CP で snapshot を取る** | `/var/lib/rancher/k3s/server/db/snapshots/` に当日のスナップショットが 3 ノード分 | ⏳ provisioner 別 proposal。当面は k3s 組み込み自動 snapshot (12h) をベースラインに使う (`kubectl get etcdsnapshotfile` で確認) |
+| 10 | **rollback runbook (snapshot あり) が手順通り動く** | 事前 snapshot → upgrade → snapshot restore 経路を実機で 1 周 | ✅ runbook 整備 (自動 snapshot を restore 元に利用)。実機 1 周は未実施 |
+| 11 | **既存 `setup_node` / `bootstrap_cluster` が壊れていない** | `make prod/provision/lint` 通過、新規プロビジョン経路で同じ k3s 版が入る | ⏳ provisioner 別 proposal |
 
 ## 段階導入計画
 
@@ -139,7 +139,7 @@ Phase 1 は 1a / 1b に分割する。**1a が本 proposal の実装スコープ
 |-------|------|---------|------|
 | **Phase 0** | この proposal で合意 | レビュー approval | ✅ |
 | **Phase 1a** | SUC を Flux で導入 + `Plan` 2 本 (テスト worker 限定 nodeSelector、`window` は動作確認のため広め) + Renovate customManager + 限定 runbook (snapshot 抜き) | 受け入れ基準 1〜6 | ✅ 着地 (PR1〜4 / `#232`〜`#235`)、Renovate 起票待ちのみ残 |
-| **Phase 1b** | provisioner 別 proposal の snapshot 経路に乗せて、nodeSelector 本番並び + `window` 02:00-05:00 JST + runbook 完成 | 受け入れ基準 7〜11 | ⏳ provisioner 別 proposal 待ち |
+| **Phase 1b** | nodeSelector 本番並び + `window` 02:00-05:00 JST + runbook 完成 (snapshot は k3s 自動取得をベースラインに利用)。provisioner 側 (`make prod/k3s/snapshot` / `versions.yaml` 同期 = #9 / #11) は別 proposal で継続 | 受け入れ基準 7・8・10 (manifests/runbook) | ✅ manifests 着地 (#9・#11 は provisioner 別 proposal 継続) |
 | **Phase 2** | 1〜2 回のパッチ更新を実機で回し、運用フォロー (実所要時間 / 障害有無 / window 設定の妥当性) | 別 PR (proposal 不要) | — |
 | **Phase 3** | minor 跨ぎを 1 回経験 → チェックリスト拡充。channel-based に切り替えるかの判断 | 別 PR or proposal | — |
 
@@ -442,6 +442,11 @@ Phase 1a の runbook では snapshot 取得ステップを「(別 proposal で�
 
 ## 更新履歴
 
+- 2026-06-15 Phase 1b (manifests 側) 着地:
+  - `server-plan` の nodeSelector を `node-role.kubernetes.io/control-plane In ["true"]`、`agent-plan` を同 `DoesNotExist` に解放 (テスト worker `br-node5` 限定から本番並びへ)
+  - 両 Plan に `window` 02:00-05:00 JST を有効化、`version` を `v1.36.1+k3s1` に更新 (1.35→1.36 の単一 minor、CP→worker 順で skew 回避)
+  - runbook を Phase 1b 反映: 事前 snapshot を k3s 組み込み自動取得 (12h) ベースラインに、`kubectl get etcdsnapshotfile` での確認手順、window 有効化、初回ライブ観察の注記を追加
+  - 受け入れ基準 #9 (`make prod/k3s/snapshot`) / #11 (provisioner lint) は provisioner 別 proposal 継続。実 upgrade の実行は人間判断で別途
 - 2026-04-30 初版 (Ansible 自作 rolling 案で書き始めたが、k3s 公式 [Automated Upgrades](https://docs.k3s.io/upgrades/automated) を再評価し SUC 採用に切替。provisioner (Ansible) 領域 — etcd snapshot playbook / Make ターゲット / `versions.yaml` 同期 — は別 proposal に切り出し、Phase 1 は 1a (本 proposal で実装) / 1b (provisioner 別 proposal 決着後) に分割する形で着地)
 - 2026-04-30 Phase 1a 着地 (PR `#232`〜`#235`) を反映:
   - **(B) Renovate 節**: customManager は **Plan の `version:` 行と `base/kustomization.yaml` の release-asset URL の 2 種を 1 manager で拾う**形に修正 (`kustomize` manager は Git ref 形式しか自動検知しないため URL 側にも customManager 必須)。`packageRules` で k3s / SUC 各々を `groupName` でまとめる形に
