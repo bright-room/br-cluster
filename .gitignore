@@ -1,29 +1,70 @@
-### system ###
-.DS_Store
-
-### idea ###
+# >>> repository-fanout managed >>>
+### JetBrains IDEs ###
+.fleet/
 .idea/
+*.iws
 *.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### VSCode ###
+.vscode/
+
+### OS ###
+.DS_Store
+**/.DS_Store
+Thumbs.db
+
+### env ###
+.env*
+!.env.example
+
+### AI agents ###
+.claude/settings.local.json
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+.superpowers/
+CLAUDE.local.md
+
+### Logfiles ###
+log/*
+!log/.gitkeep
+
+### Tempfiles ###
+.tmp/
+tmp/*
+!tmp/.gitkeep
+
+### Misc ###
+HELP.md
 
 ### python ###
-.venv/
 __pycache__/
-*.egg-info/
+.venv/
 .pytest_cache/
 .ruff_cache/
 .coverage
+*.egg-info/
+# <<< repository-fanout managed <<<
 
 ### secrets ###
-.secret/
+# {env}/ の箱だけ残す (cluster-forge は .secret/{env}/ を読むだけで作らない)。
+# `.secret/` 自体を除外すると git が配下に降りず .gitkeep の再包含が効かなくなる
+.secret/**
+!.secret/dev/
+!.secret/prod/
 !.secret/dev/.gitkeep
 !.secret/prod/.gitkeep
-.env
-.env.*
 .kube/
 
 ### generated ###
 .generated/
-docker/ssh
+# keys/ の箱だけ残す。`docker/ssh` 自体を除外すると git が配下に降りず
+# !docker/ssh/keys/.gitkeep が効かなくなる (除外ディレクトリ配下は再包含できない)
+docker/ssh/**
+!docker/ssh/keys/
 !docker/ssh/keys/.gitkeep
 
 ### ansible ###
@@ -34,9 +75,11 @@ provisioner/inventories/*/hosts.yaml
 !provisioner/inventories/base/hosts.yaml
 provisioner/inventories/*/group_vars/all/cluster_hosts.yaml
 provisioner/inventories/*/host_vars/br-gateway1.yaml
+# base/ は生成対象外 (generate-inventory の書き込み先は inventories/{env}/)。
+# 手書きの nftables 設定なので追跡する
+!provisioner/inventories/base/host_vars/br-gateway1.yaml
 
 ### misc ###
-.tmp/
 mise.lock
 
 ### docs/assets/logos (third-party brand logos; license/source to be reviewed before committing) ###

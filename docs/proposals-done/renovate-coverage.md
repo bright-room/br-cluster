@@ -46,7 +46,7 @@
 Dependency Dashboard (Issue #65) 冒頭の下記 WARN は **benign として受容**する:
 
 ```
-⚠️ WARN: Excess registryUrls found for datasource lookup - using first configured only
+WARN: Excess registryUrls found for datasource lookup - using first configured only
 ```
 
 **原因**: 同名 `HelmRepository` が複数ファイルで重複定義されており、flux manager が
