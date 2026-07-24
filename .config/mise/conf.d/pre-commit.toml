@@ -1,0 +1,15 @@
+# Managed by bright-room/canonical-files — 直接編集しない(fanout で上書きされる)
+#
+# clone 直後に pre-commit hook が未導入のままコミットしてしまう漏れを防ぐ保険。
+# - tools: mise install で pre-commit 本体も入る(未導入マシン対策。[tools] は加算マージ)
+# - enter: mise activate 済みシェルでプロジェクトに入った時に発火
+# - postinstall: mise install 直後に発火(activate 不要。同一セッションで enter が
+#   再発火しない隙間を埋める)
+# マシン側の git init.templateDir(dotfiles 管理)が第一層で、これは第二層。
+# リポ所有の mise.toml(create-only 配布)に触れないよう conf.d に分離している。
+[tools]
+pre-commit = "latest"
+
+[hooks]
+enter = 'test -f "$MISE_PROJECT_ROOT/.git/hooks/pre-commit" || ! command -v pre-commit >/dev/null || pre-commit install'
+postinstall = 'test -f "$MISE_PROJECT_ROOT/.git/hooks/pre-commit" || ! command -v pre-commit >/dev/null || pre-commit install'

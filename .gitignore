@@ -1,17 +1,57 @@
-### system ###
-.DS_Store
-
-### idea ###
+# >>> repository-fanout managed >>>
+### JetBrains IDEs ###
+.fleet/
 .idea/
+*.iws
 *.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### VSCode ###
+.vscode/
+
+### OS ###
+.DS_Store
+**/.DS_Store
+Thumbs.db
+
+### env ###
+.env*
+!.env.example
+
+### AI agents ###
+.claude/settings.local.json
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+.superpowers/
+CLAUDE.local.md
+
+### Logfiles ###
+log/*
+!log/.gitkeep
+
+### Tempfiles ###
+.tmp/
+tmp/*
+!tmp/.gitkeep
+
+### Misc ###
+HELP.md
 
 ### python ###
-.venv/
 __pycache__/
-*.egg-info/
+.venv/
 .pytest_cache/
 .ruff_cache/
 .coverage
+*.egg-info/
+# <<< repository-fanout managed <<<
+### system ###
+
+### idea ###
+
 
 ### secrets ###
 .secret/
@@ -36,7 +76,6 @@ provisioner/inventories/*/group_vars/all/cluster_hosts.yaml
 provisioner/inventories/*/host_vars/br-gateway1.yaml
 
 ### misc ###
-.tmp/
 mise.lock
 
 ### docs/assets/logos (third-party brand logos; license/source to be reviewed before committing) ###

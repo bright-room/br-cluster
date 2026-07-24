@@ -1,13 +1,18 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
+    "github>bright-room/renovate-config",
     "config:recommended",
     "helpers:pinGitHubActionDigests",
     "docker:pinDigests"
   ],
   "timezone": "Asia/Tokyo",
-  "schedule": ["before 9am on saturday"],
-  "labels": ["Kind: Dependencies"],
+  "schedule": [
+    "before 9am on saturday"
+  ],
+  "labels": [
+    "Kind: Dependencies"
+  ],
   "prConcurrentLimit": 0,
   "prHourlyLimit": 0,
   "separateMinorPatch": true,
@@ -18,37 +23,53 @@
   "dependencyDashboard": true,
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": ["before 9am on saturday"]
+    "schedule": [
+      "before 9am on saturday"
+    ]
   },
   "major": {
     "minimumReleaseAge": "14 days",
     "automerge": false
   },
   "flux": {
-    "managerFilePatterns": ["/manifests/.+\\.ya?ml$/"]
+    "managerFilePatterns": [
+      "/manifests/.+\\.ya?ml$/"
+    ]
   },
   "kustomize": {
-    "managerFilePatterns": ["/manifests/.+/kustomization\\.ya?ml$/"]
+    "managerFilePatterns": [
+      "/manifests/.+/kustomization\\.ya?ml$/"
+    ]
   },
   "packageRules": [
     {
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "groupName": "github-actions"
     },
     {
-      "matchManagers": ["mise"],
+      "matchManagers": [
+        "mise"
+      ],
       "groupName": "mise tools"
     },
     {
-      "matchManagers": ["flux"],
+      "matchManagers": [
+        "flux"
+      ],
       "pinDigests": false
     },
     {
-      "matchPackageNames": ["k3s-io/k3s"],
+      "matchPackageNames": [
+        "k3s-io/k3s"
+      ],
       "groupName": "k3s"
     },
     {
-      "matchPackageNames": ["rancher/system-upgrade-controller"],
+      "matchPackageNames": [
+        "rancher/system-upgrade-controller"
+      ],
       "groupName": "system-upgrade-controller"
     },
     {
