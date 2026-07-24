@@ -48,10 +48,6 @@ __pycache__/
 .coverage
 *.egg-info/
 # <<< repository-fanout managed <<<
-### system ###
-
-### idea ###
-
 
 ### secrets ###
 .secret/
