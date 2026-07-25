@@ -1,7 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "github>bright-room/renovate-config"
+    "github>bright-room/renovate-config",
+    "github>bright-room/renovate-config:python"
   ],
   "automerge": false,
   "rebaseWhen": "behind-base-branch",
