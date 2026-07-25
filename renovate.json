@@ -1,18 +1,11 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "github>bright-room/renovate-config",
-    "docker:pinDigests"
+    "github>bright-room/renovate-config"
   ],
   "automerge": false,
   "rebaseWhen": "behind-base-branch",
   "osvVulnerabilityAlerts": true,
-  "lockFileMaintenance": {
-    "enabled": true,
-    "schedule": [
-      "before 9am on saturday"
-    ]
-  },
   "flux": {
     "managerFilePatterns": [
       "/manifests/.+\\.ya?ml$/"
