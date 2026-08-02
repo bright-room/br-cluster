@@ -1,7 +1,7 @@
 # renovate: datasource=docker depName=ubuntu versioning=ubuntu
 variable "ubuntu_version" {
   type    = string
-  default = "24.04.4"
+  default = "26.04"
 }
 
 variable "hostname" {
