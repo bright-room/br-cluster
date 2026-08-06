@@ -2,13 +2,13 @@
 
 system-upgrade-controller (SUC) 経由で k3s をアップグレードする手順。
 
-> **Phase 1a 段階の注意 (2026-04 時点)**
+> **Phase 1b 着地 (2026-06 時点)**
 >
-> 現状はテスト worker 1 台 (`br-node5`) 限定の `nodeSelector` で運用中。
-> control-plane / 他 worker への展開、`window` (02:00-05:00 JST) の有効化、
-> etcd snapshot 取得は **Phase 1b で対応** (provisioner 別 proposal の決着後)。
-> 本 runbook の **「snapshot 取得」「rollback (snapshot restore)」「window 内
-> 自動進行」** は Phase 1b 対応の placeholder であり、現状は手作業 / 範囲限定。
+> `nodeSelector` を本番並び (server-plan = control-plane、agent-plan = worker)
+> に解放し、`window` (02:00-05:00 JST) を有効化した。事前 etcd snapshot は
+> **k3s 組み込みの自動スナップショット (12h ごと・全 CP)** をベースラインとして
+> 利用する。オンデマンド取得用の `make prod/k3s/snapshot` と `versions.yaml`
+> 同期は **provisioner 別 proposal のまま未着手** (受け入れ基準 #9 / #11)。
 >
 > Phase の定義は [`docs/proposals/k3s-upgrade.md`](../proposals/k3s-upgrade.md) 参照。
 
@@ -20,8 +20,8 @@ system-upgrade-controller (SUC) 経由で k3s をアップグレードする手�
 | Plan SoT | [`manifests/platform/system-upgrade-controller/app/base/{server,agent}-plan.yaml`](../../manifests/platform/system-upgrade-controller/app/base/) |
 | バージョン追跡 | Renovate customManager (`renovate.json` 内 `manifests/platform/system-upgrade-controller/.+\.ya?ml$` 対象) |
 | Renovate group | `k3s` (server-plan + agent-plan を 1 PR にまとめる) / `system-upgrade-controller` (controller + CRD URL を 1 PR にまとめる) |
-| etcd snapshot | **Phase 1b 対応** (provisioner 別 proposal) |
-| `window` | **未指定** (Phase 1b で 02:00-05:00 JST に絞る) |
+| etcd snapshot | k3s 組み込み自動スナップショット (12h ごと・全 CP)。オンデマンド `make prod/k3s/snapshot` は provisioner 別 proposal |
+| `window` | **02:00-05:00 JST** (両 Plan) |
 | concurrency | server: 1 / agent: 1 |
 | cordon | `cordon: true` (両 Plan、k3s-upgrade image が drain 実施) |
 
@@ -35,14 +35,21 @@ Renovate が `k3s` グループで PR を起票する (server-plan + agent-plan 
 - 関連 component (Cilium / Longhorn / Flux / cert-manager) との互換性表
 - minor 跨ぎなら下記 [minor upgrade チェックリスト](#minor-upgrade-チェックリスト) を必ず通す
 
-### 2. (Phase 1b で実体化) 事前 etcd snapshot 取得
+### 2. 事前 etcd snapshot の確認 (取得)
+
+k3s は既定で **12h ごとに全 control-plane で自動 etcd snapshot** を取得している。
+直近のスナップショットを `kubectl` で確認できる:
 
 ```sh
-# Phase 1b 以降:
-# make prod/k3s/snapshot
+kubectl get etcdsnapshotfile \
+  -o custom-columns='NODE:.spec.nodeName,TIME:.status.creationTime,NAME:.spec.snapshotName' \
+  | sort
+# 全 CP (br-node1/2/3) で当日の新しいスナップショットがあること
 ```
 
-provisioner 別 proposal で `make prod/k3s/snapshot` を実装するまでは **手動で**:
+直近の自動スナップショットで足りない場合や、確実に upgrade 直前の点を取りたい場合は
+**手動でオンデマンド取得**する (host CLI、`make prod/k3s/snapshot` は provisioner
+別 proposal で実装予定):
 
 ```sh
 # 全 control-plane (br-node1/2/3) で 1 ノードずつ実行
@@ -63,15 +70,23 @@ flux reconcile kustomization system-upgrade-controller-app
 kubectl get plans -n system-upgrade  # version が新しい値になっていること
 ```
 
-### 4. (Phase 1b で実体化) window 内に SUC が実行
+### 4. window 内に SUC が実行
 
-Phase 1b 以降は `window: 02:00-05:00 JST` 内に SUC が server → agent の順で Job を起動する。Phase 1a の現状は **window 未指定** なので apply 直後から実行される。
+`window: 02:00-05:00 JST` 内に SUC が server → agent の順で Job を起動する。
+window 外で `Plan` の `version` が更新されても Job は起こされず、次の window
+開始時に実行される。window 内に作られた Job は window 終了後も走り続ける。
+
+> **初回の本番 minor upgrade はライブ観察を推奨** (proposal リスク表)。
+> 無人の深夜実行を避けたい場合は、観察できる時間帯に合わせて window を一時的に
+> 調整するか、`window` 内に入ってから `kubectl get jobs -n system-upgrade -w` で
+> CP→worker の進行・API 断・Pod 退避を実機確認する。
 
 進行確認:
 
 ```sh
 kubectl get jobs -n system-upgrade -w
 # server-plan の Job が完了してから agent-plan の Job が起動することを確認
+kubectl get nodes -w  # VERSION が CP→worker の順に v1.36.1+k3s1 へ
 ```
 
 ### 5. 翌朝の post-check
@@ -135,7 +150,7 @@ minor 跨ぎ (`v1.X.Y` → `v1.(X+1).Y`) は patch より影響が大きいの�
 ### 注意
 
 - snapshot restore は **etcd データを巻き戻す** ので、restore 時刻以降に作られた Pod / Secret / ConfigMap は消える。restore は最終手段
-- Phase 1a 現状は snapshot 取得が手作業なので、Phase 1a 期間中の rollback は「snapshot 無し前提で Ansible 再 install のみ」が現実解
+- restore 元には k3s 自動スナップショット (12h ごと) か、upgrade 直前に手動取得したスナップショットを使う。snapshot 一覧は `kubectl get etcdsnapshotfile` で確認できる
 
 ## 個別ノード復旧
 
