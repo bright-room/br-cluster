@@ -42,7 +42,7 @@ spec:
   chart:
     spec:
       chart: argo-events
-      version: 2.4.21
+      version: 2.4.24
       sourceRef:
         kind: HelmRepository
         name: argo
