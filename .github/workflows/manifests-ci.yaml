@@ -32,7 +32,7 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925  # v4
         with:
-          version: "2026.7.13"
+          version: "2026.8.14"
           install: true
           cache: true
       - name: Build & validate cluster overlays
@@ -49,7 +49,7 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925  # v4
         with:
-          version: "2026.7.13"
+          version: "2026.8.14"
           install: true
           cache: true  # mise から helm / kustomize / flux2 を取得
       # flux-local は内部で pytest を起動し、root の pyproject.toml が
@@ -70,7 +70,7 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925  # v4
         with:
-          version: "2026.7.13"
+          version: "2026.8.14"
           install: true
           cache: true
       - run: make policy/test
