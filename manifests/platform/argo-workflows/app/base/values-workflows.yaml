@@ -80,6 +80,10 @@ controller:
       port: 5432
       database: argo_workflows
       tableName: argo_workflows
+      # br-db1 の pg_hba.conf は hostssl のみ許可。driver default (prefer) でも
+      # 実際は TLS で繋がるが、Zitadel (SSL.Mode: require) と揃えて明示する。
+      ssl: true
+      sslMode: require
       userNameSecret:
         name: argo-workflows-archive-db
         key: username
@@ -88,7 +92,7 @@ controller:
         key: password
 
 # Workflow 内で生成した artifact / log を Garage S3 に逃がす。
-# Loki / Tempo と同じバックエンドだが user / bucket は分離 (proposal §採用表)。
+# Loki / Tempo は撤去済みで、argo-workflows がこのバケットの唯一の利用者。
 artifactRepository:
   archiveLogs: true
   s3:

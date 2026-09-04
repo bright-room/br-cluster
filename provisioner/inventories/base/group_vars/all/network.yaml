@@ -3,7 +3,8 @@
 # Cluster configuration
 ##################################
 # 環境名。ドメインに 1 階層挟むことで dev / prod をゾーンごと分離する。
-cluster_env: prod
+# `generate-inventory` が inventories/{env}/group_vars/all/cluster_env.yaml
+# に書き出す (env inventory を base に重ねて実行するので、ここでは定義しない)。
 
 # 物理サーバーのホスト名が属するゾーン。
 host_domain: "{{ cluster_env }}.br-cluster.bright-room.net"

@@ -4,5 +4,7 @@
 metrics:
   enabled: true
 
-serviceMonitor:
-  enabled: true
+# ServiceMonitor is off (chart default): kube-prometheus-stack was removed on
+# this branch, so the monitoring.coreos.com/v1 CRD it provided no longer
+# exists, and the chart's ServiceMonitor template renders unconditionally
+# once serviceMonitor.enabled is true.

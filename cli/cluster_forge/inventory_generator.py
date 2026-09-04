@@ -172,7 +172,17 @@ def write_inventory(
     ch_path.write_text(ch_content)
     written.append(ch_path)
 
-    # 3. host_vars for gateways (wan_ip)
+    # 3. group_vars/all/cluster_env.yaml
+    env_dir = inv_dir / "group_vars" / "all"
+    env_dir.mkdir(parents=True, exist_ok=True)
+    env_path = env_dir / "cluster_env.yaml"
+    env_content = "---\n" + yaml.dump(
+        {"cluster_env": env}, Dumper=dumper, default_flow_style=False, sort_keys=False
+    )
+    env_path.write_text(env_content)
+    written.append(env_path)
+
+    # 4. host_vars for gateways (wan_ip)
     gw_vars = generate_gateway_host_vars(inventory, env, provider)
     for host_name, variables in gw_vars.items():
         hv_dir = inv_dir / "host_vars"

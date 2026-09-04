@@ -387,7 +387,7 @@ SQLite を選択したため k3s の etcd snapshot 機構は使えない。**ク
 
 | # | 対象 | 作業 |
 |---|---|---|
-| 1 | 1Password (`br-cluster-prod` vault) | `br-db1` / `br-storage1` / `br-observability1` / `br-ai1` / `br-cluster1-3` の各アイテムを新ホスト名で作成 (`hostname`, `ip_address`, `mac_address`, `admin_password`, `username`, `password`, `<name>_ssh`)。MAC は現物から引き継ぐ。**名前が変わらない `br-gateway1` も `ip_address` を `172.22.52.1` に更新する** (`generate-inventory` が 1Password から IP を読むため) |
+| 1 | 1Password (`br-cluster-prod` vault) | `br-db1` / `br-storage1` / `br-observability1` / `br-ai1` / `br-cluster1-3` の各アイテムを新ホスト名で作成 (`hostname`, `ip_address`, `mac_address`, `admin_password`, `username`, `password`, `<name>_ssh`)。MAC は現物から引き継ぐ。**名前が変わらない `br-gateway1` も `ip_address` を `172.22.52.1` に更新する** (`generate-inventory` が 1Password から IP を読むため)。加えて `postgresql` アイテムを新規作成する (`zitadel_password`, `argo_workflows_password`)。CloudNativePG が生成していたものを置き換える、人手で作る必要のあるアイテム |
 | 2 | `br-cloudflare-terraform` | infra トンネルの private network route を `172.22.10.0/24` → `172.22.52.0/24` に変更。**未対応だと移行後に WARP から LAN に入れなくなる** |
 | 3 | `br-cluster-zitadel-terraform` | state を作り直す。Longhorn / Grafana のアプリ定義を削除 (Argo Workflows の SSO 定義は維持) |
 | 4 | 物理ノード | 全 8 台で `free -h` と MAC を記録。**ディスクを消す前にしかできない** |

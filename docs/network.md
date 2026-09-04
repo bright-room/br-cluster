@@ -143,4 +143,4 @@ node-exporter / Alloy / etcd 向けのポート (`9100` / `9101` / `12345` / `23
 - [`docs/kubernetes.md`](kubernetes.md) — k3s 内部 (Cilium / Gateway 等)
 - [`docs/architecture.md`](architecture.md) — 設計判断 (なぜ Cloudflare Tunnel か等)
 - [`docs/network-nftables-guide.md`](network-nftables-guide.md) — nftables ルールの初学者向け解説
-- [`provisioner/inventories/prod/group_vars/all/cluster_hosts.yaml`](../provisioner/inventories/prod/group_vars/all/cluster_hosts.yaml) — ホスト IP/MAC の SoT
+- [`provisioner/inventories/base/group_vars/all/network.yaml`](../provisioner/inventories/base/group_vars/all/network.yaml) — ホスト IP/MAC は `make {env}/generate-inventory` が 1Password から `inventories/{env}/group_vars/all/cluster_hosts.yaml` (gitignored) に生成する。設定値そのものの SoT はこちら

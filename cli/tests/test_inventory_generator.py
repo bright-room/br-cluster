@@ -180,7 +180,8 @@ class TestWriteInventory:
     def test_creates_all_files(self, full_inventory: Inventory, tmp_path: Path) -> None:
         provider = MockSecretProvider()
         files = write_inventory(full_inventory, "dev", provider, tmp_path)
-        assert len(files) == 3  # hosts.yaml, cluster_hosts.yaml, gateway host_vars
+        # hosts.yaml, cluster_hosts.yaml, cluster_env.yaml, gateway host_vars
+        assert len(files) == 4
         assert (tmp_path / "inventories" / "dev" / "hosts.yaml").exists()
         assert (
             tmp_path
@@ -191,8 +192,22 @@ class TestWriteInventory:
             / "cluster_hosts.yaml"
         ).exists()
         assert (
+            tmp_path / "inventories" / "dev" / "group_vars" / "all" / "cluster_env.yaml"
+        ).exists()
+        assert (
             tmp_path / "inventories" / "dev" / "host_vars" / "br-gateway1.yaml"
         ).exists()
+
+    def test_cluster_env_yaml_contains_env(
+        self, full_inventory: Inventory, tmp_path: Path
+    ) -> None:
+        provider = MockSecretProvider()
+        write_inventory(full_inventory, "dev", provider, tmp_path)
+        content = (
+            tmp_path / "inventories" / "dev" / "group_vars" / "all" / "cluster_env.yaml"
+        ).read_text()
+        parsed = yaml.safe_load(content)
+        assert parsed == {"cluster_env": "dev"}
 
     def test_hosts_yaml_is_valid(
         self, full_inventory: Inventory, tmp_path: Path

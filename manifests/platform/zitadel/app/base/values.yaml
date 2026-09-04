@@ -46,7 +46,8 @@ zitadel:
           Username: zitadel
           SSL:
             Mode: require
-        # CNPG already provisioned DB + owner role; re-use the same role as
+        # br-db1 の PostgreSQL がデータベースとロールを作成済み
+        # (provisioner/roles/postgresql); re-use the same role as
         # Admin since it owns the database.
         Admin:
           Username: zitadel
@@ -66,7 +67,7 @@ env:
         name: zitadel-db
         key: password
 
-# Skip database/user/grant creation; CNPG already handled them.
+# Skip database/user/grant creation; br-db1 の PostgreSQL 側 (provisioner/roles/postgresql) が既に処理済み。
 initJob:
   command: "zitadel"
 
