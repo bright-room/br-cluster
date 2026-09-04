@@ -6,15 +6,18 @@
 #   - Cloudflare Access gates the hostname with WARP-only policy (no login block),
 #     plus an admin allowlist on /ui/console*. OIDC endpoints are Access-bypassed.
 #
-# Secrets wiring (via ExternalSecret -> onepassword-backend -> secret "zitadel-secrets"):
-#   - masterkey (32 bytes, ASCII) consumed through masterkeySecretName
-#   - db_password consumed via env (ZITADEL_DATABASE_POSTGRES_{USER,ADMIN}_PASSWORD)
+# Secrets wiring (via ExternalSecret -> onepassword-backend):
+#   - masterkey (32 bytes, ASCII) consumed through masterkeySecretName (secret "zitadel-secrets")
+#   - db password consumed via env (ZITADEL_DATABASE_POSTGRES_{USER,ADMIN}_PASSWORD),
+#     sourced from secret "zitadel-db" (1Password item "postgresql", same as
+#     the Ansible postgresql role that creates the DB role)
 #
 # Database:
-#   - platform-pg CNPG cluster already created the zitadel database and role
-#     via bootstrap.initdb. The zitadel role owns the database, so no CREATE
-#     privileges are needed. initJob.command is set to "zitadel" to skip
-#     database/user/grant provisioning and only run ZITADEL's own schema init.
+#   - br-db1 の PostgreSQL が zitadel データベースとロールを作成済み
+#     (provisioner/roles/postgresql)。zitadel ロールがデータベースを所有する
+#     ため CREATE 権限は不要。initJob.command は "zitadel" にして
+#     database/user/grant のプロビジョニングをスキップし、ZITADEL 自身の
+#     schema init のみ実行する。
 #
 # SMTP: intentionally unset. Mail (invites / password reset) is disabled until
 # Resend signup + DNS (SPF/DKIM/DMARC) is complete.
@@ -32,7 +35,7 @@ zitadel:
 
     Database:
       Postgres:
-        Host: platform-pg-rw.platform-pg.svc.cluster.local
+        Host: rdbms.prod.internal-service.bright-room.net
         Port: 5432
         Database: zitadel
         MaxOpenConns: 10
@@ -55,13 +58,13 @@ env:
   - name: ZITADEL_DATABASE_POSTGRES_USER_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: zitadel-secrets
-        key: db_password
+        name: zitadel-db
+        key: password
   - name: ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: zitadel-secrets
-        key: db_password
+        name: zitadel-db
+        key: password
 
 # Skip database/user/grant creation; CNPG already handled them.
 initJob:

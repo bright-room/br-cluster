@@ -69,7 +69,7 @@ controller:
               - name: message
                 value: "{{workflow.failures}}"
 
-  # Workflow 履歴は etcd ではなく platform-pg (CNPG) に逃がす。
+  # Workflow 履歴は etcd ではなく br-db1 の PostgreSQL に逃がす。
   # ttlStrategy で k8s 上の Workflow CR は短命にする一方、archive 経由で
   # UI から長期履歴を参照できる。
   persistence:
