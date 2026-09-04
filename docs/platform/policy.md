@@ -135,7 +135,7 @@ OCIRepository style では HelmRelease 自身に version が無いので、参�
 | ルール   | `metadata.annotations["lb-ipam.cilium.io/ips"]` が空でない値で設定されていること |
 | 違反例   | annotation 抜けで Cilium LB-IPAM の自動採番に流れる |
 
-詳細は [`docs/network.md`](../network.md) の「LB IP の払い出し方式」を参照。自動採番に流すと DNS / nftables / kube-vip と不整合になる。
+詳細は [`docs/network.md`](../network.md) の「LB IP の払い出し方式」を参照。自動採番に流すと DNS / nftables と不整合になる。
 
 ---
 

@@ -1,26 +1,23 @@
 # Networking
 
-クラスタの **CNI / クラスタ内 DNS / API VIP / Service LoadBalancer / Gateway / 外部公開 / DNS レコード反映** を担うコンポーネント群。物理 L2/L3 は [`docs/network.md`](../network.md) を参照。
+クラスタの **CNI / クラスタ内 DNS / Service LoadBalancer / Gateway / 外部公開 / DNS レコード反映** を担うコンポーネント群。物理 L2/L3 は [`docs/network.md`](../network.md) を参照。
 
 ## このグループが解決する課題
 
 - Pod 間ルーティングと NetworkPolicy (`Cilium`)
 - クラスタ内サービス名解決 (`CoreDNS`)
-- k8s API VIP の高可用化 (`kube-vip`)
-- LoadBalancer Service への IP 割当と LAN への ARP 広告 (`Cilium LB-IPAM` + `Cilium L2 Announcement` + `kube-vip svc_enable`)
+- LoadBalancer Service への IP 割当と LAN への ARP 広告 (`Cilium LB-IPAM` + `Cilium L2 Announcement`)
 - L7 ルーティング・TLS 終端・OIDC エッジ認可 (`Envoy Gateway` + Gateway API)
 - 自宅ルーターのポート開放を回避した外部公開 (`cloudflared` Tunnel)
-- Gateway/HTTPRoute から外部・内部 DNS への自動レコード反映 (`external-dns-cloudflare` / `external-dns-coredns`)
+- Gateway/HTTPRoute から外部 DNS への自動レコード反映 (`external-dns-cloudflare`)
 
 ## グループ全体構成
+
+<!-- TODO(figure): 2026-09-05 のノード再編を未反映。draw.io で更新が必要 -->
 
 外向き (HTTPS リクエスト) のフロー:
 
 ![クラスタ外部ネットワーク構成](../assets/networking-external.svg)
-
-LAN 内サービス (Loki push 等) のフロー:
-
-![クラスタ内部ネットワーク構成](../assets/networking-internal.svg)
 
 データプレーン / コントロールプレーンの依存関係:
 
@@ -32,9 +29,9 @@ LAN 内サービス (Loki push 等) のフロー:
 |---|---|---|---|
 | CNI | Cilium (eBPF) | flannel (k3s デフォルト) | NetworkPolicy / kube-proxy replacement / LB-IPAM を 1 本で完結。`disable-network-policy` も合わせて Cilium に集約 |
 | LB IP 割当 | Cilium LB-IPAM annotation 固定 | k3s servicelb / `spec.externalIPs` 手書き | プール管理 + 宣言的 IP 指定。詳細 → [`#lb-ip-払い出し`](#lb-ip-払い出し) |
-| ARP 広告 | Cilium L2 Announcement + kube-vip svc_enable の二重 | どちらか単独 | 2026-04-25 の grafana.b8m.app 502 で kube-vip svc_enable=false により VIP 未付与だった経緯から両方有効化 (`a71e010`) |
+| ARP 広告 | Cilium L2 Announcement 単独 | Cilium L2 + kube-vip svc_enable の二重 (kube-vip 撤去により単独化) | control-plane が 1 台になり API VIP 自体が不要になったため kube-vip を撤去。Service LB の ARP 広告は Cilium L2 Announcement のみで担う。2026-04-25 に `svc_enable: false` で LB IP が ARP されず 502 になった経緯があるため、単独化後は構築手順の中で `arping` により明示的に検証する ([`#ARP-広告`](#arp-広告)) |
 | Ingress | Envoy Gateway (Gateway API v1) | Traefik (k3s デフォルト) / Ingress (旧 API) | Gateway API + SecurityPolicy で OIDC をエッジ実装、HTTPRoute で namespace 越境を許可 |
-| Gateway 本数 | 1 本に統合 (`cluster-gateway`) + LAN 用 1 本 (`internal-gateway`) | `public-gateway` / `internal-gateway` / `cluster-gateway` の 3 本構成 | Cloudflare Access で in/out が分かれるので外向き 1 本で済む |
+| Gateway 本数 | cluster-gateway 1 本 | `public-gateway` / `internal-gateway` / `cluster-gateway` の 3 本構成 | Cloudflare Access で in/out が分かれるので外向き 1 本で済む。LAN 内向けの `internal-gateway` は利用者 (Loki push) ごと撤去 ([external-dns-coredns / internal-gateway の撤去](../proposals/2026-09-05-single-cp-rearch.md#external-dns-coredns--internal-gateway-の撤去)) |
 | 外部公開 | Cloudflare Tunnel + Access | DDNS + ポート開放 | 家庭ルーターに inbound を開けない。outbound QUIC のみ |
 | 外部 DNS 自動化 | external-dns v0.21.0 (Gateway API v1 native) | v0.20.x | v0.20.x は HTTPRoute v1 の annotation を読み落として A レコードが書かれていた事故あり |
 
@@ -42,31 +39,30 @@ LAN 内サービス (Loki push 等) のフロー:
 
 ## LB IP 払い出し
 
-外部公開用 (`172.22.10.70` cluster-gateway) と LAN 内向け (`172.22.10.71` internal-gateway) は LB-IPAM プール `172.22.10.64/26` の中から、**自動割当ではなくサービスの annotation で明示固定** している。プール定義は [`CiliumLoadBalancerIPPool default-pool`](../../manifests/platform/cilium/config/base/) (Cilium 節参照)。
+外部公開用 cluster-gateway (`172.22.52.200`) は LB-IPAM プール `172.22.52.192/26` の中から、**自動割当ではなくサービスの annotation で明示固定** している。プール定義は [`CiliumLoadBalancerIPPool default-pool`](../../manifests/platform/cilium/config/base/) (Cilium 節参照)。
 
 ```yaml
 # manifests/platform/envoy-gateway/config/base/envoy-proxy.yaml
 envoyService:
   annotations:
-    io.cilium/lb-ipam-ips: ${CLUSTER_GATEWAY_IP}   # 172.22.10.70
+    io.cilium/lb-ipam-ips: ${CLUSTER_GATEWAY_IP}   # 172.22.52.200
 ```
 
-### ARP 広告 (二重で有効)
+### ARP 広告
 
 | IP                              | ARP 広告主体 |
 |---------------------------------|--------------|
-| `172.22.10.60` (k8s-api)        | kube-vip DaemonSet (`vip_arp: true`) |
-| `172.22.10.70 / .71` (Service LB)| Cilium L2 Announcement Policy + kube-vip Service LB (`svc_enable: true`) |
+| `172.22.52.200` (Service LB、cluster-gateway) | `CiliumL2AnnouncementPolicy default-l2-announcement-policy` (`loadBalancerIPs: true`) |
 
-`svc_enable: false` にすると LB IP がどこからも ARP されなくなり外部公開系が全滅する (2026-04-25 `grafana.b8m.app` 502 の経緯)。両方有効化を維持する ([kube-vip 節](#kube-vip) も参照)。
+k8s API は control-plane が 1 台になったため VIP を持たず、`br-cluster1` の実 IP (`172.22.52.100`) がそのままエンドポイントになる。以前は kube-vip が API VIP と Service LB の ARP 広告を二重に担っていたが、kube-vip を撤去したため Service LB の ARP は Cilium L2 Announcement 単独になった。2026-04-25 に `svc_enable: false` で LB IP がどこからも ARP されず `grafana.b8m.app` が 502 になった経緯があるため、**構築手順の中で LAN 内の別ホストから `arping 172.22.52.200` を実行し、応答することを明示的に検証する** ([移行手順](../proposals/2026-09-05-single-cp-rearch.md#移行手順) 項番 8)。応答しない場合は Cilium L2 Announcement の設定を調査する。
 
 ### LB IP を増やすとき
 
 1. [`manifests/clusters/prod/config/cluster-settings.yaml`](../../manifests/clusters/prod/config/cluster-settings.yaml) に変数追加
 2. Service 側で `io.cilium/lb-ipam-ips` annotation を設定
-3. プール `172.22.10.64/26` の範囲内であることを確認
+3. プール `172.22.52.192/26` の範囲内であることを確認
 
-サブネット全体の IP 設計は [`docs/network.md#ホスト-ip--vip`](../network.md#ホスト-ip--vip) を参照。
+サブネット全体の IP 設計は [`docs/network.md`](../network.md) を参照。
 
 ---
 
@@ -80,7 +76,7 @@ eBPF ベースの CNI。CNI 機能だけでなく **kube-proxy 代替**、**LB-I
 
 - Helm values: [`manifests/platform/cilium/app/base/values.yaml`](../../manifests/platform/cilium/app/base/values.yaml)
 - 追加 CRD: [`manifests/platform/cilium/config/base/`](../../manifests/platform/cilium/config/base/)
-  - `CiliumLoadBalancerIPPool` `default-pool` (172.22.10.64/26)
+  - `CiliumLoadBalancerIPPool` `default-pool` (172.22.52.192/26)
   - `CiliumL2AnnouncementPolicy` `default-l2-announcement-policy` (eth0、externalIPs / loadBalancerIPs 両方有効)
 
 ### 設定の要点
@@ -97,7 +93,7 @@ eBPF ベースの CNI。CNI 機能だけでなく **kube-proxy 代替**、**LB-I
 ### 依存
 
 - 前提: なし (これが先頭、Helm CLI で先入れ)
-- 依存される側: 全 Pod、CoreDNS、kube-vip 以外のすべて
+- 依存される側: 全 Pod、CoreDNS 以外のすべて
 
 ### 運用上の注意
 
@@ -138,68 +134,23 @@ eBPF ベースの CNI。CNI 機能だけでなく **kube-proxy 代替**、**LB-I
 
 ---
 
-## kube-vip
-
-### 概要
-
-control-plane ノード上の DaemonSet で、**k8s API VIP `172.22.10.60` の ARP 広告**と、**Service LoadBalancer の ARP 広告**の 2 役を担う。
-
-### ソース
-
-- Helm values: [`manifests/platform/kube-vip/app/base/values.yaml`](../../manifests/platform/kube-vip/app/base/values.yaml) + `overlays/prod/values.yaml`
-
-### 設定の要点
-
-| 項目 | 値 |
-|------|----|
-| `config.address`         | `${KUBE_VIP_ADDRESS}` (= `172.22.10.60`) |
-| `cp_enable: "true"`      | Control plane VIP を有効化 |
-| `svc_enable: "true"` / `svc_election: "true"` | **Service LB の ARP も有効** |
-| `vip_arp: "true"`        | L2 (ARP) モード (BGP ではない) |
-| `vip_interface: "eth0"`  | prod overlay で明示 |
-| 配置                      | control-plane node のみ (`nodeAffinity`) |
-| Prometheus exporter      | `:2112` |
-
-### 依存
-
-- 前提: なし (Cilium と並行して Helm CLI で先入れ)
-- これに依存: secondary control-plane の join (API VIP 経由)、Service LB 全般
-
-### 運用上の注意
-
-- `svc_enable: false` にすると LB IP がどこからも ARP されなくなり、外部公開系が全滅する。2026-04-25 の grafana.b8m.app 502 がこのパターン
-- ARP は Cilium L2 Announcement とも重複するが、両方あった方が VIP の付与状態が見やすいため両方有効化
-
----
-
 ## Envoy Gateway
 
 ### 概要
 
-Gateway API v1 の実装。**外部公開用 `cluster-gateway`** と **LAN 内向け `internal-gateway`** の 2 本を運用。SecurityPolicy で OIDC をエッジ実装する。
+Gateway API v1 の実装。**外部公開用 `cluster-gateway`** の 1 本を運用。SecurityPolicy で OIDC をエッジ実装する。LAN 内向けの `internal-gateway` は撤去済み ([external-dns-coredns / internal-gateway の撤去](../proposals/2026-09-05-single-cp-rearch.md#external-dns-coredns--internal-gateway-の撤去))。
 
 ### ソース
 
 - Helm: [`manifests/platform/envoy-gateway/app/`](../../manifests/platform/envoy-gateway/app/)
 - リソース: [`manifests/platform/envoy-gateway/config/base/`](../../manifests/platform/envoy-gateway/config/base/)
   - `gateway-class.yaml` / `gateway.yaml` / `envoy-proxy.yaml` (cluster 用)
-  - `internal-gateway-class.yaml` / `internal-gateway.yaml` / `internal-envoy-proxy.yaml` (internal 用)
 
 ### Gateway 一覧
 
 | Gateway          | IP             | listener           | TLS                          | 用途 |
 |------------------|----------------|--------------------|------------------------------|------|
-| `cluster-gateway`| `172.22.10.70` | HTTPS:443 `*.b8m.app` | cert-manager (`letsencrypt-issuer`、`*.b8m.app`) | 外部公開、Cloudflare Tunnel origin |
-| `internal-gateway`| `172.22.10.71` | HTTP:80 `*.cluster-internal.bright-room.net` | なし (LAN クローズド) | 非 k3s ノードからの Loki push 等 |
-
-### `internal-gateway` の使い分け
-
-LAN 内クローズドな経路で、Cloudflare Tunnel を経由しない。クライアントによって in-cluster サービスへの到達手段を分けている:
-
-| クライアント | 経路 | 理由 |
-|--------------|------|------|
-| 非 k3s ノード (gateway1 / external1) の Alloy | `internal-gateway` (`172.22.10.71`) → HTTPRoute → Loki 等 | クラスタ外からは Service ClusterIP を引けないので Gateway 経由が必要 |
-| k3s ノード自身 (DaemonSet Alloy など) | `localhost:30800` (NodePort) → Loki | Cilium eBPF kube-proxy replacement が自ノードで NodePort を backend に変換するため、自ノードが L2 lease holder でなくても通る。Gateway を 1 ホップ減らせる |
+| `cluster-gateway`| `172.22.52.200` | HTTPS:443 `*.b8m.app` | cert-manager (`letsencrypt-issuer`、`*.b8m.app`) | 外部公開、Cloudflare Tunnel origin |
 
 ### LB IP 固定
 
@@ -219,7 +170,7 @@ Service の annotation `io.cilium/lb-ipam-ips: ${CLUSTER_GATEWAY_IP}` で Cilium
 ### 運用上の注意
 
 - `*.b8m.app` 証明書の更新失敗で全停する。`platform/certificate.md` の監視を要確認
-- HTTPRoute は別 namespace 配置可だが、`internal-gateway` の場合は `ReferenceGrant` で許可が必要
+- HTTPRoute は別 namespace 配置可だが、`cluster-gateway` の場合は `ReferenceGrant` で許可が必要
 
 ---
 
@@ -251,7 +202,7 @@ ingress:
 | 項目 | 値 / 備考 |
 |------|-----------|
 | Tunnel ID / credentials | 1Password Connect → External Secrets で `credentials.json` を Pod に注入 |
-| 転送先     | `https://172.22.10.70:443` (cluster-gateway VIP) |
+| 転送先     | `https://172.22.52.200:443` (cluster-gateway) |
 | `originServerName` | Envoy Gateway の strict SNI match に合わせて `cluster-gateway.b8m.app` を明示 |
 | `noTLSVerify`      | 内部接続なので証明書の SAN 検証は不要 |
 | メトリクス         | `:2000` |
@@ -302,39 +253,6 @@ ingress:
 
 ---
 
-## external-dns-coredns
-
-### 概要
-
-同じく external-dns。こちらは provider が `coredns`、書き込み先は **gateway1 の etcd (SkyDNS スキーマ)**。CoreDNS の `etcd` プラグインがそれを配信する。
-
-### ソース
-
-- Helm values: [`manifests/platform/external-dns-coredns/app/base/values.yaml`](../../manifests/platform/external-dns-coredns/app/base/values.yaml)
-
-### 設定の要点
-
-| 項目              | 値 |
-|-------------------|----|
-| provider          | `coredns` (community-maintained alpha) |
-| sources           | `gateway-httproute` |
-| domainFilters     | `cluster-internal.bright-room.net` |
-| image.tag         | `v0.21.0` (cloudflare 側と揃える) |
-| `ETCD_URLS`       | `${COREDNS_ETCD_URL}` = `http://172.22.10.1:2379` (LAN 内、認証なし) |
-| txtOwnerId        | `br-cluster-prod-internal` (cloudflare 側と分離) |
-
-### 依存
-
-- 前提: gateway1 の etcd 到達性 (nftables `in_pod_tcp_accept` で Pod CIDR から `:2379` 許可済み)
-- これに依存: 内部ゾーンの動的レコード (例: `internal-gateway` 配下のサービス名)
-
-### 運用上の注意
-
-- `coredns` provider は external-dns 内で **alpha** 扱い。将来削除されたら、SkyDNS スキーマを直接書く軽量コントローラに置換する想定 (CoreDNS の etcd プラグイン自体は安定)
-- etcd は **LAN 限定 / 認証なし**。nftables で Pod CIDR からのみ許可している前提なので、ファイアウォールを緩めないこと
-
----
-
 ## 外部公開フロー (`https://<svc>.b8m.app`)
 
 ブラウザから Pod までの一気通貫フロー。本グループの cloudflared / Envoy Gateway / external-dns-cloudflare / cert-manager (別グループ) が連携する。
@@ -346,7 +264,7 @@ sequenceDiagram
   participant CFA as Cloudflare Access
   participant CFT as Cloudflare Tunnel
   participant CFD as cloudflared Pod
-  participant EG as Envoy Gateway<br/>(172.22.10.70)
+  participant EG as Envoy Gateway<br/>(172.22.52.200)
   participant APP as App Pod
   U->>CFE: HTTPS *.b8m.app
   CFE->>CFA: GitHub Org + WARP posture チェック
@@ -374,4 +292,3 @@ sequenceDiagram
 - [`docs/architecture.md`](../architecture.md) — 認証 2 層、Gateway 統合の設計判断
 - [`docs/platform/certificate.md`](certificate.md) — `*.b8m.app` 証明書の発行
 - [`docs/platform/identity.md`](identity.md) — Zitadel OIDC (Envoy SecurityPolicy が参照)
-- [`docs/platform/observability.md`](observability.md) — Envoy アクセスログ / トレースの送り先
