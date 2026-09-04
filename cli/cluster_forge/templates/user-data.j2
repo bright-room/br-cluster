@@ -38,7 +38,7 @@ runcmd:
 power_state:
   mode: reboot
 {%- endif %}
-{%- if server_type == 'standalone' or (server_type == 'node' and k8s_role == 'worker') %}
+{%- if server_type == 'standalone' %}
 
 # Keep root partition at the size baked into the image. Ansible (init_disk.yaml)
 # will expand root to os_partition_size and create a dedicated data partition.

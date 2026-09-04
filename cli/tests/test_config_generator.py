@@ -69,7 +69,7 @@ class TestRenderUserData:
         assert "test-root-password" not in result
         assert "$6$" in result
 
-    def test_external_disables_root_autoexpand(
+    def test_standalone_disables_root_autoexpand(
         self, standalone_server: ServerDefinition
     ) -> None:
         secrets = MockSecretProvider().get_server_secrets("dev", standalone_server.name)
@@ -77,15 +77,14 @@ class TestRenderUserData:
         assert "mode: off" in result
         assert "resize_rootfs: false" in result
 
-    def test_worker_node_disables_root_autoexpand(
+    def test_worker_node_keeps_root_autoexpand(
         self, worker_node_server: ServerDefinition
     ) -> None:
         secrets = MockSecretProvider().get_server_secrets(
             "dev", worker_node_server.name
         )
         result = render_user_data(worker_node_server, secrets)
-        assert "mode: off" in result
-        assert "resize_rootfs: false" in result
+        assert "resize_rootfs" not in result
 
     def test_primary_node_keeps_root_autoexpand(
         self, node_server: ServerDefinition
