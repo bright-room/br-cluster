@@ -7,7 +7,7 @@ rollingUpdate:
 
 # Override the default server block so we can slip a `hosts` entry in
 # front of the kubernetes plugin. `auth.b8m.app` must resolve to the
-# Envoy Gateway VIP (CLUSTER_GATEWAY_IP, pinned by kube-vip) instead of
+# Envoy Gateway VIP (CLUSTER_GATEWAY_IP, advertised by Cilium L2) instead of
 # going out through the CF Tunnel. The Gateway terminates TLS with the
 # *.b8m.app cert and routes to the zitadel Service on 8080 via the
 # existing HTTPRoute, so in-cluster clients (tofu-controller runner,
