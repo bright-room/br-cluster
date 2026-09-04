@@ -1,5 +1,5 @@
-# cloudflared on br-external1: br-infra Tunnel client.
-# WARP private network 経由で mac から 172.22.10.0/24 (kubectl / SSH) に到達するための
+# cloudflared on br-gateway1: br-infra Tunnel client.
+# WARP private network 経由で mac から 172.22.52.0/24 (kubectl / SSH) に到達するための
 # Tunnel transport を提供する。Tunnel 本体・Route・Gateway Policy・WARP Profile は
 # br-cloudflare-terraform で IaC 管理 (zero_trust state)。
 # 詳細: docs/proposals/cloudflare-tunnel-warp-private-network.md

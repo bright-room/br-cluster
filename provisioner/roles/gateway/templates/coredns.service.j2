@@ -1,7 +1,7 @@
 [Unit]
 Description=CoreDNS DNS server
 Documentation=https://coredns.io
-After=network.target etcd.service
+After=network.target
 
 [Service]
 ExecStart={{ install_dir }}/coredns -conf /etc/coredns/Corefile

@@ -16,8 +16,3 @@
   service:
     name: caddy
     state: restarted
-
-- name: Restart cloudflared
-  service:
-    name: cloudflared
-    state: restarted
