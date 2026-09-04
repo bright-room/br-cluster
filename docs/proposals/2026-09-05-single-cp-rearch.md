@@ -312,6 +312,8 @@ Argo Events の実利用は 2 つだけで、いずれも代替可能または�
 
 証明書は `certbot` role を `br-db1` にも適用し、`br-storage1` と同じ DNS-01 (Cloudflare) の経路で発行する。`prod.internal-service.bright-room.net` は gateway1 の CoreDNS が権威で公開 DNS には A レコードが無いが、**DNS-01 チャレンジは `bright-room.net` ゾーンに TXT を置くだけなので発行できる** (環境名を挟んでラベルが深くなっても DNS-01 なら制約を受けない)。これは「案 A の `services` リストがホストをまたいで組み合わせられる」ことの実例でもある。
 
+DB の認証情報は **1Password の `postgresql` アイテム 1 つ**を唯一の出所とする (フィールド `zitadel_password` / `argo_workflows_password`)。Ansible の `postgresql` role がそこからロールを作り、k3s 側の Zitadel / Argo Workflows は同じアイテムを ExternalSecret 経由で読む。CNPG が Secret を自動生成していた経路が無くなるため、生成元と参照元を 1 箇所に揃える。
+
 `pg_hba.conf` は `172.22.52.0/24` からの `hostssl` を許可する。Cilium は Pod の外向き通信をノード IP に masquerade するため、`br-db1` から見た接続元は Pod CIDR (`10.42.0.0/16`) ではなく `br-cluster2` / `br-cluster3` のノード IP (`172.22.52.101` / `.102`) になる。
 
 **既存データは移行せず、両方とも空の DB から作り直す。** Zitadel は初期セットアップからやり直し、`br-cluster-zitadel-terraform` は state を作り直して apply する。ユーザーの再登録・MFA の再設定・1Password 側の client secret 更新が発生する。
