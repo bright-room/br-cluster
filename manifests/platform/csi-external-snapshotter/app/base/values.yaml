@@ -1,3 +1,0 @@
----
-# csi-external-snapshotter helm values (base)
-installCRDs: true
