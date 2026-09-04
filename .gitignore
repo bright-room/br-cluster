@@ -33,6 +33,7 @@ provisioner/collections/ansible_collections/
 provisioner/inventories/*/hosts.yaml
 !provisioner/inventories/base/hosts.yaml
 provisioner/inventories/*/group_vars/all/cluster_hosts.yaml
+provisioner/inventories/*/group_vars/all/cluster_env.yaml
 provisioner/inventories/*/host_vars/br-gateway1.yaml
 
 ### misc ###
