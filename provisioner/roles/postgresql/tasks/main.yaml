@@ -17,10 +17,31 @@
     mode: "0644"
   notify: Restart postgresql
 
+- name: Create PostgreSQL SSL directory
+  file:
+    path: "{{ postgresql_ssl_dir }}"
+    owner: postgres
+    group: postgres
+    mode: "0700"
+    state: directory
+
+- name: Copy SSL certificates for PostgreSQL
+  copy:
+    src: "{{ lets_encrypt.certificate_dir }}/{{ postgresql_tls_domain }}/{{ item.src }}"
+    dest: "{{ postgresql_ssl_dir }}/{{ item.dest }}"
+    owner: postgres
+    group: postgres
+    mode: "0600"
+    remote_src: true
+  loop:
+    - { src: "fullchain.pem", dest: "server.crt" }
+    - { src: "privkey.pem", dest: "server.key" }
+  notify: Restart postgresql
+
 - name: Configure TLS certificate paths
   lineinfile:
     path: "{{ postgresql_conf_dir }}/postgresql.conf"
-    regexp: "^#?{{ item.key }}"
+    regexp: "^#?\\s*{{ item.key }}\\s*="
     line: "{{ item.key }} = '{{ item.value }}'"
     owner: postgres
     group: postgres
@@ -29,9 +50,9 @@
     - key: ssl
       value: "on"
     - key: ssl_cert_file
-      value: "{{ lets_encrypt.certificate_dir }}/{{ postgresql_tls_domain }}/fullchain.pem"
+      value: "{{ postgresql_ssl_dir }}/server.crt"
     - key: ssl_key_file
-      value: "{{ lets_encrypt.certificate_dir }}/{{ postgresql_tls_domain }}/privkey.pem"
+      value: "{{ postgresql_ssl_dir }}/server.key"
   notify: Restart postgresql
 
 - name: Configure pg_hba.conf
