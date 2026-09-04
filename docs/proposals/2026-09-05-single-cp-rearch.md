@@ -310,7 +310,7 @@ Argo Events の実利用は 2 つだけで、いずれも代替可能または�
 
 接続先には IP ではなく `rdbms.prod.internal-service.bright-room.net` を使う ([ドメイン設計](#ドメイン設計))。証明書の SAN に生の IP を入れずに済み、将来 PostgreSQL を別ホストに移しても `service_records` の 1 行を書き換えるだけで済む。
 
-証明書は `certbot` role を `br-db1` にも適用し、`br-storage1` と同じ DNS-01 (Cloudflare) の経路で発行する。`prod.internal-service.bright-room.net` は gateway1 の CoreDNS が権威で公開 DNS には A レコードが無いが、**DNS-01 チャレンジは `bright-room.net` ゾーンに TXT を置くだけなので発行できる** (環境名を挟んでラベルが深くなっても DNS-01 なら制約を受けない)。これは「案 A の `services` リストがホストをまたいで組み合わせられる」ことの実例でもある。
+証明書は `certbot` role を `br-db1` にも適用し、`br-storage1` と同じ DNS-01 (Cloudflare) の経路で発行する。**certbot の `/etc/letsencrypt/live` は root 所有の 0700 なので、`postgres` ユーザーが読めるよう Garage と同じくコピーして所有者を移す** (証明書更新時の再コピーは certbot の deploy-hook が行う)。`prod.internal-service.bright-room.net` は gateway1 の CoreDNS が権威で公開 DNS には A レコードが無いが、**DNS-01 チャレンジは `bright-room.net` ゾーンに TXT を置くだけなので発行できる** (環境名を挟んでラベルが深くなっても DNS-01 なら制約を受けない)。これは「案 A の `services` リストがホストをまたいで組み合わせられる」ことの実例でもある。
 
 DB の認証情報は **1Password の `postgresql` アイテム 1 つ**を唯一の出所とする (フィールド `zitadel_password` / `argo_workflows_password`)。Ansible の `postgresql` role がそこからロールを作り、k3s 側の Zitadel / Argo Workflows は同じアイテムを ExternalSecret 経由で読む。CNPG が Secret を自動生成していた経路が無くなるため、生成元と参照元を 1 箇所に揃える。
 

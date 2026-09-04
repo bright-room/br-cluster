@@ -1300,7 +1300,7 @@ hostssl  all       all   {{ postgresql_allowed_cidr }}       scram-sha-256
 - name: Configure TLS certificate paths
   lineinfile:
     path: "{{ postgresql_conf_dir }}/postgresql.conf"
-    regexp: "^#?{{ item.key }}"
+    regexp: "^#?\\s*{{ item.key }}\\s*="
     line: "{{ item.key }} = '{{ item.value }}'"
     owner: postgres
     group: postgres
@@ -1422,13 +1422,62 @@ postgresql_databases:
 
 `roles/postgresql/defaults/main.yaml` からは `postgresql_databases` のブロックを削除する。
 
-- [ ] **Step 6: 証明書更新時のリロード hook を追加**
+- [ ] **Step 6: 証明書を PostgreSQL が読める場所にコピーし、更新 hook を追加**
 
-certbot が証明書を更新したときに PostgreSQL に読み直させる。`provisioner/roles/postgresql/templates/postgresql-ssl-reload.sh.j2` を作る。
+**certbot の `/etc/letsencrypt/live` と `/etc/letsencrypt/archive` は root 所有の 0700 で、`postgres` ユーザーはディレクトリを辿ることすらできない。** PostgreSQL に `/etc/letsencrypt/live/...` を直接指させると、起動時に `could not load private key file ... Permission denied` で落ちる。Garage と同じく、コピーして所有者を移す。
+
+`provisioner/roles/postgresql/defaults/main.yaml` に追記する。
+
+```yaml
+postgresql_ssl_dir: /etc/postgresql/ssl
+```
+
+`tasks/main.yaml` の TLS 設定タスクより **前** に、コピーを置く。
+
+```yaml
+- name: Create PostgreSQL SSL directory
+  file:
+    path: "{{ postgresql_ssl_dir }}"
+    owner: postgres
+    group: postgres
+    mode: "0700"
+    state: directory
+
+- name: Copy SSL certificates for PostgreSQL
+  copy:
+    src: "{{ lets_encrypt.certificate_dir }}/{{ postgresql_tls_domain }}/{{ item.src }}"
+    dest: "{{ postgresql_ssl_dir }}/{{ item.dest }}"
+    owner: postgres
+    group: postgres
+    mode: "0600"
+    remote_src: true
+  loop:
+    - { src: "fullchain.pem", dest: "server.crt" }
+    - { src: "privkey.pem", dest: "server.key" }
+  notify: Restart postgresql
+```
+
+Step 4 の `Configure TLS certificate paths` の `ssl_cert_file` / `ssl_key_file` は、この配置先を指す。
+
+```yaml
+    - key: ssl_cert_file
+      value: "{{ postgresql_ssl_dir }}/server.crt"
+    - key: ssl_key_file
+      value: "{{ postgresql_ssl_dir }}/server.key"
+```
+
+`provisioner/roles/postgresql/templates/postgresql-ssl-reload.sh.j2` を作る。certbot が更新したら再コピーしてから reload する。
 
 ```bash
 #!/bin/sh
 # Managed by br-cluster-provisioner (postgresql role). Do not edit manually.
+set -eu
+install -o postgres -g postgres -m 0600 \
+  {{ lets_encrypt.certificate_dir }}/{{ postgresql_tls_domain }}/fullchain.pem \
+  {{ postgresql_ssl_dir }}/server.crt
+install -o postgres -g postgres -m 0600 \
+  {{ lets_encrypt.certificate_dir }}/{{ postgresql_tls_domain }}/privkey.pem \
+  {{ postgresql_ssl_dir }}/server.key
 systemctl reload postgresql@{{ postgresql_version }}-main
 ```
 
@@ -1443,8 +1492,6 @@ systemctl reload postgresql@{{ postgresql_version }}-main
     group: root
     mode: "0700"
 ```
-
-PostgreSQL は証明書ファイルを直接参照する (Garage のようにコピーしない) ので、`reload` だけでよい。
 
 - [ ] **Step 7: `community.postgresql` コレクションを requirements に追加**
 
