@@ -15,7 +15,7 @@ def test_load_inventory_from_project_root() -> None:
     gateway = next(s for s in inventory.servers if s.name == "br-gateway1")
     assert gateway.type == ServerType.GATEWAY
 
-    node = next(s for s in inventory.servers if s.name == "br-node1")
+    node = next(s for s in inventory.servers if s.name == "br-cluster1")
     assert node.type == ServerType.NODE
     assert node.k8s_role is not None
 

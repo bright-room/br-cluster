@@ -99,3 +99,17 @@ class TestLint:
         args = mock_run.call_args[0][0]
         assert "ansible-lint" in args
         assert "playbooks/" in args
+
+
+class TestPlaybookRename:
+    def test_setup_standalone_registered(self) -> None:
+        from cluster_forge.provisioner import PLAYBOOK_COMMANDS
+
+        assert PLAYBOOK_COMMANDS["setup-standalone"] == (
+            "playbooks/setup_standalone.yaml"
+        )
+
+    def test_setup_external_removed(self) -> None:
+        from cluster_forge.provisioner import PLAYBOOK_COMMANDS
+
+        assert "setup-external" not in PLAYBOOK_COMMANDS
