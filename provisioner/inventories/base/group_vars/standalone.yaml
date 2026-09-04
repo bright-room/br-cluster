@@ -1,0 +1,6 @@
+---
+# standalone ホスト専用の override。k3s の外にいて再起動を調整する仕組みが
+# 無いため、unattended-upgrades 自身で reboot させる。
+# 04:00 JST に再起動 (gateway (03:00) と被らせない)。
+unattended_upgrades_automatic_reboot: true
+unattended_upgrades_automatic_reboot_time: "04:00"

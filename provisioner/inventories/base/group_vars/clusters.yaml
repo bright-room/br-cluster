@@ -5,10 +5,3 @@ k3s:
     port: "6443"
 
 k3s_api_domain: "k8s-api.{{ service_domain }}"
-
-# k3s ノードは localhost の NodePort 経由で Loki に push する。
-# Cilium eBPF kube-proxy replacement が NodePort → backend pod に変換する
-# ので自ノードが internal-gateway の L2 lease holder でも問題なし。
-# 非 k3s ノード (gateway / external) はこの経路が使えないので defaults
-# (ドメイン経由) のまま使う。
-alloy_journal_loki_push_url: "http://127.0.0.1:30800/loki/api/v1/push"

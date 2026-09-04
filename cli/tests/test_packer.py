@@ -13,9 +13,9 @@ class TestGeneratePkrvars:
         assert "network-config" in result
 
     def test_node_excludes_network_config(self, tmp_path: Path) -> None:
-        server = ServerDefinition(name="br-node1", type=ServerType.NODE)
+        server = ServerDefinition(name="br-cluster1", type=ServerType.NODE)
         result = generate_pkrvars(server, "dev", tmp_path)
-        assert 'hostname = "br-node1"' in result
+        assert 'hostname = "br-cluster1"' in result
         assert "user-data" in result
         assert "network-config" not in result
 
@@ -26,7 +26,7 @@ class TestGeneratePkrvars:
         assert "network-config" not in result
 
     def test_valid_hcl_format(self, tmp_path: Path) -> None:
-        server = ServerDefinition(name="br-node1", type=ServerType.NODE)
+        server = ServerDefinition(name="br-cluster1", type=ServerType.NODE)
         result = generate_pkrvars(server, "dev", tmp_path)
         assert "cloud_config_files = [" in result
         assert result.endswith("]\n")

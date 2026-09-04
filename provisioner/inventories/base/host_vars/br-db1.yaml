@@ -1,0 +1,18 @@
+---
+##################################
+# Storage configuration
+# OS ディスクの残り領域を PostgreSQL のデータ置き場として使う
+##################################
+storage_mode: ext4
+mount_point: /var/lib/postgresql
+
+##################################
+# Let's Encrypt configuration
+##################################
+lets_encrypt:
+  virtual_environment: /lets_encrypt
+  certificate_dir: /etc/letsencrypt/live
+  deploy_hook_dir: /etc/letsencrypt/renewal-hooks/deploy
+
+certbot_domains:
+  - "rdbms.{{ service_domain }}"

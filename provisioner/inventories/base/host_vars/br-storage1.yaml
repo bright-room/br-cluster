@@ -6,7 +6,6 @@
 storage_mode: ext4
 mount_point: /storage
 
-
 ##################################
 # Let's Encrypt configuration
 ##################################
@@ -14,6 +13,9 @@ lets_encrypt:
   virtual_environment: /lets_encrypt
   certificate_dir: /etc/letsencrypt/live
   deploy_hook_dir: /etc/letsencrypt/renewal-hooks/deploy
+
+certbot_domains:
+  - "object-storage.{{ service_domain }}"
 
 ##################################
 # Garage S3 configuration
@@ -35,19 +37,10 @@ garage:
   provisioning:
     region: ap-northeast-1
     buckets:
-      - name: loki
-      - name: tempo
       - name: argo-workflows
     users:
-      - name: loki
-        bucket_acl:
-          bucket_name: loki
-      - name: tempo
-        bucket_acl:
-          bucket_name: tempo
       # 1Password garage item の field label は <name>_access_key_id 形式。
-      # 既存の loki/tempo に合わせ underscore 付きで unique 化するため user.name
-      # は argo_workflows (S3 bucket は伝統的に hyphen で命名するので分離)。
+      # S3 bucket は伝統的に hyphen で命名するので user.name とは分離する。
       - name: argo_workflows
         bucket_acl:
           bucket_name: argo-workflows

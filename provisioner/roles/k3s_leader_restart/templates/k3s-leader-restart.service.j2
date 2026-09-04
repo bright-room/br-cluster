@@ -1,9 +1,0 @@
-# Managed by Ansible (role: k3s_leader_restart). Do not edit manually.
-[Unit]
-Description=Restart k3s if this node holds a leader role
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/k3s-leader-restart
