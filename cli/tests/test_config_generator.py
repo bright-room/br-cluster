@@ -70,10 +70,10 @@ class TestRenderUserData:
         assert "$6$" in result
 
     def test_external_disables_root_autoexpand(
-        self, external_server: ServerDefinition
+        self, standalone_server: ServerDefinition
     ) -> None:
-        secrets = MockSecretProvider().get_server_secrets("dev", external_server.name)
-        result = render_user_data(external_server, secrets)
+        secrets = MockSecretProvider().get_server_secrets("dev", standalone_server.name)
+        result = render_user_data(standalone_server, secrets)
         assert "mode: off" in result
         assert "resize_rootfs: false" in result
 
@@ -157,7 +157,7 @@ class TestGenerateConfig:
         tmp_output: Path,
     ) -> None:
         generate_config(node_server, "dev", mock_provider, tmp_output)
-        assert (tmp_output / "dev" / "br-node1" / "user-data").exists()
+        assert (tmp_output / "dev" / "br-cluster1" / "user-data").exists()
 
     def test_user_data_is_valid_yaml(
         self,
@@ -166,7 +166,7 @@ class TestGenerateConfig:
         tmp_output: Path,
     ) -> None:
         generate_config(node_server, "dev", mock_provider, tmp_output)
-        content = (tmp_output / "dev" / "br-node1" / "user-data").read_text()
+        content = (tmp_output / "dev" / "br-cluster1" / "user-data").read_text()
         parsed = yaml.safe_load(content)
-        assert parsed["hostname"] == "br-node1"
+        assert parsed["hostname"] == "br-cluster1"
         assert parsed["timezone"] == "JST"

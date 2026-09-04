@@ -52,3 +52,37 @@ servers:
 
     with pytest.raises(ValueError):
         load_inventory(path)
+
+
+class TestStandaloneServerType:
+    def test_standalone_type_exists(self) -> None:
+        from cluster_forge.models import ServerType
+
+        assert ServerType.STANDALONE == "standalone"
+
+    def test_external_type_removed(self) -> None:
+        from cluster_forge.models import ServerType
+
+        assert not hasattr(ServerType, "EXTERNAL")
+
+    def test_services_defaults_to_empty_list(self) -> None:
+        from cluster_forge.models import ServerDefinition, ServerType
+
+        server = ServerDefinition(name="br-ai1", type=ServerType.STANDALONE)
+        assert server.services == []
+
+    def test_services_accepts_list(self) -> None:
+        from cluster_forge.models import ServerDefinition, ServerType
+
+        server = ServerDefinition(
+            name="br-storage1",
+            type=ServerType.STANDALONE,
+            services=["garage", "caddy", "certbot"],
+        )
+        assert server.services == ["garage", "caddy", "certbot"]
+
+    def test_standalone_does_not_need_network_config(self) -> None:
+        from cluster_forge.models import ServerDefinition, ServerType
+
+        server = ServerDefinition(name="br-db1", type=ServerType.STANDALONE)
+        assert server.needs_network_config is False
