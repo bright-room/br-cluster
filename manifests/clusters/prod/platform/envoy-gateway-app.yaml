@@ -36,20 +36,3 @@ spec:
     substituteFrom:
       - kind: ConfigMap
         name: cluster-settings
----
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: envoy-gateway-monitoring
-  namespace: flux-system
-spec:
-  interval: 30m
-  targetNamespace: envoy-gateway-system
-  sourceRef:
-    kind: GitRepository
-    name: flux-system
-  dependsOn:
-    - name: envoy-gateway-app
-    - name: kube-prometheus-stack-app
-  path: ./manifests/platform/envoy-gateway/monitoring/overlays/prod
-  prune: true

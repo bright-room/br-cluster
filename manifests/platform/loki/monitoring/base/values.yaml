@@ -1,7 +1,0 @@
----
-# loki helm values (monitoring)
-# Deployed separately to ensure ServiceMonitor CRD exists (kube-prometheus-stack)
-
-monitoring:
-  serviceMonitor:
-    enabled: true
