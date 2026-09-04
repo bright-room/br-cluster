@@ -54,21 +54,3 @@ spec:
   path: ./manifests/platform/argo-workflows/samples/overlays/prod
   prune: true
   timeout: 5m
----
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: argo-workflows-notify
-  namespace: flux-system
-spec:
-  interval: 30m
-  targetNamespace: argo-workflows
-  sourceRef:
-    kind: GitRepository
-    name: flux-system
-  dependsOn:
-    - name: argo-workflows-app
-    - name: external-secrets-config
-  path: ./manifests/platform/argo-workflows/notify/overlays/prod
-  prune: true
-  timeout: 5m

@@ -4,6 +4,3 @@ kind: Kustomization
 resources:
   - cronworkflow-hello.yaml
   - workflowtemplate-dag.yaml
-  - sensor-rbac.yaml
-  - eventsource-webhook.yaml
-  - sensor-webhook.yaml

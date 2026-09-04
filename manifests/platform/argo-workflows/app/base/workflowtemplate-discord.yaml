@@ -9,19 +9,11 @@
 #   - webhook URL を Sensor manifest に焼き込まずに済む
 #     (Pod env から runtime に読む、通常の Secret パターン)
 #   - 文言 / フォーマット を script で自由に組める
-#
-# notify.b8m.app/skip: "true" ラベルを workflowMetadata に付けて、Sensor の
-# expr filter で再帰トリガを防ぐ。
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: notify-discord
-  labels:
-    notify.b8m.app/skip: "true"
 spec:
-  workflowMetadata:
-    labels:
-      notify.b8m.app/skip: "true"
   serviceAccountName: argo-workflow
   ttlStrategy:
     secondsAfterCompletion: 600

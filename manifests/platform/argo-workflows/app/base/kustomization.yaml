@@ -7,15 +7,12 @@ resources:
   - externalsecret-archive.yaml
   - externalsecret-artifact.yaml
   - externalsecret-sso.yaml
-  - eventbus.yaml
   - rbac-sso.yaml
+  - workflowtemplate-discord.yaml
 
 configMapGenerator:
   - name: argo-workflows-helm-values
     files:
       - base-values.yaml=values-workflows.yaml
-  - name: argo-events-helm-values
-    files:
-      - base-values.yaml=values-events.yaml
 configurations:
   - kustomizeconfig.yaml
