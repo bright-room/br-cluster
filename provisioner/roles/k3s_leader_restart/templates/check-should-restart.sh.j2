@@ -34,19 +34,11 @@ cm_leader=$(kubectl -n kube-system get lease kube-controller-manager \
 sched_leader=$(kubectl -n kube-system get lease kube-scheduler \
   -o jsonpath='{.spec.holderIdentity}' 2>/dev/null | cut -d_ -f1 || true)
 
-# kube-vip CP lock holder = current API VIP holder. kube-vip is a DaemonSet
-# Pod, so `systemctl restart k3s` does not directly move it; tracking it
-# here keeps the lease in scope of "leader-ness" so we still rotate when
-# this node has been the API VIP holder.
-cp_lock_leader=$(kubectl -n kube-system get lease plndr-cp-lock \
-  -o jsonpath='{.spec.holderIdentity}' 2>/dev/null || true)
-
-echo "self=${SELF} etcd_leader=${etcd_leader:-?} cm=${cm_leader:-?} sched=${sched_leader:-?} cp_lock=${cp_lock_leader:-?}"
+echo "self=${SELF} etcd_leader=${etcd_leader:-?} cm=${cm_leader:-?} sched=${sched_leader:-?}"
 
 if [[ "${etcd_leader:-0}" == "1" \
    || "${cm_leader:-}" == "${SELF}" \
-   || "${sched_leader:-}" == "${SELF}" \
-   || "${cp_lock_leader:-}" == "${SELF}" ]]; then
+   || "${sched_leader:-}" == "${SELF}" ]]; then
   echo "holding leader role(s): restart"
   exit 0
 fi
