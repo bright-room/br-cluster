@@ -1,4 +1,9 @@
 ---
+- name: Install certbot prerequisite packages
+  apt:
+    name: "{{ certbot_packages }}"
+    state: present
+
 - name: Delete old certbot working directories
   file:
     path: "{{ lets_encrypt.virtual_environment }}"
@@ -52,3 +57,21 @@
     user: "root"
     disabled: false
     state: present
+
+- name: Create SSL certificate
+  command: |
+    {{ lets_encrypt.virtual_environment }}/bin/certbot certonly \
+      --dns-cloudflare \
+      --dns-cloudflare-credentials {{ lets_encrypt.virtual_environment }}/.secrets/cloudflare_credentials.ini \
+      --dns-cloudflare-propagation-seconds 60 \
+      --server https://acme-v02.api.letsencrypt.org/directory \
+      --agree-tos \
+      --non-interactive \
+      --rsa-key-size 4096 \
+      --email {{ secrets_admin_email }} \
+      --domain {{ item }}
+  loop: "{{ certbot_domains }}"
+  register: certbot_create
+  changed_when:
+    - certbot_create.rc == 0
+    - '"Certificate not yet due for renewal; no action taken." not in certbot_create.stdout'

@@ -1,17 +1,18 @@
-{% set ext = cluster_hosts | selectattr('name', 'equalto', 'br-external1') | first %}
+{% set host = cluster_hosts | selectattr('name', 'equalto', 'br-storage1') | first %}
+{% set object_storage_domain = 'object-storage.' ~ service_domain %}
 {
     auto_https off
     admin off
 }
 
-{{ ext.domains.object_storage }}:{{ garage.server.s3_port }} {
-    bind {{ ext.ip }}
+{{ object_storage_domain }}:{{ garage.server.s3_port }} {
+    bind {{ host.ip }}
     tls {{ garage.ssl_dir }}/public.crt {{ garage.ssl_dir }}/private.key
     reverse_proxy 127.0.0.1:{{ garage.server.s3_port }}
 }
 
-{{ ext.domains.object_storage }}:443 {
-    bind {{ ext.ip }}
+{{ object_storage_domain }}:443 {
+    bind {{ host.ip }}
     tls {{ garage.ssl_dir }}/public.crt {{ garage.ssl_dir }}/private.key
     reverse_proxy 127.0.0.1:{{ garage.server.web_port }}
 }

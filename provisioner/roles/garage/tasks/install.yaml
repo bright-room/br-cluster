@@ -1,9 +1,5 @@
 ---
 # --- Pre setup ---
-- name: Set external host info
-  set_fact:
-    external_host: "{{ cluster_hosts | selectattr('name', 'equalto', 'br-external1') | first }}"
-
 - name: Add garage operator user
   user:
     name: "{{ garage.operator.user }}"
@@ -30,26 +26,9 @@
     - "{{ garage.config_dir }}"
     - "{{ garage.ssl_dir }}"
 
-- name: Create SSL certificate
-  command: |
-    {{ lets_encrypt.virtual_environment }}/bin/certbot certonly \
-      --dns-cloudflare \
-      --dns-cloudflare-credentials {{ lets_encrypt.virtual_environment }}/.secrets/cloudflare_credentials.ini \
-      --dns-cloudflare-propagation-seconds 60 \
-      --server https://acme-v02.api.letsencrypt.org/directory \
-      --agree-tos \
-      --non-interactive \
-      --rsa-key-size 4096 \
-      --email {{ secrets_admin_email }} \
-      --domain {{ external_host.domains.object_storage }}
-  register: certbot_create
-  changed_when:
-    - certbot_create.rc == 0
-    - '"Certificate not yet due for renewal; no action taken." not in certbot_create.stdout'
-
 - name: Copy SSL certificates for Garage
   copy:
-    src: "{{ lets_encrypt.certificate_dir }}/{{ external_host.domains.object_storage }}/{{ item.src }}"
+    src: "{{ lets_encrypt.certificate_dir }}/{{ garage_tls_domain }}/{{ item.src }}"
     dest: "{{ garage.ssl_dir }}/{{ item.dest }}"
     group: "{{ garage.operator.group }}"
     owner: "{{ garage.operator.user }}"
@@ -154,13 +133,3 @@
   failed_when: false
   environment:
     GARAGE_CONFIG_FILE: "{{ garage.config_dir }}/garage.toml"
-
-# --- Buckets and keys ---
-- name: Create buckets
-  include_tasks: garage_buckets.yaml
-
-- name: Create access keys
-  include_tasks: garage_keys.yaml
-  with_items: "{{ garage.provisioning.users }}"
-  loop_control:
-    loop_var: garage_user_item
