@@ -51,6 +51,7 @@ PR 1 → 2 → 3 の順に進める。PR 2 は PR 1 の `services` フィール�
 
 **Files:**
 - Modify: `cli/cluster_forge/models.py`
+- Modify: `cli/tests/conftest.py`
 - Test: `cli/tests/test_inventory.py`
 
 **Interfaces:**
@@ -130,15 +131,104 @@ class ServerDefinition(BaseModel):
 
 `services: list[str] = []` は pydantic v2 では安全 (mutable default はモデルごとにコピーされる)。
 
-- [ ] **Step 4: テストが通ることを確認**
+- [ ] **Step 4: `conftest.py` のフィクスチャを新ノードマップに更新**
+
+`ServerType.EXTERNAL` を消すと `cli/tests/conftest.py` が構築時に落ち、pytest が**収集の段階で失敗する**。Task 2 以降の「テストを走らせて失敗を見る」が成立しなくなるので、フィクスチャの更新はここで済ませる。
+
+`cli/tests/conftest.py` の `gateway_server` から `full_inventory` までを次で置き換える。`external_server` フィクスチャは削除し、`standalone_server` に置き換える。
+
+```python
+@pytest.fixture
+def gateway_server() -> ServerDefinition:
+    return ServerDefinition(name="br-gateway1", type=ServerType.GATEWAY)
+
+
+@pytest.fixture
+def node_server() -> ServerDefinition:
+    return ServerDefinition(
+        name="br-cluster1", type=ServerType.NODE, k8s_role=K8sRole.PRIMARY
+    )
+
+
+@pytest.fixture
+def standalone_server() -> ServerDefinition:
+    return ServerDefinition(
+        name="br-storage1",
+        type=ServerType.STANDALONE,
+        services=["garage", "caddy", "certbot"],
+    )
+
+
+@pytest.fixture
+def worker_node_server() -> ServerDefinition:
+    return ServerDefinition(
+        name="br-cluster2", type=ServerType.NODE, k8s_role=K8sRole.WORKER
+    )
+
+
+@pytest.fixture
+def sample_inventory() -> Inventory:
+    return Inventory(
+        environments=["dev", "prod"],
+        servers=[
+            ServerDefinition(name="br-gateway1", type=ServerType.GATEWAY),
+            ServerDefinition(
+                name="br-cluster1", type=ServerType.NODE, k8s_role=K8sRole.PRIMARY
+            ),
+            ServerDefinition(
+                name="br-storage1",
+                type=ServerType.STANDALONE,
+                services=["garage", "caddy", "certbot"],
+            ),
+        ],
+    )
+
+
+@pytest.fixture
+def full_inventory() -> Inventory:
+    return Inventory(
+        environments=["dev", "prod"],
+        servers=[
+            ServerDefinition(name="br-gateway1", type=ServerType.GATEWAY),
+            ServerDefinition(
+                name="br-db1",
+                type=ServerType.STANDALONE,
+                services=["postgresql", "certbot"],
+            ),
+            ServerDefinition(
+                name="br-storage1",
+                type=ServerType.STANDALONE,
+                services=["garage", "caddy", "certbot"],
+            ),
+            ServerDefinition(name="br-observability1", type=ServerType.STANDALONE),
+            ServerDefinition(name="br-ai1", type=ServerType.STANDALONE),
+            ServerDefinition(
+                name="br-cluster1", type=ServerType.NODE, k8s_role=K8sRole.PRIMARY
+            ),
+            ServerDefinition(
+                name="br-cluster2", type=ServerType.NODE, k8s_role=K8sRole.WORKER
+            ),
+            ServerDefinition(
+                name="br-cluster3", type=ServerType.NODE, k8s_role=K8sRole.WORKER
+            ),
+        ],
+    )
+```
+
+`external_server` フィクスチャを参照しているテストが他にあれば `standalone_server` に読み替える。
+
+Run: `grep -rn 'external_server' cli/tests/`
+Expected: 出力なし
+
+- [ ] **Step 5: 新しいテストが通ることを確認**
 
 Run: `uv run pytest cli/tests/test_inventory.py::TestStandaloneServerType -v`
 Expected: PASS
 
-- [ ] **Step 5: 既存テストが壊れた箇所を確認**
+- [ ] **Step 6: 残りの失敗箇所を確認**
 
 Run: `uv run pytest -v 2>&1 | tail -40`
-Expected: `ServerType.EXTERNAL` を参照している箇所 (`cli/tests/conftest.py`, `cli/tests/test_inventory_generator.py`, `cli/cluster_forge/inventory_generator.py`) が FAIL する。これは Task 2 / 3 で直す。**この時点ではコミットしない。**
+Expected: 収集は成功する。`ServerType.EXTERNAL` を参照する `cli/cluster_forge/inventory_generator.py` と、旧ホスト名を期待する `cli/tests/test_inventory_generator.py` / `cli/tests/test_bootstrap.py` が FAIL する。これは Task 2–4 で直す。**この時点ではコミットしない。**
 
 ## Task 2: `_build_domains()` からホスト種別の分岐を削除
 
@@ -222,95 +312,18 @@ Expected: PASS
 
 **Files:**
 - Modify: `cli/cluster_forge/inventory_generator.py:38-76`
-- Test: `cli/tests/test_inventory_generator.py`, `cli/tests/conftest.py`
+- Test: `cli/tests/test_inventory_generator.py`
 
 **Interfaces:**
-- Consumes: Task 1 の `ServerDefinition.services`
+- Consumes: Task 1 の `ServerDefinition.services` と Step 4 で更新済みの `cli/tests/conftest.py`
 - Produces: `generate_hosts_yaml()` が `all.children` に `br_cluster` / `gateway` / `clusters` / `standalone` と、`services` に現れた各サービス名のグループを持つ dict を返す。`external` グループは無くなる。
 
-- [ ] **Step 1: conftest のフィクスチャを新ノードマップに更新**
+- [ ] **Step 1: フィクスチャが更新済みであることを確認**
 
-`cli/tests/conftest.py` の `external_server` / `sample_inventory` / `full_inventory` を置き換える。`node_server` / `worker_node_server` も新ホスト名にする。
+`cli/tests/conftest.py` のフィクスチャは Task 1 Step 4 で新ノードマップに更新済み。
 
-```python
-@pytest.fixture
-def gateway_server() -> ServerDefinition:
-    return ServerDefinition(name="br-gateway1", type=ServerType.GATEWAY)
-
-
-@pytest.fixture
-def node_server() -> ServerDefinition:
-    return ServerDefinition(
-        name="br-cluster1", type=ServerType.NODE, k8s_role=K8sRole.PRIMARY
-    )
-
-
-@pytest.fixture
-def standalone_server() -> ServerDefinition:
-    return ServerDefinition(
-        name="br-storage1",
-        type=ServerType.STANDALONE,
-        services=["garage", "caddy", "certbot"],
-    )
-
-
-@pytest.fixture
-def worker_node_server() -> ServerDefinition:
-    return ServerDefinition(
-        name="br-cluster2", type=ServerType.NODE, k8s_role=K8sRole.WORKER
-    )
-
-
-@pytest.fixture
-def sample_inventory() -> Inventory:
-    return Inventory(
-        environments=["dev", "prod"],
-        servers=[
-            ServerDefinition(name="br-gateway1", type=ServerType.GATEWAY),
-            ServerDefinition(
-                name="br-cluster1", type=ServerType.NODE, k8s_role=K8sRole.PRIMARY
-            ),
-            ServerDefinition(
-                name="br-storage1",
-                type=ServerType.STANDALONE,
-                services=["garage", "caddy", "certbot"],
-            ),
-        ],
-    )
-
-
-@pytest.fixture
-def full_inventory() -> Inventory:
-    return Inventory(
-        environments=["dev", "prod"],
-        servers=[
-            ServerDefinition(name="br-gateway1", type=ServerType.GATEWAY),
-            ServerDefinition(
-                name="br-db1",
-                type=ServerType.STANDALONE,
-                services=["postgresql", "certbot"],
-            ),
-            ServerDefinition(
-                name="br-storage1",
-                type=ServerType.STANDALONE,
-                services=["garage", "caddy", "certbot"],
-            ),
-            ServerDefinition(name="br-observability1", type=ServerType.STANDALONE),
-            ServerDefinition(name="br-ai1", type=ServerType.STANDALONE),
-            ServerDefinition(
-                name="br-cluster1", type=ServerType.NODE, k8s_role=K8sRole.PRIMARY
-            ),
-            ServerDefinition(
-                name="br-cluster2", type=ServerType.NODE, k8s_role=K8sRole.WORKER
-            ),
-            ServerDefinition(
-                name="br-cluster3", type=ServerType.NODE, k8s_role=K8sRole.WORKER
-            ),
-        ],
-    )
-```
-
-`external_server` フィクスチャは削除する (参照している既存テストは Step 2 で更新)。
+Run: `grep -n 'br-db1\|br-storage1\|br-cluster1' cli/tests/conftest.py`
+Expected: `full_inventory` に 8 台すべてが並んでいる。まだ旧ホスト名なら Task 1 Step 4 を先に済ませる。
 
 - [ ] **Step 2: 失敗するテストを書く**
 
@@ -905,6 +918,7 @@ Expected: エラーなし
 - Create: `provisioner/roles/gateway/tasks/cloudflared.yaml`
 - Create: `provisioner/roles/gateway/templates/cloudflared-config.yaml.j2`
 - Modify: `provisioner/roles/gateway/tasks/main.yaml`
+- Modify: `provisioner/roles/gateway/handlers/main.yaml`
 - Modify: `provisioner/playbooks/setup_gateway.yaml`
 
 **Interfaces:**
@@ -919,14 +933,25 @@ git mv provisioner/roles/external/templates/cloudflared-config.yaml.j2 provision
 
 移した `cloudflared.yaml` の中身は変更しない (テンプレートは tunnel_id しか参照していないためホストに依存しない)。移動後に `grep -n 'br-external1\|external' provisioner/roles/gateway/tasks/cloudflared.yaml` を実行し、ヒットしたら該当箇所を `br-gateway1` に読み替える。
 
-- [ ] **Step 2: `roles/gateway/tasks/main.yaml` に登録**
+- [ ] **Step 2: `roles/gateway/tasks/main.yaml` に登録し、ハンドラを移す**
 
-ファイル末尾に追記する。
+`provisioner/roles/gateway/tasks/main.yaml` の末尾に追記する。
 
 ```yaml
 - name: Cloudflared (br-infra Tunnel) configuration
   include_tasks: cloudflared.yaml
   tags: [cloudflared]
+```
+
+`cloudflared.yaml` は `Restart cloudflared` ハンドラを notify する。ハンドラは今 `roles/external/handlers/main.yaml` にあるので、同じタスクの中で `roles/gateway/handlers/main.yaml` に移さないと、gateway role が存在しないハンドラを notify する状態になり Step 5 の ansible-lint が落ちる。
+
+`provisioner/roles/gateway/handlers/main.yaml` に追記する (ファイルが無ければ `---` から作る)。
+
+```yaml
+- name: Restart cloudflared
+  service:
+    name: cloudflared
+    state: restarted
 ```
 
 - [ ] **Step 3: `setup_gateway.yaml` の `required_secrets` に `cloudflared_br_infra` を追加**
@@ -979,7 +1004,6 @@ Expected: エラーなし
 
 **Files:**
 - Create: `provisioner/roles/garage/` (tasks / templates / handlers / defaults)
-- Modify: `provisioner/roles/gateway/handlers/main.yaml` (cloudflared ハンドラの受け入れ)
 - Create: `provisioner/roles/caddy/` (tasks / templates / handlers)
 - Create: `provisioner/roles/certbot/` (tasks / defaults)
 - Delete: `provisioner/roles/external/`
@@ -1140,14 +1164,7 @@ cp {{ lets_encrypt.certificate_dir }}/{{ garage_tls_domain }}/privkey.pem {{ gar
     state: restarted
 ```
 
-`provisioner/roles/gateway/handlers/main.yaml` に `Restart cloudflared` を追記する (Task 9 で cloudflared を移設したため)。
-
-```yaml
-- name: Restart cloudflared
-  service:
-    name: cloudflared
-    state: restarted
-```
+`Restart cloudflared` ハンドラは Task 9 Step 2 で `roles/gateway/handlers/main.yaml` に移してある。ここでは扱わない。
 
 - [ ] **Step 3: `caddy` role を切り出す**
 
