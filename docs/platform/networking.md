@@ -156,11 +156,9 @@ Gateway API v1 の実装。**外部公開用 `cluster-gateway`** の 1 本を運
 
 Service の annotation `io.cilium/lb-ipam-ips: ${CLUSTER_GATEWAY_IP}` で Cilium LB-IPAM プールから IP を pin する ([`envoy-proxy.yaml`](../../manifests/platform/envoy-gateway/config/base/envoy-proxy.yaml))。
 
-### `EnvoyProxy` での観測性 / DNS 設定
+### `EnvoyProxy` の観測性
 
-- アクセスログを **OpenTelemetry Collector** に投げる (`accessLog.settings[].sinks[].openTelemetry`)
-- トレース 100% サンプリング → OTel Collector
-- DNS resolver は `getaddrinfo` (c-ares ではなく) に差し替え、in-cluster Service 解決を安定化 (`spec.bootstrap`)
+アクセスログ / トレースの OpenTelemetry Collector 送信設定は、OpenTelemetry Collector 撤去に伴い削除済み (`telemetry` ブロックごと撤去)。再導入はオブザーバビリティ基盤の再構築 ([後続のサブプロジェクト B](../proposals/2026-09-05-single-cp-rearch.md#後続のサブプロジェクト)) の範囲。
 
 ### 依存
 
