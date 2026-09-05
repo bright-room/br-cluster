@@ -71,8 +71,10 @@ spec:
           case "$PHASE" in
             Succeeded) emoji="✅"; color=3066993 ;;
             Failed)    emoji="❌"; color=15158332 ;;
-            Error)     emoji="⚠️";  color=16027660 ;;
-            *)         emoji="ℹ️"; color=10070709 ;;
+            # 絵文字は variation selector (U+FE0F) を持たない code point を選ぶこと。
+            # security workflow の hidden-unicode ジョブが U+FE0F を HIGH で弾く
+            Error)     emoji="❗"; color=16027660 ;;
+            *)         emoji="🔵"; color=10070709 ;;
           esac
           ui_url="https://argo-workflows.b8m.app/workflows/${WORKFLOW_NS}/${WORKFLOW_NAME}"
           msg_field=""

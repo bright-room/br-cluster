@@ -1,54 +1,45 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended",
-    "helpers:pinGitHubActionDigests",
-    "docker:pinDigests"
+    "github>bright-room/renovate-config",
+    "github>bright-room/renovate-config:python"
   ],
-  "timezone": "Asia/Tokyo",
-  "schedule": ["before 9am on saturday"],
-  "labels": ["Kind: Dependencies"],
-  "prConcurrentLimit": 0,
-  "prHourlyLimit": 0,
-  "separateMinorPatch": true,
-  "minimumReleaseAge": "7 days",
   "automerge": false,
   "rebaseWhen": "behind-base-branch",
   "osvVulnerabilityAlerts": true,
-  "dependencyDashboard": true,
-  "lockFileMaintenance": {
-    "enabled": true,
-    "schedule": ["before 9am on saturday"]
-  },
-  "major": {
-    "minimumReleaseAge": "14 days",
-    "automerge": false
-  },
   "flux": {
-    "managerFilePatterns": ["/manifests/.+\\.ya?ml$/"]
+    "managerFilePatterns": [
+      "/manifests/.+\\.ya?ml$/"
+    ]
   },
   "kustomize": {
-    "managerFilePatterns": ["/manifests/.+/kustomization\\.ya?ml$/"]
+    "managerFilePatterns": [
+      "/manifests/.+/kustomization\\.ya?ml$/"
+    ]
   },
   "packageRules": [
     {
-      "matchManagers": ["github-actions"],
-      "groupName": "github-actions"
-    },
-    {
-      "matchManagers": ["mise"],
+      "matchManagers": [
+        "mise"
+      ],
       "groupName": "mise tools"
     },
     {
-      "matchManagers": ["flux"],
+      "matchManagers": [
+        "flux"
+      ],
       "pinDigests": false
     },
     {
-      "matchPackageNames": ["k3s-io/k3s"],
+      "matchPackageNames": [
+        "k3s-io/k3s"
+      ],
       "groupName": "k3s"
     },
     {
-      "matchPackageNames": ["rancher/system-upgrade-controller"],
+      "matchPackageNames": [
+        "rancher/system-upgrade-controller"
+      ],
       "groupName": "system-upgrade-controller"
     },
     {
@@ -62,33 +53,24 @@
   ],
   "customManagers": [
     {
+      "description": "Packer の variable ブロック。共通 preset の generic manager は .pkr.hcl を対象にしておらず、値も comment の直下行ではないため個別に定義する",
       "customType": "regex",
       "managerFilePatterns": [
         "/imager/variables\\.pkr\\.hcl$/"
       ],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?) versioning=(?<versioning>.*?)\\n.*?default\\s*=\\s*\"(?<currentValue>.*?)\""
+        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?) versioning=(?<versioning>.*?)\\nvariable \"[^\"]+\" \\{\\n(?:.*\\n)*?\\s*default\\s*=\\s*\"(?<currentValue>[^\"]+)\""
       ]
     },
     {
+      "description": "system-upgrade-controller の release URL。key: value 形式ではないので共通 preset の generic manager では拾えない",
       "customType": "regex",
       "managerFilePatterns": [
         "/manifests/platform/system-upgrade-controller/.+\\.ya?ml$/"
       ],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?) versioning=(?<versioning>.*?)\\n\\s*-\\s*https://github\\.com/[^/]+/[^/]+/releases/download/(?<currentValue>v[0-9.]+)/",
-        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?) versioning=(?<versioning>.*?)\\n\\s*version:\\s*\"(?<currentValue>.*?)\""
+        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?) versioning=(?<versioning>.*?)\\n\\s*-\\s*https://github\\.com/[^/]+/[^/]+/releases/download/(?<currentValue>v[0-9.]+)/"
       ]
-    },
-    {
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/provisioner/inventories/base/group_vars/all/versions\\.ya?ml$/"
-      ],
-      "matchStrings": [
-        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\n\\s*[a-z_]+:\\s*\"(?<currentValue>.*?)\""
-      ],
-      "versioningTemplate": "{{#if versioning}}{{versioning}}{{else}}semver{{/if}}"
     }
   ]
 }
