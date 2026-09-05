@@ -19,6 +19,19 @@ br-cluster の物理ハードウェアと、各ノードが担う役割をまと
 
 `br-observability1` / `br-ai1` の `ext4` パーティションは、後から切り直すのに再フラッシュが要るため当面用途が無くても先に切ってある。`storage_mode: none` の `br-cluster1-3` は Longhorn 撤去により PVC 利用者がゼロになったため。
 
+### 搭載メモリ
+
+8 台のうち **3 台が 8GB、5 台が 4GB**。8GB は次のように配分している。
+
+| ホスト名 | 搭載 | 理由 |
+|---|---|---|
+| `br-observability1` | 8GB | オブザーバビリティ基盤を載せる先。「k3s 上では重すぎる」という理由でクラスタから追い出したものなので、ここが最も RAM を要する |
+| `br-cluster2` / `br-cluster3` | 8GB | k3s で実際にワークロードが載る 2 台 |
+| `br-cluster1` | 4GB | control-plane は taint を維持するためワークロードがスケジュールされず、k3s server / Cilium agent / CoreDNS しか載らない。旧構成では 4GB の個体が control-plane + etcd 3 メンバーを運用していた実績があり、SQLite の単一 control-plane はそれより軽い |
+| `br-gateway1` / `br-db1` / `br-storage1` / `br-ai1` | 4GB | いずれも常駐プロセスが軽い |
+
+物理個体とホスト名の対応は 1Password の各アイテムの `mac_address` フィールドで決まる。個体を入れ替えたい場合はこのフィールドを書き換えて該当ノードを再フラッシュする。
+
 ## ネットワークトポロジ
 
 クラスタは自宅 LAN とは別の **専用サブネット (172.22.52.0/24)** を持ち、`br-gateway1` がその境界ルーターを兼ねる。日常使いの端末 (MacBook / Windows PC / スマホ) は自宅ルーター配下の通常 LAN に居て、クラスタへは `br-gateway1` 経由で到達する。

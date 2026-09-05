@@ -47,7 +47,24 @@
 
 ### 物理ノードの割り当て
 
-物理個体 (MAC) とホスト名の対応は、ディスクを消す前に全 8 台で `free -h` を取得してから決める。搭載メモリに差がある場合、8GB 個体を `br-db1` / `br-cluster1-3` に、少ない個体を `br-observability1` / `br-ai1` に割り当てる。
+搭載メモリは **`br-node4` / `br-node5` / `br-node6` の 3 台が 8GB、残る 5 台 (`br-gateway1` / `br-external1` / `br-node1` / `br-node2` / `br-node3`) は 4GB**。物理個体とホスト名の対応は 1Password の各アイテムが持つ `mac_address` で決まるので、リネーム時にどのアイテムへどの MAC を書くかが割り当てそのものになる。
+
+8GB 3 台の配分は次のようにする。
+
+| 新ホスト名 | 搭載 | 元の個体 |
+|---|---|---|
+| `br-cluster2` / `br-cluster3` (k3s worker) | 8GB | `br-node5` / `br-node6` |
+| `br-observability1` | **8GB** | `br-node4` |
+| `br-cluster1` (k3s control-plane) | **4GB** | 旧 control-plane 個体のいずれか |
+| `br-gateway1` / `br-db1` / `br-storage1` / `br-ai1` | 4GB | 残りの 4GB 個体 (どれでも等価) |
+
+### 不採用: 8GB 3 台をすべて k3s に充てる
+
+| 採用 | 不採用 | 理由 |
+|---|---|---|
+| control-plane に 4GB、`br-observability1` に 8GB | control-plane を含む k3s 3 台すべてに 8GB | control-plane は taint を維持するのでワークロードが一切スケジュールされず、載るのは k3s server プロセスと Cilium agent と CoreDNS だけ。**スケジュール可能な容量は 8GB × 2 で変わらない**。加えて旧 `br-node1-3` は 4GB で control-plane + etcd 3 メンバーを実際に運用していた実績があり、新構成は SQLite の単一 control-plane でそれより軽い。一方 `br-observability1` は「k3s 上では重すぎる」という理由で追い出したオブザーバビリティ基盤を載せる先であり、ここが RAM を最も必要とする |
+
+4GB 個体 5 台は互いに等価なので、`br-gateway1` / `br-db1` / `br-storage1` / `br-ai1` / `br-cluster1` の対応は任意でよい。
 
 ## サーバー定義のモデル
 
@@ -390,13 +407,13 @@ SQLite を選択したため k3s の etcd snapshot 機構は使えない。**ク
 | 1 | 1Password (`br-cluster-prod` vault) | `br-db1` / `br-storage1` / `br-observability1` / `br-ai1` / `br-cluster1-3` の各アイテムを新ホスト名で作成 (`hostname`, `ip_address`, `mac_address`, `admin_password`, `username`, `password`, `<name>_ssh`)。MAC は現物から引き継ぐ。**名前が変わらない `br-gateway1` も `ip_address` を `172.22.52.1` に更新する** (`generate-inventory` が 1Password から IP を読むため)。加えて `postgresql` アイテムを新規作成する (`zitadel_password`, `argo_workflows_password`)。CloudNativePG が生成していたものを置き換える、人手で作る必要のあるアイテム |
 | 2 | `br-cloudflare-terraform` | infra トンネルの private network route を `172.22.10.0/24` → `172.22.52.0/24` に変更。**未対応だと移行後に WARP から LAN に入れなくなる** |
 | 3 | `br-cluster-zitadel-terraform` | state を作り直す。Longhorn / Grafana のアプリ定義を削除 (Argo Workflows の SSO 定義は維持) |
-| 4 | 物理ノード | 全 8 台で `free -h` と MAC を記録。**ディスクを消す前にしかできない** |
+| 4 | ~~物理ノード~~ | **不要**。MAC は 1Password の各アイテムが `mac_address` として保持しており、アイテムをリネームすれば引き継がれる。搭載メモリも判明済み ([物理ノードの割り当て](#物理ノードの割り当て)) |
 
 ## 移行手順
 
 | # | 作業 | 検証 |
 |---|---|---|
-| 0 | 前提条件 1–4 を完了 | — |
+| 0 | 前提条件 1–3 を完了。1Password のリネーム時、`br-cluster1` に 4GB 個体の MAC を、`br-observability1` に `br-node4` (8GB) の MAC を書く | `make prod/generate-inventory` が通る |
 | 1 | 本リポジトリの変更を全て入れて PR をマージ | `make check` と `make policy/test` が green |
 | 2 | 旧クラスタを全台シャットダウン | — |
 | 3 | `make prod/build-image` → 全台に書き込み | 各台が新 IP で DHCP を取得し ssh 可能 |
