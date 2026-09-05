@@ -114,33 +114,33 @@ class MockSecretProvider(SecretProvider):
             mac_address="00:00:5e:00:53:01",
             wan_ip="198.51.100.50",
         ),
-        "br-node1": InventorySecrets(
+        "br-db1": InventorySecrets(
             ip_address="192.0.2.10",
             mac_address="00:00:5e:00:53:10",
         ),
-        "br-node2": InventorySecrets(
-            ip_address="192.0.2.11",
-            mac_address="00:00:5e:00:53:11",
+        "br-storage1": InventorySecrets(
+            ip_address="192.0.2.20",
+            mac_address="00:00:5e:00:53:20",
         ),
-        "br-node3": InventorySecrets(
-            ip_address="192.0.2.12",
-            mac_address="00:00:5e:00:53:12",
+        "br-observability1": InventorySecrets(
+            ip_address="192.0.2.30",
+            mac_address="00:00:5e:00:53:30",
         ),
-        "br-node4": InventorySecrets(
-            ip_address="192.0.2.13",
-            mac_address="00:00:5e:00:53:13",
+        "br-ai1": InventorySecrets(
+            ip_address="192.0.2.70",
+            mac_address="00:00:5e:00:53:70",
         ),
-        "br-node5": InventorySecrets(
-            ip_address="192.0.2.14",
-            mac_address="00:00:5e:00:53:14",
+        "br-cluster1": InventorySecrets(
+            ip_address="192.0.2.100",
+            mac_address="00:00:5e:00:53:64",
         ),
-        "br-node6": InventorySecrets(
-            ip_address="192.0.2.15",
-            mac_address="00:00:5e:00:53:15",
+        "br-cluster2": InventorySecrets(
+            ip_address="192.0.2.101",
+            mac_address="00:00:5e:00:53:65",
         ),
-        "br-node7": InventorySecrets(
-            ip_address="192.0.2.16",
-            mac_address="00:00:5e:00:53:16",
+        "br-cluster3": InventorySecrets(
+            ip_address="192.0.2.102",
+            mac_address="00:00:5e:00:53:66",
         ),
     }
 

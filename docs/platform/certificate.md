@@ -21,7 +21,7 @@
 | ワイルドカード        | `*.b8m.app` 1 枚 | 各サービスごとに発行 | サービス追加で発行ジョブが走らない、レート制限を踏まない |
 | 証明書の参照方法      | **Gateway API annotation** (`cert-manager.io/cluster-issuer`) | 手動で `Certificate` リソースを書く | Envoy Gateway 用 `--enable-gateway-api` を入れて宣言的に。HTTPRoute 増えても Gateway 側 1 箇所で完結 |
 | 内部 CA               | self-signed → `br-cluster-ca` (`ca-issuer`) を作っておく | 都度発行 | 将来の mTLS / 内部 PKI 用に「使えるようになっている」状態を維持 |
-| 失敗時の可視化        | Prometheus rule `rule-cert.yaml` (有効期限 / Ready / 更新エラー) | ログ目視 | 14 日前 / Not Ready 1h / RenewalErrors を Alert |
+| 失敗時の可視化        | **無し** (ログ目視) | Prometheus rule (有効期限 / Ready / 更新エラー) | オブザーバビリティ基盤の全撤去に伴い、`monitoring` component (ServiceMonitor 生成) は prod overlay から外した。再構築は [後続のサブプロジェクト B](../proposals/2026-09-05-single-cp-rearch.md#後続のサブプロジェクト) の範囲 |
 
 ---
 
@@ -35,10 +35,9 @@ Kubernetes ネイティブな証明書管理コントローラ。**ClusterIssuer
 
 - Helm: [`manifests/platform/cert-manager/app/`](../../manifests/platform/cert-manager/app/)
   - chart `cert-manager` v1.20.1 (OCIRepository, `oci://quay.io/jetstack/charts/cert-manager`)
-  - components: `dns01` / `gateway-api` / `monitoring`
+  - components: `dns01` / `gateway-api` (`monitoring` component は定義のみ残存、prod overlay からは無効化)
 - ClusterIssuers: [`manifests/platform/cert-manager/config/base/`](../../manifests/platform/cert-manager/config/base/) + [`components/acme-cloudflare/`](../../manifests/platform/cert-manager/config/components/acme-cloudflare/)
 - Secrets: [`manifests/platform/cert-manager/secrets/base/`](../../manifests/platform/cert-manager/secrets/base/)
-- 監視ルール: [`manifests/platform/kube-prometheus-stack/rules/base/rule-cert.yaml`](../../manifests/platform/kube-prometheus-stack/rules/base/rule-cert.yaml)
 
 ### Helm components の構成
 
@@ -48,7 +47,8 @@ Kubernetes ネイティブな証明書管理コントローラ。**ClusterIssuer
 |------------------|------|
 | `dns01`          | `dns01RecursiveNameservers: 8.8.8.8:53,1.1.1.1:53` (`...Only: true`)。recursive が CF 側のキャッシュに引っかかった結果 self-check が失敗するのを避ける |
 | `gateway-api`    | `--enable-gateway-api` で Gateway / HTTPRoute の annotation を解釈可能に |
-| `monitoring`     | Prometheus ServiceMonitor を生成 (`prometheus.servicemonitor.enabled: true`) |
+
+`monitoring` component (Prometheus ServiceMonitor 生成) は [`components/monitoring/`](../../manifests/platform/cert-manager/app/components/monitoring/) にコード自体は残っているが、kube-prometheus-stack 撤去に伴い prod overlay からは外している。
 
 ### ClusterIssuer 一覧
 
@@ -104,23 +104,13 @@ spec:
           - name: cluster-gateway-tls   # cert-manager が生成
 ```
 
-`internal-gateway` (HTTP のみ、LAN 限定) には付与していない。
-
 ### 監視
 
-[`rule-cert.yaml`](../../manifests/platform/kube-prometheus-stack/rules/base/rule-cert.yaml) で以下を Alert:
-
-| Alert | 条件 |
-|-------|------|
-| `CertificateExpiringSoon`   | 残り 14 日未満 |
-| `CertificateNotReady`       | `Ready != True` が 1 時間継続 |
-| `CertManagerRenewalErrors`  | `certmanager_certificate_renewal_errors_total` が増加 |
-
-ServiceMonitor は `monitoring` component で生成済み。Prometheus が拾える状態。
+kube-prometheus-stack 撤去に伴い、証明書失効 / renewal エラーの自動 Alert は現状**無し**。`kubectl get certificate -A` / `cmctl status certificate` の目視確認に頼る。オブザーバビリティ基盤の再構築 ([後続のサブプロジェクト B](../proposals/2026-09-05-single-cp-rearch.md#後続のサブプロジェクト)) で `CertificateExpiringSoon` 等の Alert を再導入する想定。
 
 ### 依存
 
-- 前提: External Secrets (Cloudflare API Token / ACME email)、kube-prometheus-stack (CRD `ServiceMonitor` / `PrometheusRule`)
+- 前提: External Secrets (Cloudflare API Token / ACME email)
 - これに依存: `cluster-gateway` (`*.b8m.app`)、将来の内部 PKI 利用先
 
 ### 運用上の注意
@@ -136,4 +126,3 @@ ServiceMonitor は `monitoring` component で生成済み。Prometheus が拾え
 
 - [`docs/platform/networking.md`](networking.md) — `cluster-gateway` の TLS Listener
 - [`docs/platform/secrets.md`](secrets.md) — External Secrets / 1Password Connect
-- [`docs/platform/observability.md`](observability.md) — `rule-cert.yaml` の Alert 配信

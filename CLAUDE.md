@@ -24,17 +24,17 @@
 
 ## 触らないもの
 
-- `garage/setup.sh` (`br-external1` 上のローカル運用スクリプト、リポジトリには含めない)
+- `garage/setup.sh` (`br-storage1` 上のローカル運用スクリプト、リポジトリには含めない)
 - `.secret/` 配下 (1Password credentials)
 - `.generated/` 配下 (中間生成物)
 - 関連リポジトリ (このリポからは触らない):
   - `bright-room/br-cloudflare-terraform` — Cloudflare Tunnel / Access / DNS
   - `bright-room/br-cluster-zitadel-terraform` — Zitadel リソース
-  - `*.cluster-internal.bright-room.net` の非 k3s インフラ全般
+  - `*.prod.br-cluster.bright-room.net` / `*.prod.internal-service.bright-room.net` の非 k3s インフラ全般
 
 ## 環境前提
 
-- 学習目的の homelab。**PVC は ephemeral 扱い** (Longhorn のオフクラスタバックアップは 2026-04-13 commit `41f3782` で意図的に撤去)
+- 学習目的の homelab。PVC 利用者はゼロ (Longhorn 撤去済み)。**クラスタ状態は Flux から再構築する**前提で、バックアップは取らない
 - Pi のリソース制約があるため、複数の OSS を並走させない設計選択が多い (例: kube-proxy → Cilium、Helm Controller → Flux)
 - ネットワーク系の説明は **平易に噛み砕く** (運用者はネットワーク非専門)
 
@@ -76,7 +76,6 @@
 |------|-----------|------|
 | Cilium → 全 Pod ネットワーク | CNI なしでは何も動かない | Helm CLI で primary に手動先入れ ([`docs/kubernetes.md#ブートストラップ順序`](docs/kubernetes.md#ブートストラップ順序)) |
 | CoreDNS → Helm install の名前解決 | install 中に `*.svc.cluster.local` が引けず止まる | 同上 |
-| kube-vip → secondary control-plane の join | API VIP が無いと `:6443` 経由の join が失敗 | 同上 |
 | 1Password Connect 起動 → External Secrets が動く | Connect が `op-credentials` Secret を要求 | Ansible bootstrap が事前投入 |
 | Flux GitHub App credential | Flux 自身が `flux-system` Secret を読む | Ansible bootstrap が事前投入 |
 | Zitadel `auth.b8m.app` の解決 | Pod から CF Tunnel 一周すると CF Access が token endpoint を 403 する | CoreDNS で `auth.b8m.app` → Envoy VIP に rewrite |
@@ -86,14 +85,11 @@
 | 領域 | 判断 | 詳細 |
 |------|------|------|
 | ノード OS ストレージ | RTL9210 の UAS 無効化 quirk が **全ノード必須** (未設定だと高負荷でフリーズ) | [`docs/hardware.md#rtl9210-uas-quirk`](docs/hardware.md#rtl9210-uas-quirk) |
-| LB IP 払い出し | Cilium LB-IPAM プールから **annotation で固定**、自動採番ではない | [`docs/network.md#lb-ip-の払い出し方式-重要`](docs/network.md#lb-ip-の払い出し方式-重要) |
-| ARP 広告 | Cilium L2 + kube-vip svc_enable の **二重で有効** | 同上 |
-| Pod ログ収集 | Alloy が **`/var/log/pods/` を直接 tail** (apiserver log-follow を使わない) | [`docs/platform/observability.md#alloy-3-リリース`](docs/platform/observability.md#alloy-3-リリース) |
-| Loki / Tempo | `br-external1` の Garage S3 (cluster-external) に保存 | [`docs/platform/observability.md`](docs/platform/observability.md) |
-| Longhorn nodeDownPodDeletionPolicy | `do-nothing` (rebuild storm 回避) | [`docs/platform/storage.md`](docs/platform/storage.md) |
-| `auth.b8m.app` 解決 | クラスタ内向けに **CoreDNS で Envoy VIP に rewrite** | [`docs/platform/identity.md`](docs/platform/identity.md) |
-| k3s upgrade | **system-upgrade-controller (SUC)** + `Plan` CRD 経由。Phase 1a は `br-node5` 限定 nodeSelector + `window` 未指定で稼働中、本番展開と etcd snapshot 連携は Phase 1b で対応 | [`docs/runbooks/k3s-upgrade.md`](docs/runbooks/k3s-upgrade.md) |
+| LB IP 払い出し | Cilium LB-IPAM プールから **annotation で固定**、自動採番ではない | [`docs/network.md#lb-ip-の払い出し方式`](docs/network.md#lb-ip-の払い出し方式) |
+| `auth.b8m.app` 解決 | クラスタ内向けに **CoreDNS で Envoy Gateway に rewrite** | [`docs/platform/identity.md`](docs/platform/identity.md) |
+| k3s upgrade | **system-upgrade-controller (SUC)** + `Plan` CRD 経由。Phase 1a は `agent-plan` (`br-cluster2` 限定) nodeSelector + `window` 未指定で稼働中。`server-plan` (`br-cluster1`) はクラスタ全停止を伴うため計画的実行のみ | [`docs/runbooks/k3s-upgrade.md`](docs/runbooks/k3s-upgrade.md) |
 | 定期ジョブ / ジョブネット | **Argo Workflows を優先**。`CronWorkflow` / `WorkflowTemplate` で書く。素の `CronJob` を新設する場合は理由を commit message と manifest コメントで明記 | [`docs/platform/workflows.md`](docs/platform/workflows.md) |
+| k3s datastore | **SQLite** (embedded etcd は撤去)。**クラスタ状態のバックアップは取らない** (snapshot 機構が無いため) | [`docs/kubernetes.md#トポロジ`](docs/kubernetes.md#トポロジ) |
 
 ## ドキュメントの書き方
 

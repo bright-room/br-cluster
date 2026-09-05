@@ -5,6 +5,3 @@ resources:
   - envoy-proxy.yaml
   - gateway-class.yaml
   - gateway.yaml
-  - internal-envoy-proxy.yaml
-  - internal-gateway-class.yaml
-  - internal-gateway.yaml

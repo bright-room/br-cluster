@@ -2,23 +2,34 @@
 ##################################
 # Cluster configuration
 ##################################
-cluster_domain: cluster-internal.bright-room.net
+# 環境名。ドメインに 1 階層挟むことで dev / prod をゾーンごと分離する。
+# `generate-inventory` が inventories/{env}/group_vars/all/cluster_env.yaml
+# に書き出す (env inventory を base に重ねて実行するので、ここでは定義しない)。
+
+# 物理サーバーのホスト名が属するゾーン。
+host_domain: "{{ cluster_env }}.br-cluster.bright-room.net"
+
+# サーバー上で動くアプリケーションが属するゾーン。
+# 実体は service_records で host に紐づく A レコード。
+service_domain: "{{ cluster_env }}.internal-service.bright-room.net"
 
 ##################################
 # Network configuration
 ##################################
 cluster_network:
-  cidr: "172.22.10.0/24"
-  subnet: "172.22.10.0"
+  cidr: "172.22.52.0/24"
+  subnet: "172.22.52.0"
   netmask: "255.255.255.0"
   prefix_length: 24
 
 ##################################
 # DHCP configuration
 ##################################
+# ホストは MAC reservation で固定するため、動的レンジは予備。
+# cluster1-3 が .100-.102 を使うので .150 以降に置く。
 dhcp:
-  range_begin: "172.22.10.100"
-  range_end: "172.22.10.200"
+  range_begin: "172.22.52.150"
+  range_end: "172.22.52.190"
   default_lease_time: 86400
   max_lease_time: 604800
 
@@ -33,10 +44,24 @@ dns:
     - "8.8.8.8"
     - "8.8.4.4"
 
+# サービス名 → それが乗っているホスト。CoreDNS がホストの IP を返す
+# A レコードとして配信する。サービスを引っ越すときは host を書き換える。
+service_records:
+  - name: dns
+    host: br-gateway1
+  - name: ntp
+    host: br-gateway1
+  - name: object-storage
+    host: br-storage1
+  - name: rdbms
+    host: br-db1
+  - name: k8s-api
+    host: br-cluster1
+
 # Domains resolved to gateway1's wan_ip from WAN side.
 # Traffic is DNAT-forwarded to the LAN target by nftables.
 wan_exposed_domains:
-  - "k8s-api.{{ cluster_domain }}"
+  - "k8s-api.{{ service_domain }}"
 
 ##################################
 # NTP configuration
@@ -47,12 +72,3 @@ ntp:
     - "ntp1.jst.mfeed.ad.jp"
     - "ntp2.jst.mfeed.ad.jp"
     - "ntp3.jst.mfeed.ad.jp"
-
-##################################
-# Cluster VIPs (floating IPs exposed via DNS)
-# k8s-api: kube-vip DaemonSet on control-plane nodes (ARP L2 failover)
-##################################
-cluster_vips:
-  - name: k8s-api
-    ip: "172.22.10.60"
-    domain: "k8s-api.{{ cluster_domain }}"

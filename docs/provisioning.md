@@ -63,7 +63,7 @@ flowchart TB
 - 1Password アクセスは **Connect REST に一本化** (`OnePasswordConnectProvider`)。`generate-config` / `generate-inventory` / `build-image` (–-skip-generate なし) は内部で `op-connect-{api,sync}` を `up -d` してから secret を取りに行く
 - `bootstrap` は SSH 鍵書き出し + ansible-runner 起動を追加で行う。Connect 起動は `_ensure_connect()` が共通化
 - ansible-runner は `OP_CONNECT_HOST: http://${ENV}-op-connect-api:8080` を介して同じ Connect API から secret を取る (`secrets` ロール)。CLI / Pod で経路が揃う
-- ansible-runner には `manifests/` も read-only マウントされ、Cilium / CoreDNS / kube-vip の bootstrap で参照する
+- ansible-runner には `manifests/` も read-only マウントされ、Cilium / CoreDNS の bootstrap で参照する
 - 各ステップは独立・冪等
 
 ## 主要コマンド
@@ -121,14 +121,17 @@ CLI は `uv run cluster-forge ...`、同等の Make ターゲット (`make {env}
 
 ### Ansible グループ構成
 
+`servers.yaml` の `type` / `k8s_role` / `services` から `generate-inventory` (`cli/cluster_forge/inventory_generator.py`) が組み立てる。
+
 | グループ      | 含まれるホスト |
 |---------------|----------------|
 | `gateway`     | `br-gateway1` |
-| `external`    | `br-external1` |
-| `master`      | `br-node1`, `br-node2`, `br-node3` |
-| `primary`     | `br-node1` のみ (`is_primary_control_node=true`) |
-| `worker`      | `br-node4`, `br-node5`, `br-node6` |
-| `br_cluster`  | 全ノード (monitoring agent の配布対象) |
+| `standalone`  | `br-db1`, `br-storage1`, `br-observability1`, `br-ai1` |
+| `master` → `primary` | `br-cluster1` のみ (control-plane) |
+| `master` → `secondary` | (現状空。将来 HA に戻す際に使う) |
+| `worker`      | `br-cluster2`, `br-cluster3` |
+| `br_cluster`  | 全ホスト (gateway + standalone + node) |
+| `<service>` (例: `postgresql`, `garage`, `caddy`, `certbot`) | `services` の値ごとに 1 グループ。ホストをまたいで組み合わせられる (`certbot` は `br-storage1` と `br-db1` の両方) |
 
 ## Step 4. プロビジョニング (Ansible Playbook)
 
@@ -140,15 +143,15 @@ Ansible は Compose 上の `ansible-runner` コンテナで実行 ([`compose.yam
 
 | Playbook                       | 対象ホスト         | 内容 |
 |--------------------------------|--------------------|------|
-| `setup-gateway`                | `gateway`          | 共通設定 → DHCP (Kea) / DNS (CoreDNS+etcd) / NTP → nftables |
-| `setup-external`               | `external`         | ディスク初期化 → certbot → Garage → Caddy |
+| `setup-gateway`                | `gateway`          | 共通設定 → DHCP (Kea) / DNS (CoreDNS hosts plugin) / NTP → nftables → cloudflared |
+| `setup-standalone`             | `standalone`       | ディスク初期化 → `services` で決まる role (`postgresql` / `garage` / `caddy` / `certbot`) を適用 |
 | `setup-node`                   | `master` + `primary` + `worker` | k3s インストール (4 Play 構成、下記参照) |
 | `bootstrap-cluster`            | `localhost`        | Flux 用 secret 投入 → ノード検証 → Flux Operator インストール |
-| `setup-monitoring-agent`       | `br_cluster`       | 全ノードに systemd 版 node_exporter / Alloy を配置 |
-| `setup-k3s-leader-restart`     | `primary`          | k3s control-plane leader を peer 健全性チェック付きで安全再起動する systemd timer |
 | `k3s-start` / `k3s-stop`       | 全 k3s ノード      | systemd サービスの起動 / 停止 |
 | `k3s-reset`                    | 全 k3s ノード      | k3s を完全削除 (再構築前提) |
 | `shutdown-cluster`             | クラスタ全体       | k3s 停止 → 順序付きシャットダウン |
+
+`setup-external` (旧) / `setup-monitoring-agent` / `setup-k3s-leader-restart` は撤去済み。非 k3s ホストの構築は `setup-standalone` の 1 本に統合し、`servers.yaml` に `services` を 1 行足して role を書くだけでホストにサービスを追加できるようにした ([spec: サーバー定義のモデル](proposals/2026-09-05-single-cp-rearch.md#サーバー定義のモデル))。
 
 ### `setup-node` の 4 Play 構成
 
@@ -156,24 +159,27 @@ Ansible は Compose 上の `ansible-runner` コンテナで実行 ([`compose.yam
 
 | Play | 対象      | 内容 |
 |------|-----------|------|
-| 1    | `master`  | 全 control-plane に `k3s server` をインストール。`primary` は新規クラスタ起動、`secondary` は primary の `:6443` を待ってから join (throttle=1) |
-| 2    | `primary` | primary 上の kubeconfig を使い、Helm で **Cilium / CoreDNS / kube-vip を直接適用** (Flux より先に居る必要があるため) |
+| 1    | `master`  | control-plane (`primary` のみ、現状 `secondary` は空) に `k3s server` をインストール。新規クラスタ起動 (`cluster-init` は使わず SQLite デフォルト) |
+| 2    | `primary` | primary 上の kubeconfig を使い、Helm で **Cilium / CoreDNS を直接適用** (Flux より先に居る必要があるため) |
 | 3    | `worker`  | `init_disk` でディスクを切ってから `k3s agent` で参加 |
-| 4    | `master`  | worker の Ready 待ち、ノードラベル、VIP 向け kubeconfig 生成 |
+| 4    | `master`  | worker の Ready 待ち、ノードラベル、kubeconfig 生成 (`primary` の実 IP 向け) |
 
 ### ロール一覧
 
 | ロール                                              | 概要 |
 |-----------------------------------------------------|------|
 | [`common`](../provisioner/roles/common)             | SSH / swap / packages / system 設定 (RTL9210 quirk 等)、全ノード共通 |
-| [`gateway`](../provisioner/roles/gateway)           | Kea DHCP / CoreDNS+etcd / NTP / pre-configuration |
-| [`external`](../provisioner/roles/external)         | Garage / Caddy / certbot |
+| [`gateway`](../provisioner/roles/gateway)           | Kea DHCP / CoreDNS / NTP / nftables / cloudflared |
+| [`garage`](../provisioner/roles/garage)             | Garage S3 (`br-storage1`) |
+| [`caddy`](../provisioner/roles/caddy)               | Garage S3 の TLS 終端リバースプロキシ (`br-storage1`) |
+| [`certbot`](../provisioner/roles/certbot)           | Let's Encrypt DNS01 発行 (`br-storage1` / `br-db1`) |
+| [`postgresql`](../provisioner/roles/postgresql)     | apt 版 PostgreSQL 16、`zitadel` / `argo_workflows` の DB とロール作成 (`br-db1`) |
 | [`k3s`](../provisioner/roles/k3s)                   | `install_master` / `install_worker` / `configure` / `post_setup` |
-| [`bootstrap/*`](../provisioner/roles/bootstrap)     | Cilium / CoreDNS / kube-vip / Flux / 初期 secrets / ノード検証 |
+| [`bootstrap/*`](../provisioner/roles/bootstrap)     | Cilium / CoreDNS / Flux / 初期 secrets / ノード検証 |
 | [`secrets`](../provisioner/roles/secrets)           | `onepassword.connect` で必要な secret だけを取得 |
-| [`monitoring_agent`](../provisioner/roles/monitoring_agent) | systemd node_exporter / Alloy |
-| [`k3s_leader_restart`](../provisioner/roles/k3s_leader_restart) | primary の安全リスタート (peer 健全性 TCP チェック) |
 | `ipr-cnrs.nftables`                                 | nftables (Galaxy ロール、`requirements.yaml` で取得) |
+
+`roles/external` は解体済み。`br-observability1` / `br-ai1` は `services: []` のため `common` のみが適用される。
 
 ### Secret の取り扱い
 
@@ -193,11 +199,10 @@ make prod/bootstrap                      # 1Password Connect + Runner 起動
 make prod/build-image                    # 全ノードの OS イメージ生成
 # 各ノードの USB-NVMe SSD にイメージを焼いて、Pi に挿して通電
 make prod/generate-inventory             # SSH 情報含む inventory 生成
-make prod/provision/setup-gateway        # gateway1 を立てる (DHCP/DNS が動く)
-make prod/provision/setup-external       # external1 を立てる
-make prod/provision/setup-node           # k3s 起動 + CNI/CoreDNS/kube-vip ブート
+make prod/provision/setup-gateway        # gateway1 を立てる (DHCP/DNS/cloudflared が動く)
+make prod/provision/setup-standalone     # db1 / storage1 / observability1 / ai1 を立てる
+make prod/provision/setup-node           # k3s 起動 + CNI/CoreDNS ブート
 make prod/provision/bootstrap-cluster    # Flux 投入
-make prod/provision/setup-monitoring-agent
 ```
 
 ## 再プロビジョン

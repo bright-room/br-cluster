@@ -115,7 +115,7 @@ prod/generate-inventory:
 # === Provisioning ===
 # Usage: make dev/provision/setup-node, make prod/provision/k3s-start, etc.
 
-PLAYBOOKS := setup-node setup-gateway setup-external setup-monitoring-agent bootstrap-cluster k3s-start k3s-stop k3s-reset setup-k3s-leader-restart shutdown-cluster
+PLAYBOOKS := setup-node setup-gateway setup-standalone bootstrap-cluster k3s-start k3s-stop k3s-reset shutdown-cluster
 
 $(foreach pb,$(PLAYBOOKS),$(eval dev/provision/$(pb):; uv run cluster-forge provision run --env dev $(pb)))
 $(foreach pb,$(PLAYBOOKS),$(eval prod/provision/$(pb):; uv run cluster-forge provision run --env prod $(pb)))

@@ -1,6 +1,0 @@
----
-# cloudnative-pg helm values (monitoring)
-# Deployed separately to ensure PodMonitor CRD exists (kube-prometheus-stack)
-
-monitoring:
-  podMonitorEnabled: true

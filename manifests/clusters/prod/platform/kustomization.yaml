@@ -2,33 +2,17 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - alloy-app.yaml
-  - alloy-cp-app.yaml
-  - alloy-events-app.yaml
   - argo-workflows-app.yaml
   - cert-manager-app.yaml
   - cilium-app.yaml
   - cloudflared-app.yaml
-  - cloudnative-pg-app.yaml
   - coredns-app.yaml
-  - csi-external-snapshotter-app.yaml
   - envoy-gateway-app.yaml
   - external-dns-cloudflare-app.yaml
-  - external-dns-coredns-app.yaml
   - external-secrets-app.yaml
   - flux-app.yaml
-  - grafana-app.yaml
-  - hubble-flow-exporter-app.yaml
-  - kube-prometheus-stack-app.yaml
-  - kube-vip-app.yaml
-  - kured-app.yaml
-  - loki-app.yaml
-  - longhorn-app.yaml
   - metrics-server-app.yaml
   - onepassword-connect-app.yaml
-  - opentelemetry-collector-app.yaml
-  - platform-pg-cluster-app.yaml
   - system-upgrade-controller-app.yaml
-  - tempo-app.yaml
   - zitadel-app.yaml
   - zitadel-terraform-app.yaml

@@ -44,9 +44,7 @@
     },
     {
       "matchPackageNames": [
-        "coredns/coredns",
-        "prometheus/node_exporter",
-        "grafana/alloy"
+        "coredns/coredns"
       ],
       "extractVersion": "^v(?<version>.+)$"
     }

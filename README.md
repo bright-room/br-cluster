@@ -2,7 +2,7 @@
 
 自宅 Raspberry Pi 上に構築する k3s クラスタ **br-cluster** の構成 / プロビジョニング / GitOps を一括管理するリポジトリ。
 
-- 8 ノード (gateway1 / external1 / k3s 6 台) を **Packer** で焼いた Ubuntu 24.04 で起動
+- 8 ノード (gateway1 / standalone 4 台 / k3s 3 台) を **Packer** で焼いた Ubuntu 24.04 で起動
 - **Ansible** + 自前 CLI (`cluster-forge`) で初期構築、以降は **Flux** で同期
 - 外部公開は **Cloudflare Tunnel + Access** + **Envoy Gateway** + **Zitadel OIDC**
 - 設計判断と全体像は [`docs/architecture.md`](docs/architecture.md)
@@ -49,11 +49,10 @@ docker info          # Docker daemon が動くこと
 make {env}/bootstrap                       # 1Password Connect + Ansible Runner 起動
 make {env}/build-image                     # 全ノードの OS イメージ生成
 make {env}/generate-inventory              # Ansible inventory 生成
-make {env}/provision/setup-gateway         # gateway1 を立てる (DHCP/DNS が動く)
-make {env}/provision/setup-external        # external1 を立てる
-make {env}/provision/setup-node            # k3s + CNI/CoreDNS/kube-vip ブート
+make {env}/provision/setup-gateway         # gateway1 を立てる (DHCP/DNS/cloudflared が動く)
+make {env}/provision/setup-standalone      # db1 / storage1 / observability1 / ai1 を立てる
+make {env}/provision/setup-node            # k3s + CNI/CoreDNS ブート
 make {env}/provision/bootstrap-cluster     # Flux 投入
-make {env}/provision/setup-monitoring-agent
 make {env}/provision/k3s-stop              # k3s 停止
 make {env}/provision/shutdown-cluster      # 順序付きシャットダウン
 make {env}/clean                           # compose down

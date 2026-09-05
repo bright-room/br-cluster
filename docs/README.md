@@ -20,19 +20,16 @@ br-cluster のドキュメント目次。読みたい目的から該当ファイ
 
 ## プラットフォームコンポーネント (グループ別)
 
-`manifests/platform/` 配下の全コンポーネントを 8 グループに整理。
+`manifests/platform/` 配下の全コンポーネントを 6 グループに整理。`metrics-server` / `system-upgrade-controller` は単機能コンポーネントのため専用 doc は持たず、[`kubernetes.md`](kubernetes.md) と [`runbooks/k3s-upgrade.md`](runbooks/k3s-upgrade.md) でそれぞれ扱う。
 
 | グループ                  | 対象リソース                                                                                               | doc |
 |---------------------------|------------------------------------------------------------------------------------------------------------|-----|
-| Networking                | Cilium / CoreDNS / kube-vip / Envoy Gateway / cloudflared / external-dns-cloudflare / external-dns-coredns | [`platform/networking.md`](platform/networking.md) |
+| Networking                | Cilium / CoreDNS / Envoy Gateway / cloudflared / external-dns-cloudflare                                   | [`platform/networking.md`](platform/networking.md) |
 | Identity                  | Zitadel / zitadel-terraform-app                                                                            | [`platform/identity.md`](platform/identity.md) |
 | Certificate Management    | cert-manager                                                                                               | [`platform/certificate.md`](platform/certificate.md) |
-| MicroService              | CloudNativePG / platform-pg-cluster                                                                        | [`platform/microservice.md`](platform/microservice.md) |
 | Secrets                   | 1Password Connect / External Secrets Operator                                                              | [`platform/secrets.md`](platform/secrets.md) |
-| Storage                   | Longhorn / csi-external-snapshotter                                                                        | [`platform/storage.md`](platform/storage.md) |
-| Observability             | kube-prometheus-stack / Grafana / Loki / Tempo / OTel Collector / Alloy×3 / hubble-flow-exporter / metrics-server | [`platform/observability.md`](platform/observability.md) |
 | GitOps                    | Flux Operator / Flux CD / tofu-controller                                                                  | [`platform/gitops.md`](platform/gitops.md) |
-| Workflow Automation       | Argo Workflows / Argo Events                                                                               | [`platform/workflows.md`](platform/workflows.md) |
+| Workflow Automation       | Argo Workflows                                                                                             | [`platform/workflows.md`](platform/workflows.md) |
 | Policy as Code            | Conftest + Rego (`policies/`) — CI で manifests を検査                                                     | [`platform/policy.md`](platform/policy.md) |
 
 ## 書き方の前提

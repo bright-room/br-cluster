@@ -1,0 +1,13 @@
+---
+postgresql_version: 16
+postgresql_data_dir: /var/lib/postgresql/{{ postgresql_version }}/main
+postgresql_conf_dir: /etc/postgresql/{{ postgresql_version }}/main
+postgresql_port: 5432
+
+# TLS 証明書は certbot role が発行したものを使う。
+postgresql_tls_domain: "rdbms.{{ service_domain }}"
+postgresql_ssl_dir: /etc/postgresql/ssl
+
+# 接続を許可する CIDR。Cilium が Pod の外向き通信をノード IP に masquerade
+# するため、k3s から見た接続元は Pod CIDR ではなくノード IP になる。
+postgresql_allowed_cidr: "{{ cluster_network.cidr }}"

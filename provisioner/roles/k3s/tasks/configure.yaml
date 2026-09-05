@@ -5,8 +5,7 @@
 
 - name: Set primary control node IP
   set_fact:
-    primary_control_node_ip: "{{ (cluster_hosts | selectattr('name', 'equalto', 'br-node1') | first).ip }}"
-  when: "'master' in group_names"
+    primary_control_node_ip: "{{ (cluster_hosts | selectattr('name', 'equalto', groups['primary'] | first) | first).ip }}"
 
 - name: Create k3s config directory
   file:

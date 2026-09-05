@@ -13,18 +13,16 @@ from cluster_forge.models import (
 from cluster_forge.secrets import SecretProvider
 
 
-def _build_domains(server: ServerDefinition, cluster_domain_ref: str) -> dict:
-    """Build domain mappings based on server type and name."""
+def _build_domains(server: ServerDefinition, host_domain_ref: str) -> dict:
+    """Build the host domain mapping. One record per physical server.
+
+    Service records (dns / ntp / object-storage / rdbms / k8s-api) live in
+    `service_records` in group_vars/all/network.yaml, not here — a service
+    name does not always match a role name, and a service can move between
+    hosts without the host record changing.
+    """
     short = server.name.replace("br-", "")
-    domains: dict[str, str] = {
-        "server": f"{short}.{cluster_domain_ref}",
-    }
-    if server.type == ServerType.GATEWAY:
-        domains["dns"] = f"dns.{cluster_domain_ref}"
-        domains["ntp"] = f"ntp.{cluster_domain_ref}"
-    elif server.type == ServerType.EXTERNAL:
-        domains["object_storage"] = f"object-storage.{cluster_domain_ref}"
-    return domains
+    return {"server": f"{short}.{host_domain_ref}"}
 
 
 def _build_interfaces(server: ServerDefinition) -> dict:
@@ -37,9 +35,8 @@ def _build_interfaces(server: ServerDefinition) -> dict:
 
 def generate_hosts_yaml(inventory: Inventory) -> dict:
     """Generate Ansible hosts.yaml structure from servers.yaml."""
-    # Collect servers by type and role
     gateways = [s for s in inventory.servers if s.type == ServerType.GATEWAY]
-    externals = [s for s in inventory.servers if s.type == ServerType.EXTERNAL]
+    standalones = [s for s in inventory.servers if s.type == ServerType.STANDALONE]
     nodes_with_k8s = [
         s for s in inventory.servers if s.type == ServerType.NODE and s.k8s_role
     ]
@@ -47,11 +44,19 @@ def generate_hosts_yaml(inventory: Inventory) -> dict:
     secondaries = [s for s in nodes_with_k8s if s.k8s_role == K8sRole.SECONDARY]
     workers = [s for s in nodes_with_k8s if s.k8s_role == K8sRole.WORKER]
 
-    # All cluster members (gateway + external + k8s nodes)
-    cluster_members = [*gateways, *externals, *nodes_with_k8s]
+    cluster_members = [*gateways, *standalones, *nodes_with_k8s]
 
     def hosts_dict(servers: list[ServerDefinition]) -> dict:
         return {s.name: None for s in servers}
+
+    # One group per service name, in first-seen order. A service can span
+    # hosts (certbot runs on both storage1 and db1).
+    service_groups: dict[str, dict] = {}
+    for server in inventory.servers:
+        for service in server.services:
+            service_groups.setdefault(service, {"hosts": {}})["hosts"][server.name] = (
+                None
+            )
 
     structure: dict = {
         "all": {
@@ -69,7 +74,8 @@ def generate_hosts_yaml(inventory: Inventory) -> dict:
                         "worker": {"hosts": hosts_dict(workers)},
                     },
                 },
-                "external": {"hosts": hosts_dict(externals)},
+                "standalone": {"hosts": hosts_dict(standalones)},
+                **service_groups,
             },
         },
     }
@@ -89,8 +95,8 @@ def generate_cluster_hosts(
             server.name,
             is_gateway=server.type == ServerType.GATEWAY,
         )
-        # Use Jinja2 reference for cluster_domain so Ansible resolves it
-        domain_ref = "{{ cluster_domain }}"
+        # Use Jinja2 reference for host_domain so Ansible resolves it
+        domain_ref = "{{ host_domain }}"
         entry: dict = {
             "name": server.name,
             "ip": secrets.ip_address,
@@ -166,7 +172,17 @@ def write_inventory(
     ch_path.write_text(ch_content)
     written.append(ch_path)
 
-    # 3. host_vars for gateways (wan_ip)
+    # 3. group_vars/all/cluster_env.yaml
+    env_dir = inv_dir / "group_vars" / "all"
+    env_dir.mkdir(parents=True, exist_ok=True)
+    env_path = env_dir / "cluster_env.yaml"
+    env_content = "---\n" + yaml.dump(
+        {"cluster_env": env}, Dumper=dumper, default_flow_style=False, sort_keys=False
+    )
+    env_path.write_text(env_content)
+    written.append(env_path)
+
+    # 4. host_vars for gateways (wan_ip)
     gw_vars = generate_gateway_host_vars(inventory, env, provider)
     for host_name, variables in gw_vars.items():
         hv_dir = inv_dir / "host_vars"
