@@ -16,7 +16,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
           persist-credentials: false
       - uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925  # v4
@@ -41,7 +41,7 @@ jobs:
           mode: analyze
           # sysdig 0.41.4 (renovate は digest 単体を追従できないため手動更新)
           sysdig-version: sha256:740a122ba3ab923467c09a25725cdc5b530d93345f00cc1ced1b4a32bd9c52a9
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
           persist-credentials: false
       - uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925  # v4
