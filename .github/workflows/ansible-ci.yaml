@@ -3,16 +3,6 @@ name: Ansible CI
 
 on:
   pull_request:
-    paths:
-      - 'provisioner/inventories/**'
-      - 'provisioner/playbooks/**'
-      - 'provisioner/roles/**'
-      - 'provisioner/tasks/**'
-      - 'provisioner/ansible.cfg'
-      - 'provisioner/requirements.yaml'
-      - '.ansible-lint'
-      - 'mise.toml'
-      - '.github/workflows/ansible-ci.yaml'
 
 permissions:
   contents: read

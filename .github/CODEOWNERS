@@ -1,1 +1,7 @@
 * @bright-room/br-maintainers
+
+# 侵害されたときに他リポ・組織全体へ波及する面は br-owners がレビューする
+/.github/workflows/ @bright-room/br-owners
+/.github/actions/ @bright-room/br-owners
+/.github/CODEOWNERS @bright-room/br-owners
+/renovate.json @bright-room/br-owners

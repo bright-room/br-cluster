@@ -3,11 +3,6 @@ name: Yaml CI
 
 on:
   pull_request:
-    paths:
-      - '**/*.yaml'
-      - '**/*.yml'
-      - '.yamllint.yaml'
-      - 'mise.toml'
 
 permissions:
   contents: read

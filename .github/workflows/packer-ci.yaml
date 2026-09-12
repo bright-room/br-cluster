@@ -3,11 +3,6 @@ name: Packer CI
 
 on:
   pull_request:
-    paths:
-      - 'imager/**'
-      - 'Makefile'
-      - 'mise.toml'
-      - '.github/workflows/packer-ci.yaml'
 
 permissions:
   contents: read
