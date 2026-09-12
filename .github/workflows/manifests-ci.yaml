@@ -3,17 +3,6 @@ name: Manifests CI
 
 on:
   pull_request:
-    paths:
-      - 'manifests/**'
-      - 'policies/**'
-      - 'scripts/manifests-build.sh'
-      - 'scripts/manifests-substitute-check.sh'
-      - 'scripts/manifests-postbuild-fixtures.env'
-      - 'Makefile'
-      - 'pyproject.toml'
-      - 'uv.lock'
-      - 'mise.toml'
-      - '.github/workflows/manifests-ci.yaml'
 
 permissions:
   contents: read

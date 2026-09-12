@@ -3,10 +3,6 @@ name: Actions CI
 
 on:
   pull_request:
-    paths:
-      - '.github/workflows/**'
-      - '.github/actions/**'
-      - 'mise.toml'
 
 permissions:
   contents: read
