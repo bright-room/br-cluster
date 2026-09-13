@@ -1,7 +1,7 @@
 ---
 versions:
   # renovate: datasource=github-releases depName=k3s-io/k3s versioning=loose
-  k3s: "v1.35.3+k3s1"
+  k3s: "v1.36.4+k3s1"
   # renovate: datasource=github-releases depName=kubernetes/kubernetes
   kubectl: "v1.36.1"
   # renovate: datasource=github-releases depName=helm/helm
