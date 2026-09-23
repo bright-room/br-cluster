@@ -58,7 +58,7 @@ nft_forward_rules:
   220 ssh from wan (home lan only):
     - iifname $wan_interface ip saddr $home_lan_network oifname $lan_interface ip daddr $lan_network tcp dport ssh ct state new accept
   250 k8s api from wan (home lan only):
-    - iifname $wan_interface ip saddr $home_lan_network oifname $lan_interface ip daddr {{ (cluster_vips | selectattr('name', 'equalto', 'k8s-api') | first).ip }} tcp dport 6443 ct state new accept
+    - iifname $wan_interface ip saddr $home_lan_network oifname $lan_interface ip daddr {{ (cluster_hosts | selectattr('name', 'equalto', 'br-cluster1') | first).ip }} tcp dport 6443 ct state new accept
 
 nft__nat_table_manage: true
 nft__nat_default_prerouting_rules: {}
@@ -66,7 +66,7 @@ nft__nat_prerouting_rules:
   000 policy:
     - type nat hook prerouting priority -100;
   020 dnat k8s api:
-    - iifname $wan_interface tcp dport 6443 dnat ip to {{ (cluster_vips | selectattr('name', 'equalto', 'k8s-api') | first).ip }}:6443
+    - iifname $wan_interface tcp dport 6443 dnat ip to {{ (cluster_hosts | selectattr('name', 'equalto', 'br-cluster1') | first).ip }}:6443
 
 nft__nat_default_postrouting_rules: {}
 nft__nat_postrouting_rules:
@@ -87,10 +87,7 @@ nft_define:
     value: "{ ff02::16 }"
   input tcp accepted from lan:
     name: in_tcp_accept
-    # 9100: prometheus-node-exporter DaemonSet on k3s nodes (hostNetwork)
-    # 9101: systemd node_exporter on every node (docs/observability-plan.md P1-A)
-    # 12345: systemd Alloy HTTP server (internal /metrics) on every node
-    value: "{ ssh, domain, 2379, 9100, 9101, 12345 }"
+    value: "{ ssh, domain }"
   input udp accepted from lan:
     name: in_udp_accept
     value: "{ domain, ntp, bootps }"
@@ -127,7 +124,7 @@ nft_define:
     value: "10.42.0.0/16"
   input tcp accepted from k8s pods:
     name: in_pod_tcp_accept
-    value: "{ domain, 2379 }"
+    value: "{ domain }"
   forward tcp accept:
     name: forward_tcp_accept
     # submission (587) is egress SMTP for Zitadel -> Resend.

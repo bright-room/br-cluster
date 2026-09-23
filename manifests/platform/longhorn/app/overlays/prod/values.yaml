@@ -1,8 +1,0 @@
----
-# longhorn helm values (prod overlay)
-defaultSettings:
-  defaultDataPath: /var/lib/longhorn
-  # Keep replicas as-is when a node goes NotReady, to avoid cascading
-  # rebuild storms during control-plane instability.
-  # See incident-2026-04-13-observability-cascade.md.
-  nodeDownPodDeletionPolicy: do-nothing

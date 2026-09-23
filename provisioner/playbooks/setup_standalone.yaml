@@ -1,0 +1,119 @@
+---
+- name: Configure standalone servers (common)
+  hosts: standalone
+  gather_facts: true
+  become: true
+
+  collections:
+    - onepassword.connect
+
+  environment:
+    OP_CONNECT_TOKEN: "{{ lookup('env', 'OP_CONNECT_TOKEN') }}"
+    OP_CONNECT_HOST: "{{ lookup('env', 'OP_CONNECT_HOST') }}"
+
+  pre_tasks:
+    # init_disk で root を os_partition_size まで拡張してから apt upgrade を走らせないと
+    # dist-upgrade 中にディスクフルで失敗する (3.4G では入らない)
+    - name: Setup initialize disk
+      include_tasks: ../tasks/init_disk.yaml
+      tags: [system]
+
+    - name: Package update
+      include_tasks: ../tasks/update.yaml
+      tags: [always]
+
+  roles:
+    - name: Fetch required secrets
+      role: secrets
+      vars:
+        required_secrets:
+          - discord_webhook
+      tags: [always]
+
+    - name: Common system configuration
+      role: common
+      tags: [system]
+
+- name: Configure certbot hosts
+  hosts: certbot
+  gather_facts: true
+  become: true
+
+  collections:
+    - onepassword.connect
+
+  environment:
+    OP_CONNECT_TOKEN: "{{ lookup('env', 'OP_CONNECT_TOKEN') }}"
+    OP_CONNECT_HOST: "{{ lookup('env', 'OP_CONNECT_HOST') }}"
+
+  roles:
+    - name: Fetch required secrets
+      role: secrets
+      vars:
+        required_secrets:
+          - cloudflare_token
+          - admin_email
+      tags: [always]
+
+    - name: Certbot (Let's Encrypt DNS-01)
+      role: certbot
+      tags: [certbot]
+
+- name: Configure PostgreSQL hosts
+  hosts: postgresql
+  gather_facts: true
+  become: true
+
+  collections:
+    - onepassword.connect
+
+  environment:
+    OP_CONNECT_TOKEN: "{{ lookup('env', 'OP_CONNECT_TOKEN') }}"
+    OP_CONNECT_HOST: "{{ lookup('env', 'OP_CONNECT_HOST') }}"
+
+  roles:
+    - name: Fetch required secrets
+      role: secrets
+      vars:
+        required_secrets:
+          - postgresql
+      tags: [always]
+
+    - name: PostgreSQL server
+      role: postgresql
+      tags: [postgresql]
+
+- name: Configure Garage hosts
+  hosts: garage
+  gather_facts: true
+  become: true
+
+  collections:
+    - onepassword.connect
+
+  environment:
+    OP_CONNECT_TOKEN: "{{ lookup('env', 'OP_CONNECT_TOKEN') }}"
+    OP_CONNECT_HOST: "{{ lookup('env', 'OP_CONNECT_HOST') }}"
+
+  roles:
+    - name: Fetch required secrets
+      role: secrets
+      vars:
+        required_secrets:
+          - garage_rpc_secret
+          - garage_operators
+      tags: [always]
+
+    - name: Garage S3
+      role: garage
+      tags: [garage]
+
+- name: Configure Caddy hosts
+  hosts: caddy
+  gather_facts: true
+  become: true
+
+  roles:
+    - name: Caddy reverse proxy
+      role: caddy
+      tags: [caddy]

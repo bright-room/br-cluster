@@ -72,6 +72,7 @@ provisioner/collections/ansible_collections/
 provisioner/inventories/*/hosts.yaml
 !provisioner/inventories/base/hosts.yaml
 provisioner/inventories/*/group_vars/all/cluster_hosts.yaml
+provisioner/inventories/*/group_vars/all/cluster_env.yaml
 provisioner/inventories/*/host_vars/br-gateway1.yaml
 # base/ は生成対象外 (generate-inventory の書き込み先は inventories/{env}/)。
 # 手書きの nftables 設定なので追跡する

@@ -89,16 +89,14 @@ flowchart TB
 
 ```python
 {
-  "setup-gateway":            "playbooks/setup_gateway.yaml",
-  "setup-external":           "playbooks/setup_external.yaml",
-  "setup-node":               "playbooks/setup_node.yaml",
-  "setup-monitoring-agent":   "playbooks/setup_monitoring_agent.yaml",
-  "setup-k3s-leader-restart": "playbooks/setup_k3s_leader_restart.yaml",
-  "bootstrap-cluster":        "playbooks/bootstrap_cluster.yaml",
-  "k3s-start":                "playbooks/k3s_start.yaml",
-  "k3s-stop":                 "playbooks/k3s_stop.yaml",
-  "k3s-reset":                "playbooks/k3s_reset.yaml",
-  "shutdown-cluster":         "playbooks/shutdown_cluster.yaml",
+  "setup-gateway":     "playbooks/setup_gateway.yaml",
+  "setup-standalone":  "playbooks/setup_standalone.yaml",
+  "setup-node":        "playbooks/setup_node.yaml",
+  "bootstrap-cluster": "playbooks/bootstrap_cluster.yaml",
+  "k3s-start":         "playbooks/k3s_start.yaml",
+  "k3s-stop":          "playbooks/k3s_stop.yaml",
+  "k3s-reset":         "playbooks/k3s_reset.yaml",
+  "shutdown-cluster":  "playbooks/shutdown_cluster.yaml",
 }
 ```
 
@@ -115,6 +113,19 @@ flowchart TB
 | ping                     | `cluster-forge provision ping --env {env}`         | `make {env}/provision/ping` |
 | lint                     | `cluster-forge provision lint --env {env}`         | `make {env}/provision/lint` |
 | clean                    | `cluster-forge clean --env {env} [--all]`          | `make {env}/clean` / `make {env}/clean-all` |
+
+## `servers.yaml` のスキーマ
+
+`ServerDefinition` (`cli/cluster_forge/models.py`) が検証する形。
+
+| フィールド | 型 | 内容 |
+|---|---|---|
+| `name` | `str` | ホスト名 (`br-` prefix) |
+| `type` | `gateway` / `node` / `standalone` | サーバー種別。`external` は撤去済み |
+| `k8s_role` | `primary` / `secondary` / `worker` (任意) | `type: node` のみ設定。`secondary` は現状未使用 (将来 HA に戻す際用) |
+| `services` | `list[str]` (デフォルト空) | `type: standalone` のホストに適用する Ansible role の一覧。1 要素につき Ansible グループが 1 つ生成される |
+
+`services` はホストをまたいで組み合わせられる (`certbot` は `br-storage1` と `br-db1` の両方に付く)。ホストにサービスを足すときは `servers.yaml` に 1 行足して role を書くだけで、Python も Make ターゲットも触らない ([spec: サーバー定義のモデル](proposals/2026-09-05-single-cp-rearch.md#サーバー定義のモデル))。
 
 ## 1Password アクセス
 
@@ -175,7 +186,7 @@ make test                 # = uv run pytest -v
 2. `inventory_generator.py` の `_build_domains` / `_build_interfaces` で新種別の振る舞いを定義
 3. `servers.yaml` の **schema は手書き**なので、追加した値が `ServerType` enum と一致することを確認
 4. `cli/tests/conftest.py` に新種別のフィクスチャを追加
-5. 関連 Ansible role / playbook が必要なら `provisioner/roles/` と `provisioner/inventories/prod/group_vars/all/cluster_hosts.yaml` の `cluster_hosts[*].interfaces` などを更新
+5. 関連 Ansible role / playbook が必要なら `provisioner/roles/` を追加。`cluster_hosts` は `generate-inventory` が動的に生成するファイルなので直接編集しない
 6. `docs/hardware.md` のノード一覧表を更新
 
 ### 新しい 1Password フィールドを参照

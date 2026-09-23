@@ -21,7 +21,7 @@ skip_list:
   # `roles/bootstrap/<area>/` のサブディレクトリ配置は意図的な構成
   # (bootstrap 関連の役割を 1 グループにまとめる)。ここは flat 化しない。
   - role-name[path]
-  # TODO: roles/{common,external,monitoring_agent,gateway,k3s,k3s_leader_restart,bootstrap/*}
+  # TODO: roles/{common,garage,caddy,certbot,postgresql,gateway,k3s,bootstrap/*}
   # 内の変数 prefix を role 名に揃えてこの skip を外す。
   # (roles/secrets/ は対応済み)
   - var-naming[no-role-prefix]

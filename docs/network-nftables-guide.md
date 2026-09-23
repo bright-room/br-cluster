@@ -8,7 +8,7 @@
 graph LR
     WAN["外の世界<br/>(WAN)"]
     GW["br-gateway1<br/>(門番)"]
-    LAN["クラスタ内 (LAN)<br/>K8sノード<br/>br-external1 (Garage)<br/>その他"]
+    LAN["クラスタ内 (LAN)<br/>K8sノード<br/>br-storage1 (Garage) 他"]
 
     WAN <-->|wlan0| GW
     GW <-->|eth0| LAN
@@ -42,9 +42,10 @@ graph LR
 
 | 許可するもの | 何に使う？ |
 |---|---|
-| SSH | 外からゲートウェイにログイン |
+| SSH (自宅 Wi-Fi からのみ) | 自宅にいるときの緊急ログイン用フォールバック |
+| DNS | 自宅 Wi-Fi の他の端末が gateway1 を DNS として使うため |
 
-**これだけ。** 最低限に絞っています。
+日常の SSH ログインは Cloudflare WARP 経由 (家 LAN と同じ hostname で到達) を使う。ここで許可している SSH は **WARP/Cloudflare が落ちたときの避難経路**で、しかも自宅 Wi-Fi の IP アドレス帯からしか受け付けない。インターネットの誰からでも叩ける窓口ではない。
 
 ### ② クラスタ内(LAN) → ゲートウェイ自身
 
@@ -52,8 +53,6 @@ graph LR
 |---|---|
 | SSH | ノードからゲートウェイにログイン |
 | DNS | 「google.com の IP 教えて」という名前解決 |
-| etcd (2379) | K8s の設定データベース |
-| node-exporter (9100) | 「CPU 使用率いくつ？」等の監視データ収集 |
 | NTP | 時計合わせ |
 | DHCP | 「IP アドレスちょうだい」 |
 
@@ -104,41 +103,40 @@ graph LR
 | HTTP / HTTPS | Web サイトへのアクセス、パッケージ取得、Flux の Git clone |
 | DNS | 名前解決 |
 | NTP | 時計合わせ |
+| Cloudflare Tunnel (QUIC/TCP、ポート 7844) | cloudflared が Cloudflare Edge に張る outbound トンネル |
+| SMTP submission (587) | Zitadel → Resend (メール送信) |
 
 **それ以外は拒否。** 例えば、ノードから外部への SSH は通せません。
 
 ### 外 → クラスタ内 (WAN → LAN)
 
-外からクラスタ内のマシンにアクセスする通信です。
+外からクラスタ内のマシンにアクセスする通信です。ここは **かなり絞られています**。
 
 ```mermaid
 graph LR
-    Internet["インターネット"] --> GW["br-gateway1"]
-    GW -->|SSH| Nodes["LAN内の各ノード"]
-    GW -->|"HTTP/HTTPS"| Web["Webサービス"]
-    GW -->|":6443"| K8s["K8s API (VIP)"]
-    GW -->|":443 (DNAT)"| Caddy["Caddy → Garage Web UI"]
+    Internet["インターネット<br/>(自宅 Wi-Fi のみ)"] -->|SSH| GW["br-gateway1"]
+    GW -->|"転送"| Nodes["LAN内の任意ノード"]
+    Internet -->|":6443 (自宅 Wi-Fi のみ)"| GW
+    GW -->|"DNAT"| K8s["k3s API (br-cluster1)"]
 
     style Internet fill:#e8f4fd,stroke:#4a90d9,color:#1a3a5c
     style GW fill:#fff3e0,stroke:#e09040,color:#5c3a1a
     style Nodes fill:#e8f5e9,stroke:#66bb6a,color:#1a5c2a
-    style Web fill:#e8f5e9,stroke:#66bb6a,color:#1a5c2a
     style K8s fill:#e8f5e9,stroke:#66bb6a,color:#1a5c2a
-    style Caddy fill:#e8f5e9,stroke:#66bb6a,color:#1a5c2a
 ```
 
 | 許可するもの | 何に使う？ |
 |---|---|
-| SSH | 外から LAN 内のどのノードにもログイン |
-| HTTP / HTTPS | 外から LAN 内の Web サービスにアクセス |
-| 6443 | 外から K8s API にアクセス (kubectl) |
-| 443 (DNAT) | 外から Garage Web UI にアクセス (Caddy 経由) |
+| SSH (自宅 Wi-Fi からのみ) | 外から LAN 内の任意のノードにログイン (WARP 障害時のフォールバック) |
+| 6443 (自宅 Wi-Fi からのみ) | 外から k3s API にアクセス (`kubectl`、WARP 障害時のフォールバック) |
+
+**それ以外は何も通しません。** `*.b8m.app` の Web サービスは、この WAN→LAN の穴を一切使わずに公開されています。代わりに `cloudflared` が LAN 側から Cloudflare Edge へ **outbound** でトンネルを張り、外部からのリクエストはそのトンネルの中を通って届きます (ゲートウェイの inbound ルールは何も開けなくてよい)。詳しくは [`docs/platform/networking.md#外部公開フロー-httpssvcb8mapp`](platform/networking.md#外部公開フロー-httpssvcb8mapp) を参照。
 
 ---
 
 ## 4. NAT = 「住所の書き換え」
 
-クラスタ内のマシンは `172.22.x.x` というプライベート IP を持っています。これは **クラスタ内だけで通じる住所** で、外の世界からは直接アクセスできません。
+クラスタ内のマシンは `172.22.52.x` というプライベート IP を持っています。これは **クラスタ内だけで通じる住所** で、外の世界からは直接アクセスできません。
 
 そこでゲートウェイが **郵便局** のように住所を書き換えます。
 
@@ -146,96 +144,39 @@ graph LR
 
 ```mermaid
 sequenceDiagram
-    participant Node as K8sノード<br/>172.22.10.10
+    participant Node as K8sノード<br/>172.22.52.100
     participant GW as br-gateway1<br/>(住所を書き換え)
     participant Ext as インターネット<br/>8.8.8.8
 
-    Node->>GW: 差出人: 172.22.10.10
+    Node->>GW: 差出人: 172.22.52.100
     Note over GW: 差出人を<br/>192.168.2.50 に書き換え
     GW->>Ext: 差出人: 192.168.2.50
     Ext->>GW: 返事: 宛先 192.168.2.50
-    Note over GW: 「これは<br/>172.22.10.10 宛だった」
-    GW->>Node: 返事: 宛先 172.22.10.10
+    Note over GW: 「これは<br/>172.22.52.100 宛だった」
+    GW->>Node: 返事: 宛先 172.22.52.100
 ```
 
 ### 外から中へ入るとき (DNAT = 転送)
 
-外からはクラスタ内の `172.22.x.x` が見えません。代わりにゲートウェイの IP + ポート番号で受けて、中の正しいマシンに転送します。
+外からはクラスタ内の `172.22.52.x` が見えません。代わりにゲートウェイの IP + ポート番号で受けて、中の正しいマシンに転送します。
+
+**現状 DNAT で転送しているのは k3s API (`:6443`) の 1 つだけ** です (しかも上で見たとおり自宅 Wi-Fi からしか叩けません)。他のサービスは DNAT を使わず、`cloudflared` の outbound トンネル経由で公開されています。
 
 ```mermaid
 graph LR
-    User1["外の人<br/>:443"] --> GW["br-gateway1<br/>(宛先を書き換え)"]
-    User2["外の人<br/>:6443"] --> GW
+    User["自宅 Wi-Fi の利用者<br/>:6443"] --> GW["br-gateway1<br/>(宛先を書き換え)"]
+    GW -->|"6443 → br-cluster1:6443"| K8s["k3s API"]
 
-    GW -->|"443 → 172.22.10.50:443"| Caddy["Caddy<br/>→ Garage Web UI"]
-    GW -->|"6443 → K8s VIP:6443"| K8s["K8s API"]
-
-    style User1 fill:#e8f4fd,stroke:#4a90d9,color:#1a3a5c
-    style User2 fill:#e8f4fd,stroke:#4a90d9,color:#1a3a5c
+    style User fill:#e8f4fd,stroke:#4a90d9,color:#1a3a5c
     style GW fill:#fff3e0,stroke:#e09040,color:#5c3a1a
-    style Caddy fill:#e8f5e9,stroke:#66bb6a,color:#1a5c2a
     style K8s fill:#e8f5e9,stroke:#66bb6a,color:#1a5c2a
 ```
 
 | 外から見えるアドレス | 転送先 | 用途 |
 |---|---|---|
-| `192.168.2.50:443` | `172.22.10.50:443` (Caddy) | Garage Web UI (TLS) |
-| `192.168.2.50:6443` | K8s API VIP:6443 | kubectl 操作 |
+| `192.168.2.50:6443` (自宅 Wi-Fi のみ) | `172.22.52.100:6443` (`br-cluster1`) | `kubectl` 操作 (WARP 障害時のフォールバック) |
 
----
-
-## Garage まわりの通信フロー
-
-Garage には複数のポートがありますが、用途によってアクセス経路が異なります。
-
-```mermaid
-graph TB
-    subgraph wan ["外からのアクセス"]
-        ExtUser["外部ユーザー"]
-    end
-
-    subgraph gw ["br-gateway1"]
-        DNAT["DNAT<br/>:443 → 172.22.10.50:443"]
-    end
-
-    subgraph external ["br-external1 (172.22.10.50)"]
-        Caddy443["Caddy :443<br/>TLS終端"]
-        Caddy3900["Caddy :3900<br/>TLS終端"]
-        GarageWeb["Garage Web UI<br/>localhost:3902"]
-        GarageS3["Garage S3 API<br/>localhost:3900"]
-        GarageAdmin["Garage Admin API<br/>localhost:3903"]
-    end
-
-    subgraph lan ["クラスタ内"]
-        K8s["K8sノード<br/>(バックアップ)"]
-        Admin["管理者<br/>(SSH経由)"]
-    end
-
-    ExtUser -->|":443"| DNAT
-    DNAT --> Caddy443
-    Caddy443 --> GarageWeb
-
-    K8s -->|":3900"| Caddy3900
-    Caddy3900 --> GarageS3
-
-    Admin -->|"SSH → garage CLI"| GarageAdmin
-
-    style ExtUser fill:#e8f4fd,stroke:#4a90d9,color:#1a3a5c
-    style DNAT fill:#fff3e0,stroke:#e09040,color:#5c3a1a
-    style Caddy443 fill:#fce4ec,stroke:#e57373,color:#5c1a1a
-    style Caddy3900 fill:#fce4ec,stroke:#e57373,color:#5c1a1a
-    style GarageWeb fill:#f3e5f5,stroke:#ab47bc,color:#4a1a5c
-    style GarageS3 fill:#f3e5f5,stroke:#ab47bc,color:#4a1a5c
-    style GarageAdmin fill:#f3e5f5,stroke:#ab47bc,color:#4a1a5c
-    style K8s fill:#e8f5e9,stroke:#66bb6a,color:#1a5c2a
-    style Admin fill:#e8f5e9,stroke:#66bb6a,color:#1a5c2a
-```
-
-| 経路 | 用途 | TLS |
-|---|---|---|
-| 外 → GW(:443) → Caddy → Garage Web UI | Web UI を外から閲覧 | あり |
-| K8sノード → Caddy(:3900) → Garage S3 API | バックアップ (Restic, Longhorn, Barman) | あり |
-| SSH → garage CLI → Admin API (localhost:3903) | バケット作成・キー管理 | 不要 (localhost) |
+k3s の API サーバーは control-plane が `br-cluster1` の 1 台だけなので、VIP のような「複数台のどれかに向ける」仕組みは無く、常にこの 1 台に転送します。
 
 ---
 
@@ -244,10 +185,9 @@ graph TB
 ```mermaid
 graph TB
     subgraph wan ["外の世界 (WAN)"]
-        ExtSSH["SSH"]
-        ExtHTTPS["HTTPS :443"]
-        ExtK8s[":6443"]
-        ExtWeb["HTTP/HTTPS"]
+        ExtSSH["SSH<br/>(自宅Wi-Fiのみ)"]
+        ExtK8s[":6443<br/>(自宅Wi-Fiのみ)"]
+        CFEdge["Cloudflare Edge<br/>(outbound の相手)"]
     end
 
     subgraph gw ["br-gateway1"]
@@ -257,9 +197,8 @@ graph TB
 
     subgraph lan ["クラスタ内 (LAN)"]
         Nodes["K8sノード"]
-        WebSvc["Webサービス"]
-        External["br-external1<br/>(Caddy + Garage)"]
-        K8sAPI["K8s API (VIP)"]
+        K8sAPI["k3s API (br-cluster1)"]
+        CFD["cloudflared Pod"]
     end
 
     subgraph outbound ["インターネット"]
@@ -268,31 +207,27 @@ graph TB
 
     %% Input
     ExtSSH -->|"WAN→GW: SSHのみ"| Input
-    Nodes -->|"LAN→GW: SSH,DNS,etcd,監視,NTP,DHCP"| Input
+    Nodes -->|"LAN→GW: SSH,DNS,NTP,DHCP"| Input
 
-    %% Forward WAN→LAN
+    %% Forward WAN→LAN (家 LAN 発のみ)
     ExtSSH -->|"SSH"| Forward
     Forward --> Nodes
-    ExtWeb -->|"HTTP/HTTPS"| Forward
-    Forward --> WebSvc
     ExtK8s --> Forward
     Forward -->|"DNAT :6443"| K8sAPI
-    ExtHTTPS --> Forward
-    Forward -->|"DNAT :443"| External
 
     %% Forward LAN→WAN
     Nodes --> Forward
     Forward -->|"HTTP/HTTPS, DNS, NTP"| Internet
+    CFD --> Forward
+    Forward -->|"outbound QUIC/TCP :7844"| CFEdge
 
     style ExtSSH fill:#e8f4fd,stroke:#4a90d9,color:#1a3a5c
-    style ExtHTTPS fill:#e8f4fd,stroke:#4a90d9,color:#1a3a5c
     style ExtK8s fill:#e8f4fd,stroke:#4a90d9,color:#1a3a5c
-    style ExtWeb fill:#e8f4fd,stroke:#4a90d9,color:#1a3a5c
+    style CFEdge fill:#e8f4fd,stroke:#4a90d9,color:#1a3a5c
     style Input fill:#fff3e0,stroke:#e09040,color:#5c3a1a
     style Forward fill:#fff3e0,stroke:#e09040,color:#5c3a1a
     style Nodes fill:#e8f5e9,stroke:#66bb6a,color:#1a5c2a
-    style WebSvc fill:#e8f5e9,stroke:#66bb6a,color:#1a5c2a
-    style External fill:#e8f5e9,stroke:#66bb6a,color:#1a5c2a
     style K8sAPI fill:#e8f5e9,stroke:#66bb6a,color:#1a5c2a
+    style CFD fill:#e8f5e9,stroke:#66bb6a,color:#1a5c2a
     style Internet fill:#f5f5f5,stroke:#999,color:#333
 ```

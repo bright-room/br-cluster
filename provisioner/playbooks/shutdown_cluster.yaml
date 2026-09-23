@@ -1,7 +1,7 @@
 ---
 # Ordered cluster shutdown.
 #
-# Order: worker -> master (control-plane) -> external -> gateway.
+# Order: worker -> master (control-plane) -> standalone -> gateway.
 #
 # gateway (br-gateway1) is the internet entry point for every other host.
 # If any earlier tier fails, we must NOT shut it down: losing the gateway
@@ -18,8 +18,7 @@
   any_errors_fatal: true
   tasks:
     # k3s-stop playbook を先に実行する前提。走ったままシャットダウンすると
-    # etcd の整合性が壊れたり Longhorn レプリカが不整合になるリスクがある
-    # ので、ここで明示的に止まる。
+    # SQLite datastore の整合性が壊れるリスクがあるので、ここで明示的に止まる。
     - name: Check k3s / k3s-agent service state
       ansible.builtin.systemd:
         name: "{{ 'k3s' if 'master' in group_names else 'k3s-agent' }}"
@@ -52,21 +51,21 @@
   gather_facts: false
   become: true
   any_errors_fatal: true
-  # Assumes k3s-stop was run first, so etcd is already stopped and parallel
-  # shutdown is safe.
+  # Assumes k3s-stop was run first, so the SQLite datastore is already
+  # stopped and shutdown is safe.
   tasks:
     - name: Power off control-plane node
       community.general.shutdown:
         msg: "Cluster shutdown initiated by ansible"
         delay: 5
 
-- name: Shutdown external services
-  hosts: external
+- name: Shutdown standalone hosts
+  hosts: standalone
   gather_facts: false
   become: true
   any_errors_fatal: true
   tasks:
-    - name: Power off external node
+    - name: Power off standalone host
       community.general.shutdown:
         msg: "Cluster shutdown initiated by ansible"
         delay: 5

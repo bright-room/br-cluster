@@ -1,12 +1,13 @@
 # Workflow Automation
 
-クラスタ内で **ジョブネット相当** (定期実行 + 外部トリガ + ジョブ間依存 + 並列) を回すためのレイヤ。Argo Workflows 本体 (Workflow controller / argo-server UI) と Argo Events (EventBus / EventSource / Sensor) を一組で運用する。CD は Flux 続投、Argo Workflows は **ジョブ実行レイヤ専用** として責務分離する。
+クラスタ内で **ジョブネット相当** (定期実行 + ジョブ間依存 + 並列) を回すためのレイヤ。Argo Workflows 本体 (Workflow controller / argo-server UI) のみを運用する。CD は Flux 続投、Argo Workflows は **ジョブ実行レイヤ専用** として責務分離する。
+
+Argo Events (EventBus / EventSource / Sensor) は撤去済み。実利用は Workflow 完了通知 (Discord) と HTTP webhook トリガのリファレンス実装の 2 つだけで、いずれも常駐コストの大半 (NATS JetStream 3 レプリカ) に見合わなかった。詳細は spec の [Argo Workflows は存続、Argo Events は撤去](../proposals/2026-09-05-single-cp-rearch.md#argo-workflows-は存続argo-events-は撤去) を参照。
 
 ## このグループが解決する課題
 
 - 素の `CronJob` / `Job` では表現できない以下を宣言的に書けるようにする:
   - ジョブ間の **依存関係** (A → B、A → B/C 並列、最後に D)
-  - **外部トリガ** (HTTP webhook で起動)
   - **並列ファンアウト** (項目数が動的なバッチ処理)
   - **再実行 / 条件分岐 / リトライ戦略** の統一的な記述
 - Workflow の **完了 / 失敗通知** を全ジョブで横断的に仕込む (個別 onExit を書かない)
@@ -18,39 +19,30 @@
 flowchart LR
   subgraph Cluster["br-cluster (argo-workflows ns)"]
     direction TB
-    subgraph Events["Argo Events"]
-      ES_WF[EventSource<br/>resource: workflows]
-      ES_WH[EventSource<br/>webhook]
-      EB[EventBus default<br/>NATS JetStream x3]
-      SN_NT[Sensor notify-discord]
-      SN_WH[Sensor sample-webhook]
-    end
     subgraph Workflows["Argo Workflows"]
       CTRL[workflow-controller]
       SRV[argo-server UI]
       WF[Workflow Pods]
-      WT_DC[WorkflowTemplate<br/>notify-discord]
-      WT_DAG[WorkflowTemplate<br/>dag-sample]
-      CWF[CronWorkflow<br/>hello]
+      WT_DC[WorkflowTemplate notify-discord]
+      WT_DAG[WorkflowTemplate dag-sample]
+      CWF[CronWorkflow hello]
     end
   end
 
   subgraph External["クラスタ外"]
-    PG[(platform-pg<br/>workflow archive)]
-    S3[Garage S3<br/>argo-workflows bucket]
+    PG[(br-db1 PostgreSQL)]
+    S3[br-storage1 Garage]
     DC[Discord webhook]
     ZT[Zitadel OIDC]
   end
 
   CWF -. cron .-> CTRL --> WF
-  WF -->|status update| ES_WF --> EB
-  EB --> SN_NT -->|create| WT_DC --> WF
+  WF -->|exit hook| WT_DC
   WT_DC -->|HTTP POST| DC
   WF -->|artifact / log| S3
   CTRL -->|archive| PG
   SRV -->|history| PG
   SRV -.->|SSO| ZT
-  ES_WH --> EB --> SN_WH -->|create| WT_DAG
 ```
 
 ## グループ全体の設計判断
@@ -58,14 +50,12 @@ flowchart LR
 | 判断 | 採用 | 不採用 / 旧構成 | 理由 |
 |---|---|---|---|
 | ジョブネット基盤 | Argo Workflows | Airflow / Tekton / 素の CronJob | k8s ネイティブ、YAML 定義、Flux と相性良。Airflow は DSL + DB が Pi に重い、Tekton は CI 寄り、CronJob は依存・並列・通知が組めない |
-| イベント駆動 | Argo Events (同 Project) | Knative Eventing | Workflows と同じ Argo Project、CRD 完結、Knative は依存が広すぎ |
-| EventBus | NATS JetStream 3 replica | NATS Streaming (deprecated) | JetStream は永続化 / 重複配送あり (at-least-once) |
-| Workflow archive | platform-pg (CNPG) に Database CRD で別 DB | 専用 PG / SQLite | 既存 CNPG 流用、SQLite は Pod 再起動で消える |
-| Artifact storage | Garage S3 (br-external1) | Longhorn PVC | Pod 退役後もログ・成果物が残る、Loki/Tempo と同じバックエンド (user/bucket は分離) |
+| イベント駆動レイヤ | **撤去** (workflowDefaults の exit hook で代替) | Argo Events (EventBus + EventSource + Sensor) | 常駐コストの大半 (NATS JetStream 3 レプリカ) を Argo Events が占めていたが、実利用は完了通知と webhook サンプルの 2 つだけで、いずれも Argo Events なしで代替可能。詳細は [不採用の代替候補比較](../proposals/2026-09-05-single-cp-rearch.md#argo-workflows-は存続argo-events-は撤去) |
+| Workflow archive | `br-db1` の PostgreSQL に `argo_workflows` DB を作成 | platform-pg (CNPG) に Database CRD で別 DB | CloudNativePG 撤去に伴い、PostgreSQL 利用者を `br-db1` の単一インスタンスに集約 |
+| Artifact storage | Garage S3 (`br-storage1`) | Longhorn PVC | Pod 退役後もログ・成果物が残る。Longhorn 撤去後の唯一の永続化経路 |
 | UI 公開 | HTTPRoute + argo-server `--auth-mode=sso` (Zitadel) | Envoy SecurityPolicy + アプリ自前 OIDC の二段重ね | Grafana と同型。二重 OIDC ダンスを避ける、CF Access が外側で GitHub org + WARP を担当 |
 | Workflow Pod RBAC | chart の `workflow.serviceAccount.create: true` で `argo-workflow` SA を作成、`workflowDefaults.spec.serviceAccountName` で強制 | default SA (無権限) | wait コンテナが workflowtaskresults を書き込む権限が要る |
-| 完了通知 | resource EventSource → Sensor → notify-discord WorkflowTemplate → curl で Discord embed | Workflow 個別の onExit | DRY、横断的に統一、UI へのリンクや embed 整形は WorkflowTemplate script で集中 |
-| 再帰トリガ防止 | EventSource の `filter.labels` で `notify.b8m.app/skip != "true"` を除外 | Sensor data/expr filter | argo-events filter は path 不在で event 全体 discard する仕様、k8s label selector は不在を「不一致」扱いするため使える |
+| 完了通知 | `controller.workflowDefaults.spec.hooks.exit` の `templateRef` から notify-discord WorkflowTemplate を起動 → curl で Discord embed | Argo Events の resource EventSource → Sensor 経由 / Workflow 個別の onExit | `spec.onExit` は同一 Workflow 内の template 名しか取れず WorkflowTemplate を参照できないため、`LifecycleHook` の `templateRef` を使う。DRY で全 Workflow に一括適用できる当初の狙いはそのまま満たせる |
 
 ---
 
@@ -78,7 +68,7 @@ Workflow 定義 (CRD `Workflow` / `WorkflowTemplate` / `CronWorkflow`) を `work
 ### ソース
 
 - Helm: [`manifests/platform/argo-workflows/app/`](../../manifests/platform/argo-workflows/app/)
-  - chart `argo-workflows` 1.0.13 (HelmRepository, `https://argoproj.github.io/argo-helm`)
+  - chart `argo-workflows` 1.0.14 (HelmRepository, `https://argoproj.github.io/argo-helm`)
 - 設定:
   - [`values-workflows.yaml`](../../manifests/platform/argo-workflows/app/base/values-workflows.yaml) — controller / server / persistence / artifactRepository / sso
   - [`overlays/prod/values-workflows.yaml`](../../manifests/platform/argo-workflows/app/overlays/prod/values-workflows.yaml) — Pi 向け resource limits
@@ -91,9 +81,10 @@ Workflow 定義 (CRD `Workflow` / `WorkflowTemplate` / `CronWorkflow`) を `work
 | `controller.workflowDefaults.spec.serviceAccountName` | `argo-workflow` (Workflow Pod の SA を強制) |
 | `controller.workflowDefaults.spec.ttlStrategy` | 成功 1 日 / 失敗 3 日で k8s 上の Workflow CR を GC |
 | `controller.workflowDefaults.spec.podGC.strategy` | `OnWorkflowSuccess` (失敗時の Pod は残す) |
-| `controller.persistence.archive` | `true`、`platform-pg-rw.platform-pg` の `argo_workflows` DB へ |
+| `controller.workflowDefaults.spec.hooks.exit` | `templateRef: notify-discord/post` を全 Workflow に強制適用 ([完了通知](#完了通知-notify-discord) 節) |
+| `controller.persistence.archive` | `true`、`rdbms.prod.internal-service.bright-room.net` の `argo_workflows` DB へ |
 | `controller.persistence.archiveTTL` | `30d` |
-| `artifactRepository.s3` | Garage `argo-workflows` bucket (`object-storage.cluster-internal.bright-room.net:3900`) |
+| `artifactRepository.s3` | Garage `argo-workflows` bucket (`object-storage.prod.internal-service.bright-room.net:3900`) |
 | `artifactRepository.archiveLogs` | `true` (pod log も S3 へ) |
 | `server.secure` | `false` (Envoy で TLS 終端) |
 | `server.extraArgs` | `--auth-mode=sso` |
@@ -123,62 +114,34 @@ argo submit -n argo-workflows --from cronworkflow/hello --watch
 
 ---
 
-## Argo Events
-
-### 概要
-
-イベント駆動で Workflow を起動する仕組み。`EventSource` がイベント源 (k8s リソース watch / webhook 等) を扱い、`EventBus` (NATS JetStream) を経由して `Sensor` がトリガを実行。
-
-### ソース
-
-- Helm: [`manifests/platform/argo-workflows/app/`](../../manifests/platform/argo-workflows/app/) (chart `argo-events` 2.4.21、同じ Flux Kustomization)
-- 設定:
-  - [`values-events.yaml`](../../manifests/platform/argo-workflows/app/base/values-events.yaml) — JetStream version / image (`metricsExporterImage` **必須**)
-- EventBus: [`eventbus.yaml`](../../manifests/platform/argo-workflows/app/base/eventbus.yaml) — `default` JetStream 3 replica / Longhorn 1Gi PVC
-
-### EventBus / Sensor の挙動の落とし穴
-
-| 落とし穴 | 仕様 / 対処 |
-|---|---|
-| at-least-once 配送 | leader election や Sensor 再起動で Workflow が複数回起動し得る。**Sensor から起動する Workflow は冪等前提で書く** (deterministic name で create 409 にする等) |
-| filter `data` / `expr` の path 不在 | path が無い event は filter 全体が error で discard される。「ラベルがある時だけ除外」のような分岐は **EventSource の `filter.labels` (k8s label selector)** に逃がす |
-| HTTP trigger の url に Secret 直接参照不可 | webhook URL を Secret に置きたい場合は **Workflow trigger 経由 (Pod env from Secret)** が筋。HTTP trigger は in-cluster な相手向け |
-
----
-
 ## 完了通知 (notify-discord)
 
 ### フロー
 
-1. argo-workflows ns 内の Workflow が status 更新 → `EventSource notify-workflow` (resource type) が UPDATE を捕捉
-2. EventSource の `filter.labels` で `notify.b8m.app/skip != "true"` の Workflow だけを EventBus に publish (notify-discord 自身が再帰しないため)
-3. `Sensor notify-discord` が `phase == Succeeded / Failed / Error` を判定し、`notify-discord` WorkflowTemplate を起動
-4. WorkflowTemplate が curl で Discord webhook に embed カードを POST
+1. Workflow が完了 (Succeeded / Failed / Error) すると `controller.workflowDefaults.spec.hooks.exit` により `notify-discord` WorkflowTemplate が起動する ([`values-workflows.yaml`](../../manifests/platform/argo-workflows/app/base/values-workflows.yaml))
+2. exit hook の `arguments.parameters` が Argo の workflow 変数 (`{{workflow.name}}` 等) から 7 パラメータを埋めて渡す。旧 Argo Events の Sensor がイベントペイロードから埋めていたのと同じ項目
+3. WorkflowTemplate が curl で Discord webhook に embed カードを POST
 
 ### ソース
 
-- [`notify/`](../../manifests/platform/argo-workflows/notify/) サブコンポーネント
-  - `eventsource-workflow.yaml` / `sensor-discord.yaml` / `workflowtemplate-discord.yaml` / `rbac.yaml` / `externalsecret-discord.yaml`
-
-### 通知抑止
-
-特定の Workflow を通知させたくない場合は `metadata.labels."notify.b8m.app/skip": "true"` を付ける。EventSource レイヤで弾かれる。
+- [`workflowtemplate-discord.yaml`](../../manifests/platform/argo-workflows/app/base/workflowtemplate-discord.yaml)
 
 ### embed 文言のカスタマイズ
 
-[`workflowtemplate-discord.yaml`](../../manifests/platform/argo-workflows/notify/base/workflowtemplate-discord.yaml) の `templates[0].script.source` の sh ブロックを編集する。phase ごとの emoji / color、fields の項目はここで完結。
+[`workflowtemplate-discord.yaml`](../../manifests/platform/argo-workflows/app/base/workflowtemplate-discord.yaml) の `templates[0].script.source` の sh ブロックを編集する。phase ごとの emoji / color、fields の項目はここで完結。
 
 ---
 
 ## サンプル
 
-[`samples/`](../../manifests/platform/argo-workflows/samples/) に proposal 受け入れ基準 1〜4 を満たすリファレンス実装が常駐:
+[`samples/`](../../manifests/platform/argo-workflows/samples/) に proposal 受け入れ基準を満たすリファレンス実装が常駐:
 
 | ファイル | 受け入れ基準 | 検証方法 |
 |---|---|---|
-| `cronworkflow-hello.yaml` | 1 (定期実行) | default で suspended、`argo submit --from cronworkflow/hello` で 1 回実行 |
-| `workflowtemplate-dag.yaml` | 3 (DAG 並列) + 4 (artifact 永続化) | `argo submit --from workflowtemplate/dag-sample` で A → B/C 並列 → D、artifact が S3 に出る |
-| `eventsource-webhook.yaml` + `sensor-webhook.yaml` | 2 (外部トリガ) | クラスタ内 curl で `http://sample-webhook-eventsource-svc:12000/sample` に POST |
+| `cronworkflow-hello.yaml` | 定期実行 | default で suspended、`argo submit --from cronworkflow/hello` で 1 回実行 |
+| `workflowtemplate-dag.yaml` | DAG 並列 + artifact 永続化 | `argo submit --from workflowtemplate/dag-sample` で A → B/C 並列 → D、artifact が S3 に出る |
+
+HTTP webhook トリガのリファレンス実装 (`eventsource-webhook.yaml` + `sensor-webhook.yaml`) は Argo Events 撤去に伴い削除。外部公開しておらず実利用もなかったため、将来 HTTP トリガが必要になった時点で Argo Events を戻すか別手段を検討する。
 
 ---
 
@@ -188,12 +151,10 @@ argo submit -n argo-workflows --from cronworkflow/hello --watch
 
 ```bash
 # 全リソースの状態
-kubectl get wf,wt,cwf,sensor,eventsource,eventbus -n argo-workflows
+kubectl get wf,wt,cwf -n argo-workflows
 
-# controller / server / events のログ
+# controller / server のログ
 stern -n argo-workflows -l app.kubernetes.io/name=argo-workflows-workflow-controller --tail=50
-stern -n argo-workflows -l sensor-name --tail=50
-stern -n argo-workflows -l eventsource-name --tail=50
 
 # Workflow Pod の wait/main ログ
 argo logs -n argo-workflows <workflow-name> --follow
@@ -201,25 +162,21 @@ argo logs -n argo-workflows <workflow-name> --follow
 
 ### Discord 通知が来ない時
 
-1. EventSource `notify-workflow` が Ready か (`kubectl get eventsource -n argo-workflows`)
-2. `kubectl logs -n argo-workflows -l sensor-name=notify-discord --tail=50 | grep -E "filter|trigger|error"` で reject 理由を確認
-3. notify-discord Workflow が立っているか (`kubectl get wf -n argo-workflows -l notify.b8m.app/skip=true`)
-4. notify-discord Workflow の curl 出力 (`argo logs -n argo-workflows notify-discord-xxx`)
+1. 対象 Workflow の exit hook が起動したか (`kubectl get wf -n argo-workflows -l workflows.argoproj.io/completed=true` で完了 Workflow を確認、`argo get -n argo-workflows <workflow-name>` で hook ステップの状態を見る)
+2. notify-discord Workflow (hook が生成する子 Workflow) の curl 出力 (`argo logs -n argo-workflows <workflow-name>-notify-discord-post` 相当)
+3. `argo-workflows-discord` Secret (webhook URL) が存在するか
 
 ### UI に "Failed to connect" が出る
 
 argo-server の SSE ストリームが Envoy で切られている。`BackendTrafficPolicy` の timeout 設定 ([`config/base/backendtrafficpolicy.yaml`](../../manifests/platform/argo-workflows/config/base/backendtrafficpolicy.yaml)) を確認。1h で足りないようなら延長する。
-
-### EventBus が NotReady
-
-`kubectl describe eventbus -n argo-workflows default` で StatefulSet 作成エラーを確認。`metricsExporterImage` の設定漏れが頻出。
 
 ### chart upgrade 時の確認ポイント
 
 argo-workflows は chart の値構造 / CRD schema が破壊的に変わることがある (例: v3 → v4 で `CronWorkflow.spec.schedule` が `schedules: []` に変更)。bump 後は:
 
 1. `make manifests/build` が通る
-2. `kubectl get wf,cwf,wt,sensor -n argo-workflows` がエラーなく Apply される
+2. `kubectl get wf,cwf,wt -n argo-workflows` がエラーなく Apply される
 3. サンプル Workflow が走る (`argo submit --from cronworkflow/hello --watch`)
+4. `workflowDefaults.hooks.exit.templateRef` が新バージョンでも有効なことを確認 (chart / Workflow controller のマイナー更新で `LifecycleHook` の仕様が変わることがある)
 
 を確認する。

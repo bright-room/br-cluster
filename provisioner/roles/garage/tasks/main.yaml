@@ -1,0 +1,15 @@
+---
+- name: Install Garage
+  include_tasks: install.yaml
+  tags: [garage]
+
+- name: Create Garage buckets
+  include_tasks: buckets.yaml
+  tags: [garage]
+
+- name: Create Garage access keys
+  include_tasks: keys.yaml
+  with_items: "{{ garage.provisioning.users }}"
+  loop_control:
+    loop_var: garage_user_item
+  tags: [garage]

@@ -11,26 +11,25 @@
 | 項目 | 値 |
 |------|-----|
 | 自動更新の仕組み | `unattended-upgrades` (security pocket only) |
-| 適用対象 | 全 host (k3s ノード + `br-gateway1` + `br-external1`) |
-| reboot オーケストレーション | k3s ノードは kured (01:00–02:30 JST) / 非 k3s は uu 自身 (gateway 03:00 / external 04:00 JST) |
-| 通知 | Discord `#br-cluster-prod-maintenance` (uu hook + kured shoutrrr) |
+| 適用対象 | 全 host (`br-gateway1` / `br-db1` / `br-storage1` / `br-observability1` / `br-ai1` / `br-cluster1-3`) |
+| reboot オーケストレーション | standalone ホスト (`br-db1` / `br-storage1` / `br-observability1` / `br-ai1`) と `br-gateway1` は uu 自身が自動再起動 (gateway 03:00 / standalone 04:00 JST)。**k3s ノード (`br-cluster1-3`) は自動再起動しない** (kured 撤去済み) — 再起動待ちのノードは手動で順番に再起動する運用 |
+| 通知 | Discord `#br-cluster-prod-maintenance` (uu hook) |
 | ログ場所 | `/var/log/unattended-upgrades/unattended-upgrades.log` (各ホスト) |
 
 ## 0. regression 検知の入口
 
 | 入口 | 何を見るか |
 |------|----------|
-| Discord 通知 | uu hook の embed 色 (赤 = エラー終了) / kured の reboot 通知後にアプリエラーが続く |
-| Grafana | アプリエラー率 / Longhorn `volume_robustness` / k3s ノードの `NotReady` |
-| 手動気付き | サービスが動かない、特定コマンドが失敗するなど |
+| Discord 通知 | uu hook の embed 色 (赤 = エラー終了) |
+| 手動気付き | サービスが動かない、`kubectl get nodes` で `NotReady`、特定コマンドが失敗するなど |
 
 ## 1. 影響範囲の特定
 
 regression を踏んでいるホストとパッケージを切り分ける。
 
 ```sh
-# 該当ホストにログイン (例: br-node3)
-ssh br-node3
+# 該当ホストにログイン (例: br-cluster2)
+ssh br-cluster2
 
 # 当日 / 直近の uu 適用ログ
 sudo less /var/log/unattended-upgrades/unattended-upgrades.log
@@ -67,21 +66,11 @@ uv run ansible all -i inventories/prod -m systemd -b \
 ### 1 ホストだけ止める
 
 ```sh
-ssh br-node3 sudo systemctl stop apt-daily-upgrade.timer apt-daily.timer
-ssh br-node3 sudo systemctl disable apt-daily-upgrade.timer apt-daily.timer
+ssh br-cluster2 sudo systemctl stop apt-daily-upgrade.timer apt-daily.timer
+ssh br-cluster2 sudo systemctl disable apt-daily-upgrade.timer apt-daily.timer
 ```
 
-### kured の reboot も止める (k3s ノードで rollback 中)
-
-rollback 中に kured が reboot を走らせると更に状況が悪化するので一時停止。
-
-```sh
-# 全 k3s ノードに annotation を打って kured の reboot を抑止
-kubectl annotate node --all kured.dev/kured-reboot-blocked=true --overwrite
-
-# DaemonSet を 0 にする方式 (より確実)
-kubectl scale ds -n kube-system kured --replicas=0
-```
+k3s ノードは自動再起動しない設定 (`unattended_upgrades_automatic_reboot: false`) のため、kured のような reboot オーケストレーションを別途止める手順は不要。
 
 ## 3. パッケージを旧バージョンに戻す
 
@@ -89,7 +78,7 @@ kubectl scale ds -n kube-system kured --replicas=0
 
 ```sh
 # 例: openssl が 3.0.2-0ubuntu1.18 → 3.0.2-0ubuntu1.19 で壊れた場合
-ssh br-node3
+ssh br-cluster2
 sudo apt install --allow-downgrades openssl=3.0.2-0ubuntu1.18
 
 # 以後 unattended-upgrades が再度上書きしないように hold
@@ -122,7 +111,6 @@ uv run ansible all -i inventories/prod -m dpkg_selections -b \
 | パッケージバージョン | `dpkg -l <pkg>` または `apt-cache policy <pkg>` で固定済を確認 |
 | サービス | regression を踏んだサービスを restart して挙動確認 |
 | k3s ノード | `kubectl get nodes` で Ready / `kubectl get pods -A` で異常 Pod を確認 |
-| Longhorn | UI / Grafana で `volume_robustness=1 (healthy)` に戻ったか |
 
 ## 5. 自動更新の再開
 
@@ -133,15 +121,6 @@ uv run ansible all -i inventories/prod -m systemd -b \
   -a 'name=apt-daily.timer state=started enabled=yes'
 uv run ansible all -i inventories/prod -m systemd -b \
   -a 'name=apt-daily-upgrade.timer state=started enabled=yes'
-```
-
-kured を戻す:
-
-```sh
-kubectl annotate node --all kured.dev/kured-reboot-blocked- --overwrite
-# または
-kubectl scale ds -n kube-system kured --replicas=1
-# (chart は DaemonSet なので replicas 概念は無いが、 kustomize patch で 0 にしていた場合のみ)
 ```
 
 ## 6. 恒久対応
@@ -161,6 +140,4 @@ kubectl scale ds -n kube-system kured --replicas=1
 ## 関連 doc
 
 - 設計: [`docs/proposals/ubuntu-auto-update.md`](../proposals/ubuntu-auto-update.md)
-- kured manifest: [`manifests/platform/kured/app/base/values.yaml`](../../manifests/platform/kured/app/base/values.yaml)
 - uu Ansible role: [`provisioner/roles/common/tasks/unattended_upgrades.yaml`](../../provisioner/roles/common/tasks/unattended_upgrades.yaml)
-- Longhorn rebuild 抑止 alert: [`manifests/platform/kube-prometheus-stack/rules/base/rule-storage.yaml`](../../manifests/platform/kube-prometheus-stack/rules/base/rule-storage.yaml) (`LonghornVolumeRebuilding`)

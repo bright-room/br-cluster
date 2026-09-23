@@ -14,3 +14,7 @@
 - name: NTP configuration
   include_tasks: ntp.yaml
   tags: [ntp]
+
+- name: Cloudflared (br-infra Tunnel) configuration
+  include_tasks: cloudflared.yaml
+  tags: [cloudflared]

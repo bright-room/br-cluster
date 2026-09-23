@@ -6,29 +6,29 @@
 }
 
 {% set gw = cluster_hosts | selectattr('name', 'equalto', 'br-gateway1') | first %}
-{{ cluster_domain }}:53 {
+{{ host_domain }}:53 {
     bind {{ gw.ip }}
     hosts {
 {% for host in cluster_hosts %}
-{% for domain in host.domains.values() %}
-        {{ host.ip }}     {{ domain }}
-{% endfor %}
-{% endfor %}
-{% for vip in cluster_vips %}
-{% if vip.domain is defined %}
-        {{ vip.ip }}     {{ vip.domain }}
-{% endif %}
+        {{ host.ip }}     {{ host.domains.server }}
 {% endfor %}
         fallthrough
-    }
-    etcd {
-        path /skydns
-        endpoint http://{{ gw.ip }}:2379
     }
     import common
 }
 
-{{ cluster_domain }}:53 {
+{{ service_domain }}:53 {
+    bind {{ gw.ip }}
+    hosts {
+{% for record in service_records %}
+        {{ (cluster_hosts | selectattr('name', 'equalto', record.host) | first).ip }}     {{ record.name }}.{{ service_domain }}
+{% endfor %}
+        fallthrough
+    }
+    import common
+}
+
+{{ service_domain }}:53 {
     bind {{ wan_ip }}
     hosts {
 {% for domain in wan_exposed_domains %}

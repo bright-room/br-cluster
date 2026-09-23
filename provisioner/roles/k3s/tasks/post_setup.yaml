@@ -28,12 +28,12 @@
       clusters:
         - name: default
           cluster:
-            server: "https://{{ k3s_api_vip_domain }}:6443"
+            server: "https://{{ k3s_api_domain }}:6443"
             certificate-authority-data: "{{ _k3s_kubeconfig.clusters[0].cluster['certificate-authority-data'] }}"
         - name: default-wan
           cluster:
             server: "https://{{ hostvars['br-gateway1'].wan_ip }}:6443"
-            tls-server-name: "{{ k3s_api_vip_domain }}"
+            tls-server-name: "{{ k3s_api_domain }}"
             certificate-authority-data: "{{ _k3s_kubeconfig.clusters[0].cluster['certificate-authority-data'] }}"
       users:
         - name: default

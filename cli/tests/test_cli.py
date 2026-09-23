@@ -65,9 +65,9 @@ class TestResolveServers:
         assert len(result) == 3
 
     def test_filters_by_name(self, sample_inventory: Inventory) -> None:
-        result = _resolve_servers(sample_inventory, "dev", "br-node1")
+        result = _resolve_servers(sample_inventory, "dev", "br-cluster1")
         assert len(result) == 1
-        assert result[0].name == "br-node1"
+        assert result[0].name == "br-cluster1"
 
     def test_unknown_env_raises(self, sample_inventory: Inventory) -> None:
         with pytest.raises(Exception, match="Unknown environment"):

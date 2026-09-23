@@ -6,23 +6,29 @@ environments:
 servers:
   - name: br-gateway1
     type: gateway
-  - name: br-external1
-    type: external
-  - name: br-node1
+  - name: br-db1
+    type: standalone
+    services:
+      - postgresql
+      - certbot
+  - name: br-storage1
+    type: standalone
+    services:
+      - garage
+      - caddy
+      - certbot
+  - name: br-observability1
+    type: standalone
+    services: []
+  - name: br-ai1
+    type: standalone
+    services: []
+  - name: br-cluster1
     type: node
     k8s_role: primary
-  - name: br-node2
-    type: node
-    k8s_role: secondary
-  - name: br-node3
-    type: node
-    k8s_role: secondary
-  - name: br-node4
+  - name: br-cluster2
     type: node
     k8s_role: worker
-  - name: br-node5
-    type: node
-    k8s_role: worker
-  - name: br-node6
+  - name: br-cluster3
     type: node
     k8s_role: worker

@@ -7,13 +7,13 @@ metadata:
 spec:
   concurrency: 1
   cordon: true
-  # Phase 1a: テスト worker 1 台 (br-node5) にのみ適用。
+  # Phase 1a: テスト worker 1 台 (br-cluster2) にのみ適用。
   # 他 worker / control-plane への影響を遮断した状態で動作確認する。
   # Phase 1b で control-plane 除外の本番 selector に解放する想定
   # (docs/proposals/k3s-upgrade.md 参照)。
   nodeSelector:
     matchExpressions:
-      - { key: kubernetes.io/hostname, operator: In, values: ["br-node5"] }
+      - { key: kubernetes.io/hostname, operator: In, values: ["br-cluster2"] }
   serviceAccountName: system-upgrade
   # renovate: datasource=github-releases depName=k3s-io/k3s versioning=loose
   version: "v1.35.3+k3s1"

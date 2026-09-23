@@ -15,16 +15,9 @@ gpu_memory_mb: 16
 ##################################
 # Storage configuration
 # storage_mode:
-#   none - OS ディスク全体を root に使う (gateway1, node1-3)
-#   ext4 - OS 用 + データ用パーティションに分割 (external1, node4-6)
+#   none - OS ディスク全体を root に使う (gateway1, cluster1-3)
+#   ext4 - OS 用 + データ用パーティションに分割 (db1, storage1, observability1, ai1)
 ##################################
 storage_mode: none
 os_partition_size_mib: 65536  # 64 GiB
 mount_opts: "defaults,noatime,discard,nofail"
-
-##################################
-# Monitoring agent
-##################################
-# Ship systemd-journald to Loki via the internal Envoy Gateway (P2-C).
-# Applies to every host in the br_cluster group (k3s + gateway + external).
-alloy_journal_enabled: true

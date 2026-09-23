@@ -4,13 +4,4 @@ k3s:
   cluster:
     port: "6443"
 
-# Kube-VIP floating IP for K8s API (replaces HAProxy)
-k3s_api_vip_address: "{{ (cluster_vips | selectattr('name', 'equalto', 'k8s-api') | first).ip }}"
-k3s_api_vip_domain: "{{ (cluster_vips | selectattr('name', 'equalto', 'k8s-api') | first).domain }}"
-
-# k3s ノードは localhost の NodePort 経由で Loki に push する。
-# Cilium eBPF kube-proxy replacement が NodePort → backend pod に変換する
-# ので自ノードが internal-gateway の L2 lease holder でも問題なし。
-# 非 k3s ノード (gateway / external) はこの経路が使えないので defaults
-# (ドメイン経由) のまま使う。
-alloy_journal_loki_push_url: "http://127.0.0.1:30800/loki/api/v1/push"
+k3s_api_domain: "k8s-api.{{ service_domain }}"

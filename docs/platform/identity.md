@@ -11,24 +11,26 @@
 
 ## グループ全体構成
 
+<!-- TODO(figure): 2026-09-05 のノード再編を未反映。draw.io で更新が必要 -->
+
 ![Identity 全体構成](../assets/identity.svg)
 
 OIDC クライアント側の接続パターンには 2 種類ある:
 
 | パターン | 例 | 仕組み |
 |---|---|---|
-| **Native OIDC** (アプリ自前) | Grafana | アプリが OIDC / OAuth2 をネイティブに喋る。`tf-zitadel-output` の `<app>_client_id` / `<app>_client_secret` を `ExternalSecret` で取り込み、`auth.b8m.app` の token endpoint に **直接** アクセスする。**`SecurityPolicy` は不要** |
-| **Envoy SecurityPolicy** (Envoy 肩代わり) | Prometheus / Alertmanager / Hubble UI / Longhorn UI 等 | アプリは認証を喋れない / 共通化したい場合、HTTPRoute に `SecurityPolicy` を attach し Envoy が OIDC を肩代わり。未認証なら Zitadel にリダイレクトし、cookie で sidecar 化。さらに `jwt` provider ＋ `authorization` で `roles` claim を検査し **到達可否のロール認可** まで行う (access token は JWT 型) |
+| **Native OIDC** (アプリ自前) | Argo Workflows / Flux Web | アプリが OIDC / OAuth2 をネイティブに喋る。`tf-zitadel-output` の `<app>_client_id` / `<app>_client_secret` を `ExternalSecret` で取り込み、`auth.b8m.app` の token endpoint に **直接** アクセスする。**`SecurityPolicy` は不要** |
+| **Envoy SecurityPolicy** (Envoy 肩代わり) | Hubble UI | アプリは認証を喋れない / 共通化したい場合、HTTPRoute に `SecurityPolicy` を attach し Envoy が OIDC を肩代わり。未認証なら Zitadel にリダイレクトし、cookie で sidecar 化。さらに `jwt` provider ＋ `authorization` で `roles` claim を検査し **到達可否のロール認可** まで行う (access token は JWT 型) |
 
 どちらのパターンでも、Zitadel 側の OIDC アプリ宣言は **`br-cluster-zitadel-terraform` の `oidc_application` モジュール群** (`br-dev` org の `platform` project) に集約され、tofu-controller が apply した結果が `tf-zitadel-output` Secret に書き出される (一次元情報)。クライアント側 (br-cluster) はそれを読むだけ。
 
-ロールの強制スタイルは 2 系統: **Native OIDC** はアプリ内 RBAC に `roles` claim をマップ (Grafana → Org role、Argo → SSO RBAC の SA、Flux Web → email impersonation ＋ k8s RBAC)。**Envoy SecurityPolicy** は `authorization` で到達可否のバイナリ判定。詳細は [#組織・プロジェクト・ロール (RBAC)](#組織プロジェクトロール-rbac)。
+ロールの強制スタイルは 2 系統: **Native OIDC** はアプリ内 RBAC に `roles` claim をマップ (Argo → SSO RBAC の SA、Flux Web → email impersonation ＋ k8s RBAC)。**Envoy SecurityPolicy** は `authorization` で到達可否のバイナリ判定。詳細は [#組織・プロジェクト・ロール (RBAC)](#組織プロジェクトロール-rbac)。
 
 ## グループ全体の設計判断
 
 | 判断 | 採用 | 不採用 / 旧構成 | 理由 |
 |---|---|---|---|
-| OIDC IdP                | Zitadel (Go + Postgres) | Keycloak | JVM が Pi で重い、DB 運用コスト。Zitadel は CNPG (既存) に乗る |
+| OIDC IdP                | Zitadel (Go + Postgres) | Keycloak | JVM が Pi で重い、DB 運用コスト。Zitadel は `br-db1` の PostgreSQL (既存) に乗る |
 | Zitadel リソース管理    | OpenTofu + tofu-controller (in-cluster) | console 手動 / GitHub Actions で apply | state を k8s Secret に置けばクラスタ寿命と同期。GitOps から外れない |
 | クラスタ内 OIDC 解決経路 | CoreDNS で `auth.b8m.app` を Envoy VIP にリダイレクト | CF Tunnel を一周 | CF Access がクラスタ内クライアントの token endpoint を 403 で弾く問題を回避 |
 | Envoy SecurityPolicy → Zitadel 参照 | `backendRefs` (Service 直指し) | `issuer` の DNS 解決まかせ | Envoy の c-ares リゾルバが in-cluster STRICT_DNS を取りこぼすことがあるため EDS 経由で確実化 |
@@ -46,7 +48,7 @@ OIDC クライアント側の接続パターンには 2 種類ある:
 
 ### 概要
 
-Go 製の OIDC / OAuth2 / SAML IdP。`auth.b8m.app` で公開し、CNPG の `zitadel` データベースに永続化する。
+Go 製の OIDC / OAuth2 / SAML IdP。`auth.b8m.app` で公開し、`br-db1` の PostgreSQL の `zitadel` データベースに永続化する。
 
 ### ソース
 
@@ -61,8 +63,8 @@ Go 製の OIDC / OAuth2 / SAML IdP。`auth.b8m.app` で公開し、CNPG の `zit
 |------|-----------|
 | 公開ドメイン            | `auth.b8m.app` (`ExternalDomain`) |
 | クラスタ内 TLS          | Off (`TLS.Enabled: false`)。Envoy が TLS 終端し、Pod へは HTTP |
-| データベース            | CNPG `platform-pg-rw.platform-pg.svc.cluster.local:5432` / database `zitadel`、ユーザー `zitadel` (DB owner) |
-| 初期化                  | `initJob.command: zitadel` で **CNPG 側が作った DB / Role を再利用** (Helm 同梱の create を skip) |
+| データベース            | `rdbms.prod.internal-service.bright-room.net:5432` (`br-db1` の PostgreSQL) / database `zitadel`、ユーザー `zitadel` (DB owner) |
+| 初期化                  | `initJob.command: zitadel` で **Ansible `postgresql` role が作った DB / Role を再利用** (Helm 同梱の create を skip) |
 | Master key / DB password | 1Password 経由で `zitadel-secrets` Secret に注入 (External Secrets) |
 | SMTP                    | **Resend で稼働中** (`zitadel_smtp_config`、`set_active=true`)。招待 / メール検証 / パスワードリセットに使用。creds は 1Password `resend` item → `zitadel-smtp-creds` Secret → tofu-controller `varsFrom` |
 | Replica                 | 1 (Pi のリソース節約)、worker ノード固定 (`nodeSelector: node_type: worker`) |
@@ -78,7 +80,7 @@ Go 製の OIDC / OAuth2 / SAML IdP。`auth.b8m.app` で公開し、CNPG の `zit
 
 ### ReferenceGrant の用途
 
-別 namespace の `SecurityPolicy` (`kube-prom-stack` / `kube-system` / `longhorn-system`) から `zitadel` Service を `backendRefs` で参照させるための許可。**Envoy の c-ares リゾルバが in-cluster STRICT_DNS で取りこぼす問題の回避策**として、DNS ではなく EDS で当てている。
+別 namespace の `SecurityPolicy` (`kube-system`) から `zitadel` Service を `backendRefs` で参照させるための許可。**Envoy の c-ares リゾルバが in-cluster STRICT_DNS で取りこぼす問題の回避策**として、DNS ではなく EDS で当てている。オブザーバビリティ / Longhorn 撤去に伴い、それらの namespace からの参照は削除済み。
 
 ### CoreDNS のショートカット
 
@@ -87,6 +89,8 @@ Go 製の OIDC / OAuth2 / SAML IdP。`auth.b8m.app` で公開し、CNPG の `zit
 ```text
 ${CLUSTER_GATEWAY_IP} auth.b8m.app
 ```
+
+`CLUSTER_GATEWAY_IP` は `172.22.52.200` (cluster-gateway)。
 
 これにより、クラスタ内 Pod (tofu-controller、Envoy SecurityPolicy の OIDC discovery) は **CF Tunnel を経由せず**、Envoy Gateway VIP に直接当たる。
 
@@ -103,12 +107,12 @@ ${CLUSTER_GATEWAY_IP} auth.b8m.app
 
 ### 依存
 
-- 前提: CNPG `platform-pg-cluster`、External Secrets、Envoy Gateway (`cluster-gateway`)、cert-manager (`*.b8m.app`)
-- これに依存: 全 OIDC 保護アプリ (Grafana、Alertmanager、Hubble UI、Longhorn UI、Prometheus 等)
+- 前提: `br-db1` の PostgreSQL (Ansible `postgresql` role が `zitadel` DB / Role を事前作成)、External Secrets、Envoy Gateway (`cluster-gateway`)、cert-manager (`*.b8m.app`)
+- これに依存: 全 OIDC 保護アプリ (Argo Workflows 等)
 
 ### 運用上の注意
 
-- CNPG の `zitadel` ロール / DB は `platform-pg-cluster` の `bootstrap.initdb` で作成済み。Helm 側の init は **skip 前提** (`initJob.command: zitadel`)。両方走らせると失敗するので注意
+- `br-db1` の `zitadel` ロール / DB は Ansible `postgresql` role が作成済み。Helm 側の init は **skip 前提** (`initJob.command: zitadel`)。両方走らせると失敗するので注意
 - `masterkey` を再生成すると **既存の暗号化セッションが全部死ぬ**。1Password に厳重保管
 
 ---
@@ -126,7 +130,7 @@ Zitadel instance
 │   └─ project: platform
 │       ├─ roles: admin / maintainer / developer / viewer
 │       ├─ project_role_check / has_project_check / project_role_assertion = true
-│       ├─ apps: grafana / argo-workflows / flux-web / alertmanager / hubble / longhorn / prometheus
+│       ├─ apps: argo-workflows / flux-web / hubble
 │       └─ Action: addRolesClaim (フラット roles claim を token/userinfo に注入)
 └─ org: br-apps                         ← 公開アプリ利用者 (TF プロビジョン、登録無効)
     └─ project: <個人アプリごと>
@@ -147,7 +151,7 @@ Zitadel instance
 ### 運用
 
 - ユーザー追加は **br-dev に作成 ＋ platform project の role grant** が必須 (grant 無しは全拒否)。
-- Zitadel ユーザーを作り直すと OIDC `sub` が変わり、sub でユーザーを持つアプリ (Grafana) は再ログインで `User sync failed`。旧 OAuth ユーザーレコードを削除して作り直す。
+- Zitadel ユーザーを作り直すと OIDC `sub` が変わり、sub でユーザーを持つアプリは再ログインで `User sync failed` になり得る。旧 OAuth ユーザーレコードを削除して作り直す。
 - セルフ登録は instance default login policy `allow_register=false` で無効。`zitadel_default_login_policy` は **全フィールド上書き**なので、変更時は live 値 (Admin API `/admin/v1/policies/login`) をミラーし register 以外を変えないこと (MFA 方式・lifetime のリセット事故防止)。
 
 ---
@@ -192,7 +196,7 @@ Zitadel instance
 4. **br-cluster** 側で `referencegrant.yaml` の `from` リストに対象 namespace を追加 (初回だけ)
 5. **br-cloudflare-terraform** 側で `access_applications` map に `<name> = "<name>.b8m.app"` を追加 → CF Access (GitHub Org + WARP) が新ホストに効く
 
-**Native OIDC** (Grafana / Argo / Flux Web) の場合は 3 の `SecurityPolicy` を付けず、アプリ側の OAuth 設定で client 情報と **roles claim → アプリ内 RBAC** のマッピングを行う (Grafana の `role_attribute_path`、Argo の `sso.rbac` ＋ SA、Flux Web の group impersonation。実例: [`manifests/platform/grafana/app/base/values.yaml`](../../manifests/platform/grafana/app/base/values.yaml))。
+**Native OIDC** (Argo / Flux Web) の場合は 3 の `SecurityPolicy` を付けず、アプリ側の OAuth 設定で client 情報と **roles claim → アプリ内 RBAC** のマッピングを行う (Argo の `sso.rbac` ＋ SA、Flux Web の group impersonation。実例: [`manifests/platform/argo-workflows/app/base/values-workflows.yaml`](../../manifests/platform/argo-workflows/app/base/values-workflows.yaml))。
 
 ### 公開アプリ (br-apps) の追加
 
@@ -213,7 +217,6 @@ CF Access で保護しない一般公開アプリで Zitadel SSO を使う場合
 ## 関連
 
 - [`docs/platform/networking.md`](networking.md) — Envoy SecurityPolicy / CoreDNS ショートカット / cluster-gateway
-- [`docs/platform/microservice.md`](microservice.md) — CNPG / `platform-pg-cluster` (Zitadel の DB)
 - [`docs/platform/secrets.md`](secrets.md) — External Secrets / 1Password Connect
 - [`docs/platform/certificate.md`](certificate.md) — `*.b8m.app` 証明書
 - [`docs/architecture.md`](../architecture.md) — 認証 2 層の設計判断

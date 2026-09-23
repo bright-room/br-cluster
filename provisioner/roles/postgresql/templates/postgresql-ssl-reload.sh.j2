@@ -1,0 +1,10 @@
+#!/bin/sh
+# Managed by br-cluster-provisioner (postgresql role). Do not edit manually.
+set -eu
+install -o postgres -g postgres -m 0600 \
+  {{ lets_encrypt.certificate_dir }}/{{ postgresql_tls_domain }}/fullchain.pem \
+  {{ postgresql_ssl_dir }}/server.crt
+install -o postgres -g postgres -m 0600 \
+  {{ lets_encrypt.certificate_dir }}/{{ postgresql_tls_domain }}/privkey.pem \
+  {{ postgresql_ssl_dir }}/server.key
+systemctl reload postgresql@{{ postgresql_version }}-main
