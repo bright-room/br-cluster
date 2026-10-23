@@ -1,4 +1,4 @@
-server: https://{{ k3s_api_vip_domain }}:{{ k3s.cluster.port }}
+server: https://{{ primary_control_node_ip }}:{{ k3s.cluster.port }}
 token-file: {{ k3s.config_dir }}/cluster-token
 node-name: {{ inventory_hostname }}
 node-label:

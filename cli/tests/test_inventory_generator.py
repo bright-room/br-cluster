@@ -21,7 +21,11 @@ class TestGenerateHostsYaml:
         assert "br_cluster" in children
         assert "gateway" in children
         assert "clusters" in children
-        assert "external" in children
+        assert "standalone" in children
+
+    def test_external_group_removed(self, full_inventory: Inventory) -> None:
+        result = generate_hosts_yaml(full_inventory)
+        assert "external" not in result["all"]["children"]
 
     def test_gateway_group(self, full_inventory: Inventory) -> None:
         result = generate_hosts_yaml(full_inventory)
@@ -31,50 +35,64 @@ class TestGenerateHostsYaml:
     def test_primary_group(self, full_inventory: Inventory) -> None:
         result = generate_hosts_yaml(full_inventory)
         primary = result["all"]["children"]["clusters"]["children"]["master"]
-        assert "br-node1" in primary["children"]["primary"]["hosts"]
+        assert "br-cluster1" in primary["children"]["primary"]["hosts"]
 
-    def test_secondary_group(self, full_inventory: Inventory) -> None:
+    def test_secondary_group_is_empty(self, full_inventory: Inventory) -> None:
         result = generate_hosts_yaml(full_inventory)
-        secondary = result["all"]["children"]["clusters"]["children"]["master"]
-        hosts = secondary["children"]["secondary"]["hosts"]
-        assert "br-node2" in hosts
-        assert "br-node3" in hosts
+        master = result["all"]["children"]["clusters"]["children"]["master"]
+        assert master["children"]["secondary"]["hosts"] == {}
 
     def test_worker_group(self, full_inventory: Inventory) -> None:
         result = generate_hosts_yaml(full_inventory)
         workers = result["all"]["children"]["clusters"]["children"]["worker"]
         hosts = workers["hosts"]
-        assert "br-node4" in hosts
-        assert "br-node5" in hosts
-        assert "br-node6" in hosts
+        assert "br-cluster2" in hosts
+        assert "br-cluster3" in hosts
 
-    def test_external_group(self, full_inventory: Inventory) -> None:
+    def test_standalone_group(self, full_inventory: Inventory) -> None:
         result = generate_hosts_yaml(full_inventory)
-        ext_hosts = result["all"]["children"]["external"]["hosts"]
-        assert "br-external1" in ext_hosts
+        hosts = result["all"]["children"]["standalone"]["hosts"]
+        assert "br-db1" in hosts
+        assert "br-storage1" in hosts
+        assert "br-observability1" in hosts
+        assert "br-ai1" in hosts
 
-    def test_br_cluster_contains_all_k8s_members(
-        self, full_inventory: Inventory
-    ) -> None:
+    def test_service_groups_generated(self, full_inventory: Inventory) -> None:
+        children = generate_hosts_yaml(full_inventory)["all"]["children"]
+        assert children["garage"]["hosts"] == {"br-storage1": None}
+        assert children["caddy"]["hosts"] == {"br-storage1": None}
+        assert children["postgresql"]["hosts"] == {"br-db1": None}
+
+    def test_service_group_can_span_hosts(self, full_inventory: Inventory) -> None:
+        children = generate_hosts_yaml(full_inventory)["all"]["children"]
+        assert children["certbot"]["hosts"] == {
+            "br-storage1": None,
+            "br-db1": None,
+        }
+
+    def test_no_group_for_unused_service(self, full_inventory: Inventory) -> None:
+        children = generate_hosts_yaml(full_inventory)["all"]["children"]
+        assert "cloudflared" not in children
+
+    def test_br_cluster_contains_every_server(self, full_inventory: Inventory) -> None:
         result = generate_hosts_yaml(full_inventory)
         cluster = result["all"]["children"]["br_cluster"]["hosts"]
         assert "br-gateway1" in cluster
-        assert "br-external1" in cluster
-        assert "br-node1" in cluster
-        assert "br-node6" in cluster
+        assert "br-db1" in cluster
+        assert "br-ai1" in cluster
+        assert "br-cluster1" in cluster
+        assert "br-cluster3" in cluster
 
     def test_node_without_k8s_role_excluded_from_clusters(self) -> None:
         inv = Inventory(
             environments=["dev"],
             servers=[
-                ServerDefinition(
-                    name="br-standalone", type=ServerType.NODE, k8s_role=None
-                ),
+                ServerDefinition(name="br-orphan", type=ServerType.NODE, k8s_role=None),
             ],
         )
         result = generate_hosts_yaml(inv)
         cluster = result["all"]["children"]["br_cluster"]["hosts"]
-        assert "br-standalone" not in cluster
+        assert "br-orphan" not in cluster
 
 
 class TestGenerateClusterHosts:
@@ -93,23 +111,30 @@ class TestGenerateClusterHosts:
     def test_node_has_only_cluster_interface(self, full_inventory: Inventory) -> None:
         provider = MockSecretProvider()
         result = generate_cluster_hosts(full_inventory, "dev", provider)
-        node = next(h for h in result if h["name"] == "br-node1")
+        node = next(h for h in result if h["name"] == "br-cluster1")
         assert node["interfaces"] == {"cluster": "eth0"}
 
-    def test_gateway_has_dns_ntp_domains(self, full_inventory: Inventory) -> None:
+    def test_every_host_has_only_server_domain(self, full_inventory: Inventory) -> None:
         provider = MockSecretProvider()
         result = generate_cluster_hosts(full_inventory, "dev", provider)
-        gw = next(h for h in result if h["name"] == "br-gateway1")
-        assert "dns" in gw["domains"]
-        assert "ntp" in gw["domains"]
+        for entry in result:
+            assert list(entry["domains"].keys()) == ["server"]
 
-    def test_external_has_object_storage_domain(
+    def test_server_domain_uses_host_domain_ref(
         self, full_inventory: Inventory
     ) -> None:
         provider = MockSecretProvider()
         result = generate_cluster_hosts(full_inventory, "dev", provider)
-        ext = next(h for h in result if h["name"] == "br-external1")
-        assert "object_storage" in ext["domains"]
+        gw = next(h for h in result if h["name"] == "br-gateway1")
+        assert gw["domains"]["server"] == "gateway1.{{ host_domain }}"
+
+    def test_service_domains_are_not_generated(self, full_inventory: Inventory) -> None:
+        provider = MockSecretProvider()
+        result = generate_cluster_hosts(full_inventory, "dev", provider)
+        for entry in result:
+            assert "dns" not in entry["domains"]
+            assert "ntp" not in entry["domains"]
+            assert "object_storage" not in entry["domains"]
 
     def test_uses_secrets_for_ip_and_mac(self, full_inventory: Inventory) -> None:
         provider = MockSecretProvider()
@@ -117,6 +142,19 @@ class TestGenerateClusterHosts:
         gw = next(h for h in result if h["name"] == "br-gateway1")
         assert gw["ip"] == "192.0.2.1"
         assert gw["mac"] == "00:00:5e:00:53:01"
+
+    def test_mock_provider_covers_every_server(self, full_inventory: Inventory) -> None:
+        provider = MockSecretProvider()
+        result = generate_cluster_hosts(full_inventory, "dev", provider)
+        # 192.0.2.99 is the MockSecretProvider fallback for unknown hosts.
+        for entry in result:
+            assert entry["ip"] != "192.0.2.99", entry["name"]
+
+    def test_cluster1_mock_ip(self, full_inventory: Inventory) -> None:
+        provider = MockSecretProvider()
+        result = generate_cluster_hosts(full_inventory, "dev", provider)
+        node = next(h for h in result if h["name"] == "br-cluster1")
+        assert node["ip"] == "192.0.2.100"
 
     def test_no_hostname_field(self, full_inventory: Inventory) -> None:
         provider = MockSecretProvider()
@@ -135,14 +173,15 @@ class TestGenerateGatewayHostVars:
     def test_no_vars_for_non_gateway(self, full_inventory: Inventory) -> None:
         provider = MockSecretProvider()
         result = generate_gateway_host_vars(full_inventory, "dev", provider)
-        assert "br-node1" not in result
+        assert "br-cluster1" not in result
 
 
 class TestWriteInventory:
     def test_creates_all_files(self, full_inventory: Inventory, tmp_path: Path) -> None:
         provider = MockSecretProvider()
         files = write_inventory(full_inventory, "dev", provider, tmp_path)
-        assert len(files) == 3  # hosts.yaml, cluster_hosts.yaml, gateway host_vars
+        # hosts.yaml, cluster_hosts.yaml, cluster_env.yaml, gateway host_vars
+        assert len(files) == 4
         assert (tmp_path / "inventories" / "dev" / "hosts.yaml").exists()
         assert (
             tmp_path
@@ -153,8 +192,22 @@ class TestWriteInventory:
             / "cluster_hosts.yaml"
         ).exists()
         assert (
+            tmp_path / "inventories" / "dev" / "group_vars" / "all" / "cluster_env.yaml"
+        ).exists()
+        assert (
             tmp_path / "inventories" / "dev" / "host_vars" / "br-gateway1.yaml"
         ).exists()
+
+    def test_cluster_env_yaml_contains_env(
+        self, full_inventory: Inventory, tmp_path: Path
+    ) -> None:
+        provider = MockSecretProvider()
+        write_inventory(full_inventory, "dev", provider, tmp_path)
+        content = (
+            tmp_path / "inventories" / "dev" / "group_vars" / "all" / "cluster_env.yaml"
+        ).read_text()
+        parsed = yaml.safe_load(content)
+        assert parsed == {"cluster_env": "dev"}
 
     def test_hosts_yaml_is_valid(
         self, full_inventory: Inventory, tmp_path: Path

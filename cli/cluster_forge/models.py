@@ -8,7 +8,7 @@ from pydantic import BaseModel
 class ServerType(StrEnum):
     GATEWAY = "gateway"
     NODE = "node"
-    EXTERNAL = "external"
+    STANDALONE = "standalone"
 
 
 class K8sRole(StrEnum):
@@ -21,6 +21,7 @@ class ServerDefinition(BaseModel):
     name: str
     type: ServerType
     k8s_role: K8sRole | None = None
+    services: list[str] = []
 
     @property
     def needs_network_config(self) -> bool:

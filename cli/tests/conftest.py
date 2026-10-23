@@ -19,19 +19,23 @@ def gateway_server() -> ServerDefinition:
 @pytest.fixture
 def node_server() -> ServerDefinition:
     return ServerDefinition(
-        name="br-node1", type=ServerType.NODE, k8s_role=K8sRole.PRIMARY
+        name="br-cluster1", type=ServerType.NODE, k8s_role=K8sRole.PRIMARY
     )
 
 
 @pytest.fixture
-def external_server() -> ServerDefinition:
-    return ServerDefinition(name="br-external1", type=ServerType.EXTERNAL)
+def standalone_server() -> ServerDefinition:
+    return ServerDefinition(
+        name="br-storage1",
+        type=ServerType.STANDALONE,
+        services=["garage", "caddy", "certbot"],
+    )
 
 
 @pytest.fixture
 def worker_node_server() -> ServerDefinition:
     return ServerDefinition(
-        name="br-node4", type=ServerType.NODE, k8s_role=K8sRole.WORKER
+        name="br-cluster2", type=ServerType.NODE, k8s_role=K8sRole.WORKER
     )
 
 
@@ -42,9 +46,13 @@ def sample_inventory() -> Inventory:
         servers=[
             ServerDefinition(name="br-gateway1", type=ServerType.GATEWAY),
             ServerDefinition(
-                name="br-node1", type=ServerType.NODE, k8s_role=K8sRole.PRIMARY
+                name="br-cluster1", type=ServerType.NODE, k8s_role=K8sRole.PRIMARY
             ),
-            ServerDefinition(name="br-external1", type=ServerType.EXTERNAL),
+            ServerDefinition(
+                name="br-storage1",
+                type=ServerType.STANDALONE,
+                services=["garage", "caddy", "certbot"],
+            ),
         ],
     )
 
@@ -55,24 +63,26 @@ def full_inventory() -> Inventory:
         environments=["dev", "prod"],
         servers=[
             ServerDefinition(name="br-gateway1", type=ServerType.GATEWAY),
-            ServerDefinition(name="br-external1", type=ServerType.EXTERNAL),
             ServerDefinition(
-                name="br-node1", type=ServerType.NODE, k8s_role=K8sRole.PRIMARY
+                name="br-db1",
+                type=ServerType.STANDALONE,
+                services=["postgresql", "certbot"],
             ),
             ServerDefinition(
-                name="br-node2", type=ServerType.NODE, k8s_role=K8sRole.SECONDARY
+                name="br-storage1",
+                type=ServerType.STANDALONE,
+                services=["garage", "caddy", "certbot"],
+            ),
+            ServerDefinition(name="br-observability1", type=ServerType.STANDALONE),
+            ServerDefinition(name="br-ai1", type=ServerType.STANDALONE),
+            ServerDefinition(
+                name="br-cluster1", type=ServerType.NODE, k8s_role=K8sRole.PRIMARY
             ),
             ServerDefinition(
-                name="br-node3", type=ServerType.NODE, k8s_role=K8sRole.SECONDARY
+                name="br-cluster2", type=ServerType.NODE, k8s_role=K8sRole.WORKER
             ),
             ServerDefinition(
-                name="br-node4", type=ServerType.NODE, k8s_role=K8sRole.WORKER
-            ),
-            ServerDefinition(
-                name="br-node5", type=ServerType.NODE, k8s_role=K8sRole.WORKER
-            ),
-            ServerDefinition(
-                name="br-node6", type=ServerType.NODE, k8s_role=K8sRole.WORKER
+                name="br-cluster3", type=ServerType.NODE, k8s_role=K8sRole.WORKER
             ),
         ],
     )

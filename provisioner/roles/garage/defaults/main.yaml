@@ -1,0 +1,2 @@
+---
+garage_tls_domain: "object-storage.{{ service_domain }}"

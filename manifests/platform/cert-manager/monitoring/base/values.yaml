@@ -1,8 +1,0 @@
----
-# cert-manager helm values (monitoring)
-# Deployed separately to ensure ServiceMonitor CRD exists (kube-prometheus-stack)
-
-prometheus:
-  enabled: true
-  servicemonitor:
-    enabled: true

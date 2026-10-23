@@ -1,0 +1,5 @@
+---
+- name: Restart garage
+  service:
+    name: garage
+    state: restarted

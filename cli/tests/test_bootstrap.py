@@ -29,7 +29,7 @@ def gateway_info() -> ServerSSHInfo:
 @pytest.fixture
 def node_info() -> ServerSSHInfo:
     return ServerSSHInfo(
-        name="br-node1",
+        name="br-cluster1",
         hostname="192.0.2.10",
         username="bradmin",
         public_key="ssh-ed25519 AAAAND node@test",
@@ -40,11 +40,11 @@ def node_info() -> ServerSSHInfo:
 @pytest.fixture
 def external_info() -> ServerSSHInfo:
     return ServerSSHInfo(
-        name="br-external1",
+        name="br-storage1",
         hostname="192.0.2.16",
         username="bradmin",
         public_key="ssh-ed25519 AAAAEX external@test",
-        server_type=ServerType.EXTERNAL,
+        server_type=ServerType.STANDALONE,
     )
 
 
@@ -77,9 +77,9 @@ class TestWriteSSHKeys:
     ) -> None:
         keys_dir = tmp_path / "keys"
         keys_dir.mkdir()
-        (keys_dir / "br-node1.pub").write_text("old-key\n")
+        (keys_dir / "br-cluster1.pub").write_text("old-key\n")
         write_ssh_keys(tmp_path, [node_info])
-        assert (keys_dir / "br-node1.pub").read_text() == node_info.public_key + "\n"
+        assert (keys_dir / "br-cluster1.pub").read_text() == node_info.public_key + "\n"
 
 
 class TestGenerateSSHConfig:
@@ -89,8 +89,8 @@ class TestGenerateSSHConfig:
         generate_ssh_config(tmp_path, all_infos)
         config = (tmp_path / "config").read_text()
         assert "Host br-gateway1" in config
-        assert "Host br-node1" in config
-        assert "Host br-external1" in config
+        assert "Host br-cluster1" in config
+        assert "Host br-storage1" in config
 
     def test_gateway_has_no_proxy_jump(
         self, tmp_path: Path, all_infos: list[ServerSSHInfo]
@@ -108,7 +108,7 @@ class TestGenerateSSHConfig:
         generate_ssh_config(tmp_path, all_infos)
         config = (tmp_path / "config").read_text()
         blocks = config.split("Host ")
-        node_block = next(b for b in blocks if b.startswith("br-node1"))
+        node_block = next(b for b in blocks if b.startswith("br-cluster1"))
         assert "ProxyJump br-gateway1" in node_block
 
     def test_gateway_uses_correct_ip(
@@ -124,7 +124,7 @@ class TestGenerateSSHConfig:
         generate_ssh_config(tmp_path, all_infos)
         config = (tmp_path / "config").read_text()
         gw_pos = config.index("Host br-gateway1")
-        node_pos = config.index("Host br-node1")
+        node_pos = config.index("Host br-cluster1")
         assert gw_pos < node_pos
 
     def test_includes_header(self, tmp_path: Path, gateway_info: ServerSSHInfo) -> None:
@@ -138,7 +138,7 @@ class TestGenerateSSHConfig:
     ) -> None:
         generate_ssh_config(tmp_path, [gateway_info, node_info])
         config = (tmp_path / "config").read_text()
-        assert "IdentityFile /root/.ssh/keys/br-node1.pub" in config
+        assert "IdentityFile /root/.ssh/keys/br-cluster1.pub" in config
 
 
 class TestFetchServerSSHInfo:
@@ -163,12 +163,12 @@ class TestFetchServerSSHInfo:
     def test_fetches_node_with_internal_ip(self) -> None:
         client = MagicMock(spec=ConnectClient)
         client.get_field.side_effect = lambda vault, item, field, *, section=None: {
-            ("vault", "br-node1", "ip_address", None): "192.0.2.10",
-            ("vault", "br-node1", "username", None): "bradmin",
-            ("vault", "br-node1_ssh", "public key", None): "ssh-ed25519 AAAA",
+            ("vault", "br-cluster1", "ip_address", None): "192.0.2.10",
+            ("vault", "br-cluster1", "username", None): "bradmin",
+            ("vault", "br-cluster1_ssh", "public key", None): "ssh-ed25519 AAAA",
         }[(vault, item, field, section)]
 
-        server = ServerDefinition(name="br-node1", type=ServerType.NODE)
+        server = ServerDefinition(name="br-cluster1", type=ServerType.NODE)
         info = fetch_server_ssh_info(client, "vault", server)
         assert info.hostname == "192.0.2.10"
         assert info.server_type == ServerType.NODE

@@ -4,10 +4,8 @@ import subprocess
 
 PLAYBOOK_COMMANDS = {
     "setup-gateway": "playbooks/setup_gateway.yaml",
-    "setup-external": "playbooks/setup_external.yaml",
+    "setup-standalone": "playbooks/setup_standalone.yaml",
     "setup-node": "playbooks/setup_node.yaml",
-    "setup-monitoring-agent": "playbooks/setup_monitoring_agent.yaml",
-    "setup-k3s-leader-restart": "playbooks/setup_k3s_leader_restart.yaml",
     "bootstrap-cluster": "playbooks/bootstrap_cluster.yaml",
     "k3s-start": "playbooks/k3s_start.yaml",
     "k3s-stop": "playbooks/k3s_stop.yaml",

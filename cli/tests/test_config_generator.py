@@ -69,23 +69,22 @@ class TestRenderUserData:
         assert "test-root-password" not in result
         assert "$6$" in result
 
-    def test_external_disables_root_autoexpand(
-        self, external_server: ServerDefinition
+    def test_standalone_disables_root_autoexpand(
+        self, standalone_server: ServerDefinition
     ) -> None:
-        secrets = MockSecretProvider().get_server_secrets("dev", external_server.name)
-        result = render_user_data(external_server, secrets)
+        secrets = MockSecretProvider().get_server_secrets("dev", standalone_server.name)
+        result = render_user_data(standalone_server, secrets)
         assert "mode: off" in result
         assert "resize_rootfs: false" in result
 
-    def test_worker_node_disables_root_autoexpand(
+    def test_worker_node_keeps_root_autoexpand(
         self, worker_node_server: ServerDefinition
     ) -> None:
         secrets = MockSecretProvider().get_server_secrets(
             "dev", worker_node_server.name
         )
         result = render_user_data(worker_node_server, secrets)
-        assert "mode: off" in result
-        assert "resize_rootfs: false" in result
+        assert "resize_rootfs" not in result
 
     def test_primary_node_keeps_root_autoexpand(
         self, node_server: ServerDefinition
@@ -157,7 +156,7 @@ class TestGenerateConfig:
         tmp_output: Path,
     ) -> None:
         generate_config(node_server, "dev", mock_provider, tmp_output)
-        assert (tmp_output / "dev" / "br-node1" / "user-data").exists()
+        assert (tmp_output / "dev" / "br-cluster1" / "user-data").exists()
 
     def test_user_data_is_valid_yaml(
         self,
@@ -166,7 +165,7 @@ class TestGenerateConfig:
         tmp_output: Path,
     ) -> None:
         generate_config(node_server, "dev", mock_provider, tmp_output)
-        content = (tmp_output / "dev" / "br-node1" / "user-data").read_text()
+        content = (tmp_output / "dev" / "br-cluster1" / "user-data").read_text()
         parsed = yaml.safe_load(content)
-        assert parsed["hostname"] == "br-node1"
+        assert parsed["hostname"] == "br-cluster1"
         assert parsed["timezone"] == "JST"

@@ -40,18 +40,50 @@ controller:
       podGC:
         strategy: OnWorkflowSuccess
       activeDeadlineSeconds: 7200
+      # Argo Events の Sensor を撤去したため、全 Workflow への Discord 通知は
+      # workflowDefaults の exit hook で一括適用する。
+      # spec.onExit は同一 Workflow 内の template 名しか取れず WorkflowTemplate を
+      # 参照できないため、LifecycleHook (spec.hooks) の templateRef を使う。
+      # Sensor が EventSource のペイロードから埋めていた 7 パラメータは、
+      # ここでは Argo の workflow 変数から埋める。
+      hooks:
+        exit:
+          expression: "true"
+          templateRef:
+            name: notify-discord
+            template: post
+          arguments:
+            parameters:
+              - name: workflow-name
+                value: "{{workflow.name}}"
+              - name: workflow-namespace
+                value: "{{workflow.namespace}}"
+              - name: phase
+                value: "{{workflow.status}}"
+              - name: started-at
+                value: "{{workflow.creationTimestamp}}"
+              - name: finished-at
+                value: "{{workflow.duration}}"
+              - name: progress
+                value: "{{workflow.parameters}}"
+              - name: message
+                value: "{{workflow.failures}}"
 
-  # Workflow 履歴は etcd ではなく platform-pg (CNPG) に逃がす。
+  # Workflow 履歴は etcd ではなく br-db1 の PostgreSQL に逃がす。
   # ttlStrategy で k8s 上の Workflow CR は短命にする一方、archive 経由で
   # UI から長期履歴を参照できる。
   persistence:
     archive: true
     archiveTTL: 30d
     postgresql:
-      host: platform-pg-rw.platform-pg.svc.cluster.local
+      host: rdbms.prod.internal-service.bright-room.net
       port: 5432
       database: argo_workflows
       tableName: argo_workflows
+      # br-db1 の pg_hba.conf は hostssl のみ許可。driver default (prefer) でも
+      # 実際は TLS で繋がるが、Zitadel (SSL.Mode: require) と揃えて明示する。
+      ssl: true
+      sslMode: require
       userNameSecret:
         name: argo-workflows-archive-db
         key: username
@@ -60,12 +92,12 @@ controller:
         key: password
 
 # Workflow 内で生成した artifact / log を Garage S3 に逃がす。
-# Loki / Tempo と同じバックエンドだが user / bucket は分離 (proposal §採用表)。
+# Loki / Tempo は撤去済みで、argo-workflows がこのバケットの唯一の利用者。
 artifactRepository:
   archiveLogs: true
   s3:
     bucket: argo-workflows
-    endpoint: object-storage.cluster-internal.bright-room.net:3900
+    endpoint: object-storage.prod.internal-service.bright-room.net:3900
     region: ap-northeast-1
     insecure: false
     keyFormat: "{{workflow.namespace}}/{{workflow.name}}/{{pod.name}}"

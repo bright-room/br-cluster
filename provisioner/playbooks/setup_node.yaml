@@ -35,8 +35,8 @@
       role: k3s
       tags: [k3s]
 
-# Play 2: Bootstrap CNI, CoreDNS, and kube-vip on primary master
-- name: Bootstrap cluster networking
+# Play 2: Bootstrap CNI and CoreDNS on the control-plane node
+- name: Bootstrap CNI and CoreDNS on primary master
   hosts: primary
   gather_facts: true
   become: true
@@ -63,7 +63,6 @@
       loop:
         - cilium
         - coredns
-        - kube-vip
 
   roles:
     - role: bootstrap/cilium
@@ -78,12 +77,6 @@
       vars:
         coredns_values_base: /tmp/bootstrap-manifests/platform/coredns/app/base/values.yaml
         coredns_values_overlay: /tmp/bootstrap-manifests/platform/coredns/app/overlays/prod/values.yaml
-
-    - role: bootstrap/kube_vip
-      tags: [kube-vip]
-      vars:
-        kube_vip_values_base: /tmp/bootstrap-manifests/platform/kube-vip/app/base/values.yaml
-        kube_vip_values_overlay: /tmp/bootstrap-manifests/platform/kube-vip/app/overlays/prod/values.yaml
 
 # Play 3: Install k3s on worker nodes
 - name: Configure worker nodes

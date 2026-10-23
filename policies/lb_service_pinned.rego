@@ -7,7 +7,7 @@ import data.lib.k8s
 
 # LoadBalancer Service は Cilium LB-IPAM の自動採番に頼らず、
 # `lb-ipam.cilium.io/ips` annotation で IP を固定する。
-# 自動採番に流すと DNS / nftables / kube-vip と不整合になる
+# 自動採番に流すと DNS / nftables / Cilium L2 Announcement と不整合になる
 # (docs/network.md "LB IP の払い出し方式" 参照)。
 deny contains msg if {
 	some s in k8s.of_kind("Service")

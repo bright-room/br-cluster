@@ -1,0 +1,23 @@
+{% set host = cluster_hosts | selectattr('name', 'equalto', 'br-storage1') | first %}
+metadata_dir = "{{ garage.meta_dir }}"
+data_dir = "{{ garage.data_dir }}"
+db_engine = "lmdb"
+
+replication_factor = 1
+consistency_mode = "consistent"
+
+rpc_bind_addr = "[::]:{{ garage.server.rpc_port }}"
+rpc_public_addr = "{{ host.ip }}:{{ garage.server.rpc_port }}"
+rpc_secret = "{{ secrets_garage_rpc_secret }}"
+
+[s3_api]
+s3_region = "{{ garage.provisioning.region }}"
+api_bind_addr = "127.0.0.1:{{ garage.server.s3_port }}"
+root_domain = ".s3.{{ garage_tls_domain }}"
+
+[s3_web]
+bind_addr = "127.0.0.1:{{ garage.server.web_port }}"
+root_domain = ".web.{{ garage_tls_domain }}"
+
+[admin]
+api_bind_addr = "127.0.0.1:{{ garage.server.admin_port }}"

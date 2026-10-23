@@ -1,0 +1,6 @@
+---
+postgresql_databases:
+  - name: zitadel
+    owner: zitadel
+  - name: argo_workflows
+    owner: argo_workflows

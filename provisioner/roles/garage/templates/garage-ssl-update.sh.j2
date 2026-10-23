@@ -1,0 +1,6 @@
+#!/bin/bash
+cp {{ lets_encrypt.certificate_dir }}/{{ garage_tls_domain }}/fullchain.pem {{ garage.ssl_dir }}/public.crt
+cp {{ lets_encrypt.certificate_dir }}/{{ garage_tls_domain }}/privkey.pem {{ garage.ssl_dir }}/private.key
+chown {{ garage.operator.user }}:{{ garage.operator.group }} {{ garage.ssl_dir }}/public.crt {{ garage.ssl_dir }}/private.key
+chmod 0640 {{ garage.ssl_dir }}/public.crt {{ garage.ssl_dir }}/private.key
+systemctl reload caddy

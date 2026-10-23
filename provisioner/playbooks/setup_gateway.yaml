@@ -22,6 +22,7 @@
       vars:
         required_secrets:
           - discord_webhook
+          - cloudflared_br_infra
       tags: [always]
 
     - name: Common system configuration

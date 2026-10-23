@@ -9,25 +9,26 @@
 | 項目                    | 値 |
 |-------------------------|----|
 | ディストリビューション  | k3s `v1.35.3+k3s1` ([`versions.yaml`](../provisioner/inventories/base/group_vars/all/versions.yaml)) |
-| Control Plane           | 3 台 (`br-node1` primary / `br-node2` / `br-node3`)、組込み etcd クォーラム |
-| Worker                  | 3 台 (`br-node4-6`) |
-| API VIP                 | `172.22.10.60` を kube-vip DaemonSet が ARP announce (node1-3 上) |
+| Control Plane           | 1 台 (`br-cluster1`)、datastore は **SQLite** (embedded etcd は撤去) |
+| Worker                  | 2 台 (`br-cluster2` / `br-cluster3`) |
+| API エンドポイント      | `br-cluster1` 実 IP `172.22.52.100` (VIP なし) |
 | Pod CIDR                | `10.42.0.0/16` (Cilium IPAM cluster-pool) |
 | Service CIDR            | `10.43.0.0/16` (k3s デフォルト) |
 | CoreDNS ClusterIP       | `10.43.0.10` |
+
+control-plane を 1 台に縮小したのは、Raspberry Pi 上で 3 台分の control-plane リソースを維持するコストが homelab の規模に見合わないため。可用性の向上は目的とせず、`br-cluster1` の再起動・故障がクラスタ全停止に直結することを受け入れる選択をしている ([ダウンタイム特性とバックアップ方針](proposals/2026-09-05-single-cp-rearch.md#ダウンタイム特性とバックアップ方針))。**クラスタ状態のバックアップは取らない** — SQLite には etcd snapshot に相当する機構がなく、Flux による GitOps と「PVC は ephemeral」という前提のもと、`br-cluster1` が死んだ場合は再フラッシュして Flux に再構築させるのが復旧手順になる。
 
 ### ノード別 k3s 役割
 
 物理ホストの一覧は [`docs/hardware.md`](hardware.md#ノード一覧)。ここでは k3s レイヤの役割のみ示す。
 
-| ホスト         | k3s role  | 起動方法                          | etcd メンバー | 主な責務 |
-|----------------|-----------|-----------------------------------|---------------|----------|
-| `br-node1`     | primary   | `k3s server` (クラスタ起動モード) | ✅            | ブートストラップ元 (Cilium / CoreDNS / kube-vip / Flux を適用) |
-| `br-node2`     | secondary | `k3s server` (既存クラスタトークン) | ✅          | control-plane HA |
-| `br-node3`     | secondary | `k3s server` (既存クラスタトークン) | ✅          | control-plane HA |
-| `br-node4-6`   | worker    | `k3s agent`                        | —             | ワークロード Pod、Longhorn レプリカ |
+| ホスト         | k3s role  | 起動方法                          | 主な責務 |
+|----------------|-----------|-----------------------------------|----------|
+| `br-cluster1`  | primary   | `k3s server` (クラスタ起動モード) | ブートストラップ元 (Cilium / CoreDNS / Flux を適用)。control-plane taint 維持 (スケジュール不可) |
+| `br-cluster2`  | worker    | `k3s agent`                        | ワークロード Pod |
+| `br-cluster3`  | worker    | `k3s agent`                        | ワークロード Pod |
 
-API VIP `172.22.10.60` は kube-vip DaemonSet が node1-3 上で ARP announce する。Worker ノードのデータ領域マウント (`/var/lib/longhorn`) は物理レイヤの責務なので [`docs/hardware.md#ディスクレイアウト`](hardware.md#ディスクレイアウト) を参照。
+control-plane の taint (`node-role.kubernetes.io/control-plane:NoSchedule`) は維持する。control-plane が 1 台になるとワークロードとのリソース競合の影響がクラスタ全体に及ぶため。Cilium / CoreDNS には既に toleration がある。
 
 ## k3s で無効化している組込みコンポーネント
 
@@ -41,18 +42,20 @@ API VIP `172.22.10.60` は kube-vip DaemonSet が node1-3 上で ARP announce �
 | `disable-helm-controller`| Flux の HelmRelease               |
 | `servicelb`              | Cilium LB-IPAM + L2 Announcement  |
 | `traefik`                | Envoy Gateway                     |
+| `local-storage`          | (現状維持。Longhorn 撤去後も PVC 利用者はゼロ) |
 
 ## ブートストラップ順序
 
-Flux が動く前に、**primary ノード上で Helm を直接叩いて 3 つだけ先入れ**する ([`provisioner/playbooks/setup_node.yaml`](../provisioner/playbooks/setup_node.yaml) Play 2)。
+Flux が動く前に、**primary ノード上で Helm を直接叩いて 2 つだけ先入れ**する ([`provisioner/playbooks/setup_node.yaml`](../provisioner/playbooks/setup_node.yaml) Play 2)。
 
 | 順 | コンポーネント | これが無いと起きる問題 |
 |----|----------------|------------------------|
-| 1  | **Cilium**     | Pod ネットワークが開通せず secondary control-plane も上がれない |
+| 1  | **Cilium**     | Pod ネットワークが開通せず何も動かない |
 | 2  | **CoreDNS**    | `*.svc.cluster.local` が引けず Helm install が止まる |
-| 3  | **kube-vip**   | API VIP が announce されず secondary が `:6443` で参加できない |
 
-values は `manifests/platform/{cilium,coredns,kube-vip}/app/{base,overlays/prod}/` の同じものを Helm CLI で apply。以降、Flux が同一 values を `HelmRelease` として再宣言するため差分は発生しない。
+kube-vip は API VIP と Service LB の ARP 広告を担っていたが、control-plane が 1 台になり API VIP 自体が不要になったため撤去した。Service LB の ARP 広告は Cilium L2 Announcement 単独で担う ([`platform/networking.md`](platform/networking.md#arp-広告))。
+
+values は `manifests/platform/{cilium,coredns}/app/{base,overlays/prod}/` の同じものを Helm CLI で apply。以降、Flux が同一 values を `HelmRelease` として再宣言するため差分は発生しない。
 
 その後 [`bootstrap_cluster.yaml`](../provisioner/playbooks/bootstrap_cluster.yaml) が:
 
@@ -69,13 +72,11 @@ values は `manifests/platform/{cilium,coredns,kube-vip}/app/{base,overlays/prod
 | 変数                            | 値 |
 |---------------------------------|----|
 | `CLUSTER_DOMAIN`                | `b8m.app` |
-| `CLUSTER_INTERNAL_DOMAIN`       | `cluster-internal.bright-room.net` |
-| `KUBE_VIP_ADDRESS`              | `172.22.10.60` |
-| `CLUSTER_GATEWAY_IP`            | `172.22.10.70` |
-| `INTERNAL_CLUSTER_GATEWAY_IP`   | `172.22.10.71` |
-| `COREDNS_ETCD_URL`              | `http://172.22.10.1:2379` |
+| `CLUSTER_GATEWAY_IP`            | `172.22.52.200` |
 | `TRUSTED_INTERNAL_POD_CIDR`     | `10.42.0.0/16` |
 | `CLOUDFLARED_TUNNEL_ID` / `_CNAME` | Cloudflare Tunnel 識別子 |
+
+`CLUSTER_INTERNAL_DOMAIN` / `KUBE_VIP_ADDRESS` / `INTERNAL_CLUSTER_GATEWAY_IP` / `COREDNS_ETCD_URL` は kube-vip / internal-gateway / external-dns-coredns の撤去に伴い廃止。内部 DNS のゾーン設計は [`docs/network.md`](network.md) を参照。
 
 ## プラットフォームコンポーネント (グループ別)
 
@@ -83,14 +84,15 @@ values は `manifests/platform/{cilium,coredns,kube-vip}/app/{base,overlays/prod
 
 | グループ | 含まれるリソース | doc |
 |---|---|---|
-| Networking             | Cilium / CoreDNS / kube-vip / Envoy Gateway / cloudflared / external-dns-cloudflare / external-dns-coredns | [`platform/networking.md`](platform/networking.md) |
+| Networking             | Cilium / CoreDNS / Envoy Gateway / cloudflared / external-dns-cloudflare | [`platform/networking.md`](platform/networking.md) |
 | Identity               | Zitadel / zitadel-terraform-app | [`platform/identity.md`](platform/identity.md) |
 | Certificate Management | cert-manager | [`platform/certificate.md`](platform/certificate.md) |
-| MicroService           | CloudNativePG / platform-pg-cluster | [`platform/microservice.md`](platform/microservice.md) |
 | Secrets                | 1Password Connect / External Secrets Operator | [`platform/secrets.md`](platform/secrets.md) |
-| Storage                | Longhorn / csi-external-snapshotter | [`platform/storage.md`](platform/storage.md) |
-| Observability          | kube-prometheus-stack / Grafana / Loki / Tempo / OpenTelemetry Collector / Alloy×3 / hubble-flow-exporter / metrics-server | [`platform/observability.md`](platform/observability.md) |
 | GitOps                 | Flux Operator / Flux CD | [`platform/gitops.md`](platform/gitops.md) |
+| Workflow Automation    | Argo Workflows | [`platform/workflows.md`](platform/workflows.md) |
+| Policy as Code         | Conftest + Rego (`policies/`) | [`platform/policy.md`](platform/policy.md) |
+
+`metrics-server` / `system-upgrade-controller` は単機能コンポーネントのため専用の `platform/*.md` を持たない。`system-upgrade-controller` は [`runbooks/k3s-upgrade.md`](runbooks/k3s-upgrade.md) を参照。
 
 ## 関連
 

@@ -6,4 +6,4 @@ metadata:
   namespace: kube-system
 spec:
   blocks:
-    - cidr: 172.22.10.64/26
+    - cidr: 172.22.52.192/26

@@ -162,7 +162,7 @@ spec:
 
 - 前提 (`onepassword-backend`): 1Password Connect が動いている
 - 前提 (`kubernetes-backend`): RBAC が `zitadel` namespace で許可されている (現状 `remoteNamespace: zitadel` 固定)
-- これに依存: 全 namespace の `ExternalSecret` 利用者 (cert-manager / cloudflared / Zitadel / CNPG / Loki / Tempo …)
+- これに依存: 全 namespace の `ExternalSecret` 利用者 (cert-manager / cloudflared / Zitadel / Argo Workflows …)
 
 ### 運用上の注意
 
