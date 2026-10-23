@@ -7,18 +7,23 @@ metadata:
 spec:
   concurrency: 1
   cordon: true
-  # Phase 1a: テスト worker 1 台 (br-node5) にのみ適用。
-  # 他 worker / control-plane への影響を遮断した状態で動作確認する。
-  # Phase 1b で control-plane 除外の本番 selector に解放する想定
+  # Phase 1b: worker (control-plane label を持たない全ノード = br-node4/5/6) を
+  # 対象に本番解放。prepare で server-plan の完了を待ってから更新するため、
+  # CP が全台 1.36 になった後に worker が上がる (kubelet > apiserver の skew 回避)
   # (docs/proposals/k3s-upgrade.md 参照)。
   nodeSelector:
     matchExpressions:
-      - { key: kubernetes.io/hostname, operator: In, values: ["br-node5"] }
+      - { key: node-role.kubernetes.io/control-plane, operator: DoesNotExist }
   serviceAccountName: system-upgrade
   # renovate: datasource=github-releases depName=k3s-io/k3s versioning=loose
-  version: "v1.35.3+k3s1"
+  version: "v1.36.1+k3s1"
   prepare:
     image: rancher/k3s-upgrade
     args: [prepare, server-plan]
   upgrade:
     image: rancher/k3s-upgrade
+  window:
+    days: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
+    startTime: "02:00"
+    endTime: "05:00"
+    timeZone: "Asia/Tokyo"

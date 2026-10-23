@@ -7,16 +7,20 @@ metadata:
 spec:
   concurrency: 1
   cordon: true
-  # Phase 1a: テスト worker 限定 nodeSelector で導入。
-  # br-node5 は worker のため control-plane label と一致せず、
-  # server-plan は実質 no-op (Job 生成されない) 状態で manifest 流入と
-  # controller 認識のみを確認する。Phase 1b で本番 selector に解放する
-  # 想定 (docs/proposals/k3s-upgrade.md 参照)。
+  # Phase 1b: control-plane (br-node1/2/3) を対象に本番解放。
+  # concurrency=1 で 1 台ずつ更新し etcd quorum を維持する。
+  # agent-plan は prepare で本 plan の完了を待つため CP→worker の順になる
+  # (docs/proposals/k3s-upgrade.md 参照)。
   nodeSelector:
     matchExpressions:
-      - { key: kubernetes.io/hostname, operator: In, values: ["br-node5"] }
+      - { key: node-role.kubernetes.io/control-plane, operator: In, values: ["true"] }
   serviceAccountName: system-upgrade
   # renovate: datasource=github-releases depName=k3s-io/k3s versioning=loose
-  version: "v1.35.3+k3s1"
+  version: "v1.36.1+k3s1"
   upgrade:
     image: rancher/k3s-upgrade
+  window:
+    days: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
+    startTime: "02:00"
+    endTime: "05:00"
+    timeZone: "Asia/Tokyo"
