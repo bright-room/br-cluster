@@ -24,7 +24,7 @@ RUN curl -LO "https://get.helm.sh/helm-v4.1.3-linux-${TARGETARCH}.tar.gz" && \
     tar -xzf helm-v4.1.3-linux-${TARGETARCH}.tar.gz && \
     install -o root -g root -m 0755 linux-${TARGETARCH}/helm /usr/local/bin/helm
 
-FROM python:3.14.5-slim-bookworm@sha256:a9bee15510a364124aa24692899d269835683b883de42f7ebec8c293cf679ccb
+FROM python:3.15.2-slim-bookworm@sha256:96599df822d0e1c6bb700014a05c7f3c8cabc6e0f7ff3c4f9f69cee033b4b5d9
 
 COPY --from=builder /usr/bin/op /usr/bin/
 COPY --from=builder /usr/local/bin/kubectl /usr/local/bin/
